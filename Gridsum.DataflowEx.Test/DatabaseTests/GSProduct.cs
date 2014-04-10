@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Gridsum.DataflowEx.Database;
-
-namespace Gridsum.DataflowEx.Test
+﻿namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
     class GSProduct
     {

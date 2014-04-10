@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Gridsum.DataflowEx.Database;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Gridsum.DataflowEx.Test
+namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
     /// <summary>
     /// 选择WD与CD两种产品进行测试。各个属性的测试目的如下：

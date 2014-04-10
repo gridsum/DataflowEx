@@ -2,12 +2,10 @@
 using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks.Dataflow;
 using Gridsum.DataflowEx.Database;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Gridsum.DataflowEx.Test
+namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
     public class A
     {
