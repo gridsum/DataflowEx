@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{770147
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gridsum.DataflowEx.Test", "Gridsum.DataflowEx.Test\Gridsum.DataflowEx.Test.csproj", "{E5089AD2-0BE8-48E8-B361-A4C38B016C76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{A4FD6288-AE2E-4C28-B7D4-D317D1601E86}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A4FD6288-AE2E-4C28-B7D4-D317D1601E86}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A4FD6288-AE2E-4C28-B7D4-D317D1601E86}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5089AD2-0BE8-48E8-B361-A4C38B016C76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5089AD2-0BE8-48E8-B361-A4C38B016C76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5089AD2-0BE8-48E8-B361-A4C38B016C76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5089AD2-0BE8-48E8-B361-A4C38B016C76}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
