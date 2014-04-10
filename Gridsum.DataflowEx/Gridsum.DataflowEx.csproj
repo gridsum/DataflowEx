@@ -55,7 +55,6 @@
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
     <Compile Include="Database\BulkDataReader.cs" />
-    <Compile Include="Database\DestLabel.cs" />
     <Compile Include="Database\DBColumnMapping.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Database\DbBulkInserter.cs" />

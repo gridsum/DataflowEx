@@ -26,7 +26,7 @@ namespace Gridsum.DataflowEx.Database
         /// 1、标记ValueType与String类型，表明将与数据库表的字段名为PropertyInfo.Name的匹配。
         /// </summary>
         /// <param name="destLabel">产品名称</param>
-        public DBColumnMapping(DestLabel destLabel)
+        public DBColumnMapping(string destLabel)
             : this(destLabel, -1, null, null, null)
         {
         }
@@ -39,7 +39,7 @@ namespace Gridsum.DataflowEx.Database
         /// <param name="destColumnOffset">将要匹配的数据库表的列位置</param>
         /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
         /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
-        public DBColumnMapping(DestLabel destLabel, int destColumnOffset, object defaultValue = null, string destTableName = null) : this(destLabel, destColumnOffset, null, destTableName, defaultValue) { }
+        public DBColumnMapping(string destLabel, int destColumnOffset, object defaultValue = null, string destTableName = null) : this(destLabel, destColumnOffset, null, destTableName, defaultValue) { }
 
         /// <summary>
         /// 用途：
@@ -49,13 +49,13 @@ namespace Gridsum.DataflowEx.Database
         /// <param name="destColumnName">将要匹配的数据库表的列名称</param>
         /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
         /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
-        public DBColumnMapping(DestLabel destLabel, string destColumnName, object defaultValue = null, string destTableName = null)
+        public DBColumnMapping(string destLabel, string destColumnName, object defaultValue = null, string destTableName = null)
             : this(destLabel, -1, destColumnName, destTableName, defaultValue)
         {
         }
 
 
-        protected DBColumnMapping(DestLabel destLabel, int destColumnOffset, string destColumnName, string destTableName, object defaultValue = null)
+        protected DBColumnMapping(string destLabel, int destColumnOffset, string destColumnName, string destTableName, object defaultValue = null)
             : base()
         {
             DestLabel = destLabel;
@@ -68,7 +68,7 @@ namespace Gridsum.DataflowEx.Database
         /// <summary>
         /// 产品类型
         /// </summary>
-        public DestLabel DestLabel { get; private set; }
+        public string DestLabel { get; private set; }
 
         /// <summary>
         /// 数据库对应的表名称，默认为空

@@ -22,7 +22,7 @@ namespace Gridsum.DataflowEx.Database
         private Task m_dispatchTask;
         private Func<int, Lazy<DbBulkInserter<T>>> m_initer;
 
-        public MultiDbBulkInserter(BlockContainerOptions options, Func<T, int> dispatchFunc, Func<int, string> connectionGetter, string destTable, DestLabel destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null)
+        public MultiDbBulkInserter(BlockContainerOptions options, Func<T, int> dispatchFunc, Func<int, string> connectionGetter, string destTable, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null)
             : base(options)
         {
             m_options = options;

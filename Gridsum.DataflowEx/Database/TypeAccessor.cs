@@ -11,11 +11,11 @@ namespace Gridsum.DataflowEx
 {
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly Dictionary<DestLabel, TypeAccessor<T>> m_accessors;
+        private static readonly Dictionary<string, TypeAccessor<T>> m_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new Dictionary<DestLabel, TypeAccessor<T>>();
+            m_accessors = new Dictionary<string, TypeAccessor<T>>();
         }
 
         private TypeAccessorManager()
@@ -30,7 +30,7 @@ namespace Gridsum.DataflowEx
         /// <param name="connectionString"></param>
         /// <param name="dataTableName"></param>
         /// <returns></returns>
-        public static TypeAccessor<T> GetAccessorByDestLabel(DestLabel destLabel, string connectionString,
+        public static TypeAccessor<T> GetAccessorByDestLabel(string destLabel, string connectionString,
             string dataTableName)
         {
             lock (m_accessors)
@@ -51,14 +51,14 @@ namespace Gridsum.DataflowEx
         private readonly string m_connectionString;
         private readonly IList<DBColumnMapping> m_dbColumnMappings;
         private readonly string m_destinationTablename;
-        private readonly DestLabel m_destLabel;
+        private readonly string m_destLabel;
         private readonly Dictionary<int, Func<T, dynamic>> m_properties;
 
         private DataTable m_schemaTable;
 
         #region ctor and init
 
-        public TypeAccessor(DestLabel destLabel, string connectionString, string destinationTableName)
+        public TypeAccessor(string destLabel, string connectionString, string destinationTableName)
         {
             m_destLabel = destLabel;
             m_connectionString = connectionString;
@@ -277,9 +277,9 @@ namespace Gridsum.DataflowEx
                     if (prop.PropertyType.IsValueType || prop.PropertyType == stringType)
                     {
                         var attrs = (DBColumnMapping[]) prop.GetCustomAttributes(typeof (DBColumnMapping), true);
-                        bool has = attrs.Any(attr => attr.DestLabel.HasFlag(m_destLabel));
+                        bool has = attrs.Any(attr => attr.DestLabel == m_destLabel);
                         if (has == false) continue;
-                        hasMapping = has;
+                        hasMapping = true;
                         break;
                     }
                     //reference type
@@ -376,7 +376,7 @@ namespace Gridsum.DataflowEx
                         (DBColumnMapping[])
                             valueTypeMapping.CurrentPropertyInfo.GetCustomAttributes(typeof (DBColumnMapping), true);
 
-                    DBColumnMapping[] destAttrs = attrs.Where(attr => attr.DestLabel.HasFlag(m_destLabel)).ToArray();
+                    DBColumnMapping[] destAttrs = attrs.Where(attr => attr.DestLabel == m_destLabel).ToArray();
 
                     DBColumnMapping[] selectedAttrs =
                         destAttrs.Where(attr => attr.IsTableNameMatch(m_destinationTablename)).ToArray();
@@ -590,7 +590,7 @@ namespace Gridsum.DataflowEx
 
         #region instance public properties, methods
 
-        public DestLabel CurrentDestLabel
+        public string CurrentDestLabel
         {
             get { return m_destLabel; }
         }
