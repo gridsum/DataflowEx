@@ -54,14 +54,17 @@
     <Compile Include="BlockContainerBase.cs" />
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
+    <Compile Include="BlockContainerUtils.cs" />
     <Compile Include="Database\BulkDataReader.cs" />
     <Compile Include="Database\DBColumnMapping.cs" />
+    <Compile Include="IntHolder.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Database\DbBulkInserter.cs" />
     <Compile Include="IBlockContainer.cs" />
     <Compile Include="Database\MultiDbBulkInserter.cs" />
     <Compile Include="OtherBlockContainerFailedException.cs" />
     <Compile Include="PostToInputBlockFailedException.cs" />
+    <Compile Include="PropagatorBlockContainer.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Database\TypeAccessor.cs" />

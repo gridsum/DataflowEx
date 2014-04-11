@@ -7,35 +7,16 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
-    public abstract class BlockContainerBase
+    public abstract class BlockContainerBase : IBlockContainer
     {
-        private static ConcurrentDictionary<string, StatisticsRecorder.IntHolder> s_nameDict = new ConcurrentDictionary<string, StatisticsRecorder.IntHolder>();
-
+        private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
         protected Lazy<string> m_lazyName;
-
-        public BlockContainerBase()
-        {
-            m_lazyName = new Lazy<string>(() =>
-            {
-                string friendlyName = Utils.GetFriendlyName(this.GetType());
-                int count = s_nameDict.GetOrAdd(friendlyName, new StatisticsRecorder.IntHolder()).Increment();
-                return friendlyName + count;
-            });
-        }
-
-        public virtual string Name
-        {
-            get { return m_lazyName.Value; }
-        }
-    }
-
-    public abstract class BlockContainerBase<TIn> : BlockContainerBase, IBlockContainer<TIn>
-    {
         protected readonly BlockContainerOptions m_containerOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
-        private IList<BlockMeta> m_blockMetas = new List<BlockMeta>();
-        
-        private class BlockMeta
+        protected Lazy<Task> m_completionTask;
+        protected IList<BlockMeta> m_blockMetas = new List<BlockMeta>();
+
+        protected class BlockMeta
         {
             public IDataflowBlock Block { get; set; }
             public Func<int> CountGetter { get; set; }
@@ -45,15 +26,28 @@ namespace Gridsum.DataflowEx
         public BlockContainerBase(BlockContainerOptions containerOptions)
         {
             m_containerOptions = containerOptions;
-            m_defaultLinkOption = new DataflowLinkOptions() {PropagateCompletion = true};
+            m_defaultLinkOption = new DataflowLinkOptions() { PropagateCompletion = true };
             m_completionTask = new Lazy<Task>(GetCompletionTask);
 
             if (m_containerOptions.ContainerMonitorEnabled || m_containerOptions.BlockMonitorEnabled)
             {
                 StartPerformanceMonitorAsync();
             }
-        }
 
+            m_lazyName = new Lazy<string>(() =>
+            {
+                string friendlyName = Utils.GetFriendlyName(this.GetType());
+                int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
+                return friendlyName + count;
+            });
+        }
+        
+        
+        public virtual string Name
+        {
+            get { return m_lazyName.Value; }
+        }
+        
         //todo: needs a mandatory way to force block registeration
         protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter, Action<Task> blockCompletionCallback = null)
         {
@@ -72,25 +66,25 @@ namespace Gridsum.DataflowEx
                     if (task.Status == TaskStatus.Faulted && task.Exception != null)
                     {
                         task.Exception.Flatten().Handle(e =>
-                            {
-                                if (exception == null) exception = e;
+                        {
+                            if (exception == null) exception = e;
 
-                                if (this.CompletionTask.IsCompleted || e is OtherBlockFailedException || e is OtherBlockContainerFailedException)
-                                {
-                                    //do nothing
-                                }
-                                else
-                                {                                    
-                                    this.Fault(e); //make sure everything in the container is down.
-                                }
-                                return true;
-                            });
+                            if (this.CompletionTask.IsCompleted || e is OtherBlockFailedException || e is OtherBlockContainerFailedException)
+                            {
+                                //do nothing
+                            }
+                            else
+                            {
+                                this.Fault(e); //make sure everything in the container is down.
+                            }
+                            return true;
+                        });
                     }
 
                     if (blockCompletionCallback != null)
                     {
                         blockCompletionCallback(task);
-                    }                    
+                    }
                 }
                 catch (Exception e)
                 {
@@ -104,10 +98,10 @@ namespace Gridsum.DataflowEx
                     tcs.SetException(exception);
                 }
                 else
-                    tcs.SetResult(string.Empty);                
+                    tcs.SetResult(string.Empty);
             });
 
-            m_blockMetas.Add(new BlockMeta { Block = block, CompletionTask = tcs.Task, CountGetter = countGetter ?? (() => -1) });                   
+            m_blockMetas.Add(new BlockMeta { Block = block, CompletionTask = tcs.Task, CountGetter = countGetter ?? (() => -1) });
         }
 
         //todo: add completion condition and cancellation token support
@@ -129,21 +123,19 @@ namespace Gridsum.DataflowEx
 
                 if (m_containerOptions.BlockMonitorEnabled)
                 {
-                    foreach( BlockMeta bm in m_blockMetas)
+                    foreach (BlockMeta bm in m_blockMetas)
                     {
                         IDataflowBlock block = bm.Block;
                         var count = bm.CountGetter();
 
                         if (count != 0 || m_containerOptions.PerformanceMonitorMode == BlockContainerOptions.PerformanceLogMode.Verbose)
                         {
-                            LogHelper.Logger.Debug(h => h("[{0}->{1}] has {2} todo items at this moment.", this.Name, Utils.GetFriendlyName(block.GetType()), count));    
+                            LogHelper.Logger.Debug(h => h("[{0}->{1}] has {2} todo items at this moment.", this.Name, Utils.GetFriendlyName(block.GetType()), count));
                         }
                     }
                 }
             }
         }
-
-        private Lazy<Task> m_completionTask;
 
         protected virtual Task GetCompletionTask()
         {
@@ -172,7 +164,7 @@ namespace Gridsum.DataflowEx
                     catch (Exception e)
                     {
                         tcs.SetException(e);
-                    }                    
+                    }
                 }
             });
 
@@ -183,7 +175,41 @@ namespace Gridsum.DataflowEx
         {
             //
         }
-        
+
+        public Task CompletionTask
+        {
+            get
+            {
+                //todo: check multiple access and block registration
+                return m_completionTask.Value;
+            }
+        }
+
+        public virtual IEnumerable<IDataflowBlock> Blocks { get { return m_blockMetas.Select(bm => bm.Block); } }
+
+        public virtual void Fault(Exception exception, bool propagateException = false)
+        {
+            LogHelper.Logger.ErrorFormat("<{0}>Unrecoverable exception received. Shutting down my blocks...", exception, this.Name);
+
+            foreach (var dataflowBlock in Blocks)
+            {
+                if (!dataflowBlock.Completion.IsCompleted)
+                {
+                    string msg = string.Format("<{0}>Shutting down {1}", this.Name, Utils.GetFriendlyName(dataflowBlock.GetType()));
+                    LogHelper.Logger.Error(msg);
+                    dataflowBlock.Fault(propagateException ? exception : new OtherBlockFailedException()); //just use aggregation exception just like native link
+                }
+            }
+        }
+
+        public virtual int BufferedCount
+        {
+            get
+            {
+                return m_blockMetas.Select(bm => bm.CountGetter).Sum(countGetter => countGetter());
+            }
+        }
+
         private class ExceptionComparer : IComparer<Exception>
         {
             public int Compare(Exception x, Exception y)
@@ -216,42 +242,16 @@ namespace Gridsum.DataflowEx
                 return 0;
             }
         }
+    }
 
-        public Task CompletionTask { 
-            get 
-            {
-                //todo: check multiple access and block registration
-                return m_completionTask.Value;
-            } 
+    public abstract class BlockContainerBase<TIn> : BlockContainerBase, IBlockContainer<TIn>
+    {
+        protected BlockContainerBase(BlockContainerOptions containerOptions) : base(containerOptions)
+        {
         }
-
-        public virtual IEnumerable<IDataflowBlock> Blocks { get { return m_blockMetas.Select(bm => bm.Block); } }
 
         public abstract ITargetBlock<TIn> InputBlock { get; }
-
-        public virtual void Fault(Exception exception, bool propagateException = false)
-        {
-            LogHelper.Logger.ErrorFormat("<{0}>Unrecoverable exception received. Shutting down my blocks...", exception, this.Name);
-
-            foreach (var dataflowBlock in Blocks)
-            {
-                if (!dataflowBlock.Completion.IsCompleted)
-                {
-                    string msg = string.Format("<{0}>Shutting down {1}", this.Name, Utils.GetFriendlyName(dataflowBlock.GetType()));
-                    LogHelper.Logger.Error(msg);
-                    dataflowBlock.Fault(propagateException ? exception : new OtherBlockFailedException()); //just use aggregation exception just like native link
-                }
-            }
-        }
-
-        public virtual int BufferedCount
-        {
-            get
-            {
-                return m_blockMetas.Select(bm => bm.CountGetter).Sum(countGetter => countGetter());
-            }
-        }
-
+        
         /// <summary>
         /// Helper method to read from a text reader and post everything in the text reader to the pipeline
         /// </summary>

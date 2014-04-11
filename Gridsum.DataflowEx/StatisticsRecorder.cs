@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 
 namespace Gridsum.DataflowEx
 {
@@ -12,20 +11,6 @@ namespace Gridsum.DataflowEx
     /// </summary>
     public class StatisticsRecorder
     {
-        public class IntHolder
-        {
-            private int m_count;
-            public int Count
-            {
-                get { return m_count; }
-            }
-
-            public void Increment()
-            {
-                Interlocked.Increment(ref m_count);
-            }
-        }
-
         protected ConcurrentDictionary<Type, IntHolder> m_typeRecordDict = new ConcurrentDictionary<Type, IntHolder>();
         
         public int this[Type objectType]
