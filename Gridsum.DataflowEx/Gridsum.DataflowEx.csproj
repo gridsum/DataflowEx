@@ -68,6 +68,7 @@
     <Compile Include="StatisticsRecorder.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Gridsum.DataflowEx.nuspec" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

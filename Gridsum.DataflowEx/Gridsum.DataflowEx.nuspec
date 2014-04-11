@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <projectUrl>https://github.com/gridsum/DataflowEx</projectUrl>
+    <iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>TPL Dataflow is great. But the fundamental blocks are a bit hard to use in real world scenarioes because 
+    (1) Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain 
+    mutable states and reuse our data processing logic. Ever found it difficult to build a library upon TPL Dataflow? 
+    (2) Blocks needs to be chained carefully and a bit tediously (also don't forget to link conditionally to null target otherwise the flow
+    will never end..). These boilerplate codes are far from graceful but inevitable due to the non-OO design.
+    Gridsum.DataflowEx is born to solve all this with an OO design on top of TPL Dataflow, by introducing the concept of IBlockContainer.
+    You can now easily write reusable components with extension points along with TPL Dataflow! You also get other cool features for free 
+    like upstream failure propagation and built-in performance monitor.</description>
+    <releaseNotes>A beta release with fundamental block containers</releaseNotes>
+    <copyright>Copyright 2014, Gridsum</copyright>
+    <tags>tpl dataflow block</tags>
+  </metadata>
+</package>
