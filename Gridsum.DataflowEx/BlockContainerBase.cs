@@ -42,7 +42,6 @@ namespace Gridsum.DataflowEx
             });
         }
         
-        
         public virtual string Name
         {
             get { return m_lazyName.Value; }
@@ -51,6 +50,11 @@ namespace Gridsum.DataflowEx
         //todo: needs a mandatory way to force block registeration
         protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter, Action<Task> blockCompletionCallback = null)
         {
+            if (block == null)
+            {
+                throw new ArgumentNullException("block");
+            }
+
             if (m_completionTask.IsValueCreated)
             {
                 throw new InvalidOperationException("You cannot register block after completion task has been generated. Please ensure you are calling RegisterBlock() inside constructor.");
@@ -101,7 +105,12 @@ namespace Gridsum.DataflowEx
                     tcs.SetResult(string.Empty);
             });
 
-            m_blockMetas.Add(new BlockMeta { Block = block, CompletionTask = tcs.Task, CountGetter = countGetter ?? (() => -1) });
+            m_blockMetas.Add(new BlockMeta
+            {
+                Block = block, 
+                CompletionTask = tcs.Task, 
+                CountGetter = countGetter ?? (() => block.GetBufferCount())
+            });
         }
 
         //todo: add completion condition and cancellation token support

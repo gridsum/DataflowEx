@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Microsoft.CSharp.RuntimeBinder;
 
 namespace Gridsum.DataflowEx
 {
@@ -18,5 +19,7 @@ namespace Gridsum.DataflowEx
         {
             return new PropagatorBlockContainer<TIn, TOut>(block, options);
         }
+
+        
     }
 }
