@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,12 +7,34 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
-    public abstract class BlockContainerBase<TIn> : IBlockContainer<TIn>
+    public abstract class BlockContainerBase
+    {
+        private static ConcurrentDictionary<string, StatisticsRecorder.IntHolder> s_nameDict = new ConcurrentDictionary<string, StatisticsRecorder.IntHolder>();
+
+        protected Lazy<string> m_lazyName;
+
+        public BlockContainerBase()
+        {
+            m_lazyName = new Lazy<string>(() =>
+            {
+                string friendlyName = Utils.GetFriendlyName(this.GetType());
+                int count = s_nameDict.GetOrAdd(friendlyName, new StatisticsRecorder.IntHolder()).Increment();
+                return friendlyName + count;
+            });
+        }
+
+        public virtual string Name
+        {
+            get { return m_lazyName.Value; }
+        }
+    }
+
+    public abstract class BlockContainerBase<TIn> : BlockContainerBase, IBlockContainer<TIn>
     {
         protected readonly BlockContainerOptions m_containerOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         private IList<BlockMeta> m_blockMetas = new List<BlockMeta>();
-
+        
         private class BlockMeta
         {
             public IDataflowBlock Block { get; set; }
@@ -31,6 +54,7 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        //todo: needs a mandatory way to force block registeration
         protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter, Action<Task> blockCompletionCallback = null)
         {
             if (m_completionTask.IsValueCreated)
@@ -196,6 +220,7 @@ namespace Gridsum.DataflowEx
         public Task CompletionTask { 
             get 
             {
+                //todo: check multiple access and block registration
                 return m_completionTask.Value;
             } 
         }
@@ -216,13 +241,6 @@ namespace Gridsum.DataflowEx
                     LogHelper.Logger.Error(msg);
                     dataflowBlock.Fault(propagateException ? exception : new OtherBlockFailedException()); //just use aggregation exception just like native link
                 }
-            }
-        }
-
-        public virtual string Name
-        {
-            get { 
-                return Utils.GetFriendlyName(this.GetType());
             }
         }
 
