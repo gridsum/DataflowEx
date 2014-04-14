@@ -45,8 +45,8 @@ namespace Gridsum.DataflowEx.Test
 
             container1.InputBlock.Post(1);
             container1.InputBlock.Complete();
-            
-            Assert.AreEqual(container2.CompletionTask, await Task.WhenAny(container2.CompletionTask, Task.Delay(1000)));
+
+            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
         }
 
         [TestMethod]
@@ -70,9 +70,6 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.FromBlock(block2);
 
-            Console.WriteLine(container1.Name);
-            Console.WriteLine(container2.Name);
-
             container1.Link(container2);
             container2.Link(container1); //circular
 
@@ -80,7 +77,7 @@ namespace Gridsum.DataflowEx.Test
             await Task.Delay(1000); //IMPORTANT: wait for block work done (nothing left in their input/output queue)
             container1.InputBlock.Complete();
 
-            Assert.AreEqual(container2.CompletionTask, await Task.WhenAny(container2.CompletionTask, Task.Delay(1000)));
+            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
         }
 
         [TestMethod]

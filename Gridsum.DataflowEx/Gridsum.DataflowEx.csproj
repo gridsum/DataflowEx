@@ -51,6 +51,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoCompletion\AutoCompleteContainerPair.cs" />
+    <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="BlockContainerBase.cs" />
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
