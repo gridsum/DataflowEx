@@ -27,7 +27,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
 
             var before = new TransformBlock<TIn, TIn>(@in =>
             {
-                if (m_last != null && @in.UniqueId == m_last.Value)
+                if (m_last == null || @in.UniqueId == m_last.Value)
                 {
                     //The last one is back, so there is nothing else in the pipeline.
                     //Set a timer: if nothing new produced when timer expires, the whole loop ends.
