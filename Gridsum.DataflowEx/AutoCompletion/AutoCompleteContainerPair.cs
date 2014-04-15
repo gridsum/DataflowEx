@@ -23,7 +23,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
             m_processTimeout = processTimeout;
             m_timer = new Timer();
             m_timer.Interval = m_processTimeout.TotalMilliseconds;
-            m_timer.Elapsed += m_timer_Elapsed;
+            m_timer.Elapsed += OnTimerElapsed;
 
             var before = new TransformBlock<TIn, TIn>(@in =>
             {
@@ -49,7 +49,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
             m_after = BlockContainerUtils.FromBlock(after);
         }
 
-        void m_timer_Elapsed(object sender, ElapsedEventArgs e)
+        void OnTimerElapsed(object sender, ElapsedEventArgs e)
         {
             LogHelper.Logger.InfoFormat("Auto complete timer elapsed. Shutting down block containers..");
 

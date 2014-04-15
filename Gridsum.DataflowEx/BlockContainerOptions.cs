@@ -8,7 +8,12 @@ namespace Gridsum.DataflowEx
         public bool ContainerMonitorEnabled { get; set; }
         public bool BlockMonitorEnabled { get; set; }
         public PerformanceLogMode PerformanceMonitorMode { get; set; }
+
+        /// <summary>
+        /// A hint to container implementation on parallelism of underlying block if feasible
+        /// </summary>
         public int? RecommendedParallelismIfMultiThreaded { get; set; }
+
         public TimeSpan? MonitorInterval { get; set; }
 
         private static BlockContainerOptions s_defaultOptions = new BlockContainerOptions()
