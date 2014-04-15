@@ -123,7 +123,7 @@ namespace Gridsum.DataflowEx.Test
         }
     }
 
-    class FaultyBlocks : BlockContainerBase<string, string>
+    class FaultyBlocks : BlockContainer<string, string>
     {
         private TransformBlock<string, string> m_inputBlock;
         private TransformBlock<string, string> m_block2;
@@ -166,7 +166,7 @@ namespace Gridsum.DataflowEx.Test
         }
     }
 
-    class InnocentBlocks : BlockContainerBase<string>
+    class InnocentBlocks : BlockContainer<string>
     {
         private ActionBlock<string> m_inputBlock;
 

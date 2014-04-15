@@ -15,8 +15,8 @@ namespace Gridsum.DataflowEx.AutoCompletion
         private readonly TimeSpan m_processTimeout;
         private readonly Timer m_timer;
         private Guid? m_last;
-        private BlockContainerBase<TIn, TIn> m_before;
-        private BlockContainerBase<TOut, TOut> m_after;
+        private BlockContainer<TIn, TIn> m_before;
+        private BlockContainer<TOut, TOut> m_after;
 
         public AutoCompleteContainerPair(TimeSpan processTimeout)
         {
@@ -29,6 +29,8 @@ namespace Gridsum.DataflowEx.AutoCompletion
             {
                 if (m_last != null && @in.UniqueId == m_last.Value)
                 {
+                    //The last one is back, so there is nothing else in the pipeline.
+                    //Set a timer: if nothing new produced when timer expires, the whole loop ends.
                     m_timer.Start();
                 }
                 return @in;
@@ -54,12 +56,12 @@ namespace Gridsum.DataflowEx.AutoCompletion
             m_before.InputBlock.Complete(); //pass completion down to the chain
         }
 
-        public BlockContainerBase<TIn, TIn> Before
+        public BlockContainer<TIn, TIn> Before
         {
             get { return m_before; }
         }
 
-        public BlockContainerBase<TOut, TOut> After
+        public BlockContainer<TOut, TOut> After
         {
             get { return m_after; }
         }

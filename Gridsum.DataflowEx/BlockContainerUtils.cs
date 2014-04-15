@@ -10,12 +10,12 @@ namespace Gridsum.DataflowEx
 {
     public class BlockContainerUtils
     {
-        public static BlockContainerBase<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
+        public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
         {
             return new PropagatorBlockContainer<TIn, TOut>(block);
         }
 
-        public static BlockContainerBase<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions options)
+        public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions options)
         {
             return new PropagatorBlockContainer<TIn, TOut>(block, options);
         }

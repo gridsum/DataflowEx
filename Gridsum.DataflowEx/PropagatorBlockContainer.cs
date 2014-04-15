@@ -7,7 +7,7 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
-    public class PropagatorBlockContainer<TIn, TOut> : BlockContainerBase<TIn, TOut>
+    public class PropagatorBlockContainer<TIn, TOut> : BlockContainer<TIn, TOut>
     {
         private readonly IPropagatorBlock<TIn, TOut> m_block;
 

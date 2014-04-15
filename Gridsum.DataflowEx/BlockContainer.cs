@@ -7,14 +7,18 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
-    public abstract class BlockContainerBase : IBlockContainer
+    /// <summary>
+    /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
+    /// may contain one or multiple blocks. Inheritors should call RegisterBlock in their constructors.
+    /// </summary>
+    public abstract class BlockContainer : IBlockContainer
     {
         private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
-        protected Lazy<string> m_lazyName;
         protected readonly BlockContainerOptions m_containerOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
         protected IList<BlockMeta> m_blockMetas = new List<BlockMeta>();
+        protected string m_defaultName;
 
         protected class BlockMeta
         {
@@ -23,28 +27,28 @@ namespace Gridsum.DataflowEx
             public Task CompletionTask { get; set; }
         }
 
-        public BlockContainerBase(BlockContainerOptions containerOptions)
+        public BlockContainer(BlockContainerOptions containerOptions)
         {
             m_containerOptions = containerOptions;
             m_defaultLinkOption = new DataflowLinkOptions() { PropagateCompletion = true };
             m_completionTask = new Lazy<Task>(GetCompletionTask);
 
+            string friendlyName = Utils.GetFriendlyName(this.GetType());
+            int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
+            m_defaultName = friendlyName + count;
+            
             if (m_containerOptions.ContainerMonitorEnabled || m_containerOptions.BlockMonitorEnabled)
             {
                 StartPerformanceMonitorAsync();
             }
-
-            m_lazyName = new Lazy<string>(() =>
-            {
-                string friendlyName = Utils.GetFriendlyName(this.GetType());
-                int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
-                return friendlyName + count;
-            });
         }
         
+        /// <summary>
+        /// Display name of the container
+        /// </summary>
         public virtual string Name
         {
-            get { return m_lazyName.Value; }
+            get { return m_defaultName; }
         }
         
         //todo: needs a mandatory way to force block registeration
@@ -114,7 +118,7 @@ namespace Gridsum.DataflowEx
         }
 
         //todo: add completion condition and cancellation token support
-        private async void StartPerformanceMonitorAsync()
+        private async Task StartPerformanceMonitorAsync()
         {
             while (true)
             {
@@ -185,6 +189,9 @@ namespace Gridsum.DataflowEx
             //
         }
 
+        /// <summary>
+        /// Represents the completion of the whole container
+        /// </summary>
         public Task CompletionTask
         {
             get
@@ -211,6 +218,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Sum of the buffer size of all blocks in the container
+        /// </summary>
         public virtual int BufferedCount
         {
             get
@@ -253,9 +263,9 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainerBase<TIn> : BlockContainerBase, IBlockContainer<TIn>
+    public abstract class BlockContainer<TIn> : BlockContainer, IBlockContainer<TIn>
     {
-        protected BlockContainerBase(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
         {
         }
 
@@ -304,12 +314,12 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainerBase<TIn, TOut> : BlockContainerBase<TIn>, IBlockContainer<TIn, TOut>
+    public abstract class BlockContainer<TIn, TOut> : BlockContainer<TIn>, IBlockContainer<TIn, TOut>
     {
         protected List<Predicate<TOut>> m_conditions = new List<Predicate<TOut>>();
         protected StatisticsRecorder GarbageRecorder { get; private set; }
 
-        protected BlockContainerBase(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
         {
             this.GarbageRecorder = new StatisticsRecorder();
         }

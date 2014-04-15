@@ -22,24 +22,4 @@ namespace Gridsum.DataflowEx
     {
         ISourceBlock<TOut> OutputBlock { get; }
     }
-
-//    public class TransformBlockContainer<TIn, TOut> : BlockContainerBase<TIn, TOut>
-//    {
-//        private TransformBlock<TIn, TOut> m_transformBlock;
-//
-//        public TransformBlockContainer(Func<TIn, TOut> func)
-//        {
-//            m_transformBlock = new TransformBlock<TIn, TOut>(func);
-//        }
-//
-//        public override ITargetBlock<TIn> InputBlock
-//        {
-//            get { return m_transformBlock; }
-//        }
-//
-//        public override ISourceBlock<TOut> OutputBlock
-//        {
-//            get { return m_transformBlock; }
-//        }
-//    }
 }
