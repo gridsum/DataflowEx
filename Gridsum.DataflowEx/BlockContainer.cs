@@ -362,7 +362,7 @@ namespace Gridsum.DataflowEx
                 });
         }
 
-        public void Link(IBlockContainer<TOut> other)
+        public void LinkTo(IBlockContainer<TOut> other)
         {
             //this.OutputBlock.LinkTo(other.InputBlock, m_defaultOption);
             LinkBlockToContainer(this.OutputBlock, other);

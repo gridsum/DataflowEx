@@ -53,6 +53,7 @@
   <ItemGroup>
     <Compile Include="AutoCompletion\AutoCompleteContainerPair.cs" />
     <Compile Include="AutoCompletion\ITracableItem.cs" />
+    <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="BlockContainer.cs" />
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />

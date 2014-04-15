@@ -40,7 +40,7 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.FromBlock(block2);
 
-            container1.Link(container2);
+            container1.LinkTo(container2);
             container2.LinkLeftToNull();
 
             container1.InputBlock.Post(1);
@@ -70,8 +70,8 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.FromBlock(block2);
 
-            container1.Link(container2);
-            container2.Link(container1); //circular
+            container1.LinkTo(container2);
+            container2.LinkTo(container1); //circular
 
             container1.InputBlock.Post(1);
             await Task.Delay(1000); //IMPORTANT: wait for block work done (nothing left in their input/output queue)

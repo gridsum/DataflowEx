@@ -8,6 +8,6 @@ namespace Gridsum.DataflowEx.AutoCompletion
 {
     public interface ITracableItem
     {
-        Guid UniqueId { get; set; }
+        Guid UniqueId { get; }
     }
 }
