@@ -46,5 +46,31 @@ namespace Gridsum.DataflowEx.Test
             container1.InputBlock.Post(new Int() {Val = 1});
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
         }
+
+        [TestMethod]
+        public async Task TestAutoComplete2()
+        {
+            var block1 = new TransformManyBlock<Int, Int>(i =>
+            {
+                return new[] { i }; //preserve the guid
+            });
+            var block2 = new TransformManyBlock<Int, Int>(i =>
+            {
+                int j = i.Val + 1;
+                Console.WriteLine("block2: i = {0}, j = {1}", i.Val, j);
+                Thread.Sleep(500);
+                if (j < 10) return new[] { new Int { Val = j } };
+                else return Enumerable.Empty<Int>();
+            });
+
+            var container1 = BlockContainerUtils.FromBlock(block1);
+            var container2 = BlockContainerUtils.AutoComplete(BlockContainerUtils.FromBlock(block2), TimeSpan.FromSeconds(1));
+            
+            container1.Link(container2);
+            container2.Link(container1);
+
+            container1.InputBlock.Post(new Int() { Val = 1 });
+            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
+        }
     }
 }

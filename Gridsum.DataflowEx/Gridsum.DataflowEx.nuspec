@@ -4,10 +4,10 @@
     <id>$id$</id>
     <version>$version$</version>
     <title>$title$</title>
-    <authors>$author$</authors>
-    <owners>$author$</owners>
+    <authors>karldodd</authors>
+    <owners>karldodd</owners>
     <projectUrl>https://github.com/gridsum/DataflowEx</projectUrl>
-    <iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>
+    <iconUrl>http://www.gridsum.com/templets/gs/images/slogo.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>TPL Dataflow is great. But the fundamental blocks are a bit hard to use in real world scenarioes because 
     (1) Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain 
