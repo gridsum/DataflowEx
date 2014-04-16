@@ -67,6 +67,12 @@
     <Compile Include="IBlockContainer.cs" />
     <Compile Include="Database\MultiDbBulkInserter.cs" />
     <Compile Include="OtherBlockContainerFailedException.cs" />
+    <Compile Include="PatternMatch\IMatchable.cs" />
+    <Compile Include="PatternMatch\IMatchCondition.cs" />
+    <Compile Include="PatternMatch\MatchNoneCondition.cs" />
+    <Compile Include="PatternMatch\MatchType.cs" />
+    <Compile Include="PatternMatch\MultiMatcher.cs" />
+    <Compile Include="PatternMatch\StringMatchCondition.cs" />
     <Compile Include="PostToInputBlockFailedException.cs" />
     <Compile Include="PropagatorBlockContainer.cs" />
     <Compile Include="Utils.cs" />
