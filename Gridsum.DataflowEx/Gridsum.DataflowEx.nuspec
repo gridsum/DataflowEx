@@ -9,6 +9,7 @@
     <projectUrl>https://github.com/gridsum/DataflowEx</projectUrl>
     <iconUrl>http://www.gridsum.com/templets/gs/images/slogo.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Gridsum's Object-Oriented extensions and helpers to TPL Dataflow</summary>
     <description>
       Gridsum.DataflowEx provides Object-Oriented extensions to TPL Dataflow library.
       You can easily write reusable components with mutable states and extension points while still having the power of TPL Dataflow
