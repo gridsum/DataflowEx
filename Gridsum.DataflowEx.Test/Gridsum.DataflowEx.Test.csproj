@@ -82,6 +82,7 @@
     <Compile Include="BlockExtensionTest.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TestAutoComplete.cs" />
+    <Compile Include="TestStringCondition.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj">
