@@ -53,7 +53,7 @@ namespace Gridsum.DataflowEx
         }
         
         //todo: needs a mandatory way to force block registeration
-        protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter, Action<Task> blockCompletionCallback = null)
+        protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter = null, Action<Task> blockCompletionCallback = null)
         {
             if (block == null)
             {
@@ -365,7 +365,6 @@ namespace Gridsum.DataflowEx
 
         public void LinkTo(IBlockContainer<TOut> other)
         {
-            //this.OutputBlock.LinkTo(other.InputBlock, m_defaultOption);
             LinkBlockToContainer(this.OutputBlock, other);
         }
 
@@ -379,8 +378,7 @@ namespace Gridsum.DataflowEx
             m_conditions.Add(predicate);
             var converter = new TransformBlock<TOut, TTarget>(transform);
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
-            //converter.LinkTo(other.InputBlock, m_defaultOption); 
-
+            
             LinkBlockToContainer(converter, other);            
         }
 

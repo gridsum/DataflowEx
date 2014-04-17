@@ -24,6 +24,11 @@ namespace Gridsum.DataflowEx
                 return b.InputCount;
             }
 
+            if (blockGenericType == typeof (BufferBlock<>))
+            {
+                return b.Count;
+            }
+
 //            if (typeof(ISourceBlock<>).IsInstanceOfType(block))
 //            {
 //                return b.OutputCount;

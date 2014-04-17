@@ -60,6 +60,7 @@
     <Compile Include="BlockContainerUtils.cs" />
     <Compile Include="Database\BulkDataReader.cs" />
     <Compile Include="Database\DBColumnMapping.cs" />
+    <Compile Include="DataCopier.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
     <Compile Include="IntHolder.cs" />
     <Compile Include="LogHelper.cs" />

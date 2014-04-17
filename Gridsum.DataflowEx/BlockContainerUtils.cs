@@ -9,7 +9,7 @@ using Microsoft.CSharp.RuntimeBinder;
 
 namespace Gridsum.DataflowEx
 {
-    public class BlockContainerUtils
+    public static class BlockContainerUtils
     {
         public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
         {
@@ -21,7 +21,7 @@ namespace Gridsum.DataflowEx
             return new PropagatorBlockContainer<TIn, TOut>(block, options);
         }
 
-        public static BlockContainer<TIn, TOut> AutoComplete<TIn, TOut>(BlockContainer<TIn, TOut> blockContainer, TimeSpan timeout)
+        public static BlockContainer<TIn, TOut> AutoComplete<TIn, TOut>(this BlockContainer<TIn, TOut> blockContainer, TimeSpan timeout)
             where TIn : ITracableItem
             where TOut : ITracableItem 
         {

@@ -2,6 +2,13 @@
 
 namespace Gridsum.DataflowEx
 {
+    /// <summary>
+    /// Provides hints and configurations to block containers. 
+    /// </summary>
+    /// <remarks>
+    /// This class provides hints & suggestions. The corrent adoption of the configurations depends
+    /// on the block container implementations.
+    /// </remarks>
     public class BlockContainerOptions
     {
         public int? RecommendedCapacity { get; set; }
