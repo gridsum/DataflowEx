@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.PatternMatch;
 
 namespace Gridsum.DataflowEx
 {
@@ -366,6 +367,11 @@ namespace Gridsum.DataflowEx
         {
             //this.OutputBlock.LinkTo(other.InputBlock, m_defaultOption);
             LinkBlockToContainer(this.OutputBlock, other);
+        }
+
+        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
+        {
+            this.TransformAndLink(other, transform, new Predicate<TOut>(condition.Matches));
         }
 
         public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
