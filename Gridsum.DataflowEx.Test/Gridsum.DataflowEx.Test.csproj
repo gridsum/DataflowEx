@@ -80,6 +80,7 @@
     <Compile Include="DatabaseTests\NestClassTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="BlockExtensionTest.cs" />
+    <Compile Include="TestBlockBehaviors.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TestAutoComplete.cs" />
     <Compile Include="TestStringCondition.cs" />
