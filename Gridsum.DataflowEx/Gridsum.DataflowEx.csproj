@@ -73,6 +73,7 @@
     <Compile Include="PatternMatch\MatchType.cs" />
     <Compile Include="PatternMatch\MultiMatcher.cs" />
     <Compile Include="PatternMatch\StringMatchCondition.cs" />
+    <Compile Include="PatternMatch\UrlStringMatchCondition.cs" />
     <Compile Include="PostToInputBlockFailedException.cs" />
     <Compile Include="PropagatorBlockContainer.cs" />
     <Compile Include="Utils.cs" />
