@@ -41,9 +41,9 @@ namespace Gridsum.DataflowEx
             this.CleanUp();            
         }
         
-        public override void Fault(Exception exception, bool propagateException = false)
+        public override void Fault(Exception exception)
         {
-            m_b1.Fault(exception, propagateException);
+            m_b1.Fault(exception);
         }
 
         public override IEnumerable<IDataflowBlock> Blocks
@@ -100,9 +100,9 @@ namespace Gridsum.DataflowEx
             this.CleanUp();
         }
 
-        public override void Fault(Exception exception, bool propagateException = false)
+        public override void Fault(Exception exception)
         {
-            m_b1.Fault(exception, propagateException);
+            m_b1.Fault(exception);
         }
 
         public override IEnumerable<IDataflowBlock> Blocks

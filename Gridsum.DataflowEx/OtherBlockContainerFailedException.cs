@@ -16,4 +16,12 @@ namespace Gridsum.DataflowEx
         {
         }
     }
+
+    public class OtherBlockCanceledException : Exception
+    {
+        public OtherBlockCanceledException()
+            : base("Some other block was canceled so I am down")
+        {
+        }
+    }
 }
