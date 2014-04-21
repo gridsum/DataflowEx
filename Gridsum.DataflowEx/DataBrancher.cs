@@ -64,5 +64,13 @@ namespace Gridsum.DataflowEx
         {
             get { return m_copyBuffer; }
         }
+
+        /// <summary>
+        /// Link the copied data stream to another block
+        /// </summary>
+        public void LinkSecondlyTo(IBlockContainer<T> other)
+        {
+            LinkBlockToContainer(this.CopiedOutputBlock, other);
+        }
     }
 }
