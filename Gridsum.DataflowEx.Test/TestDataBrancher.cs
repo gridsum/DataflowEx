@@ -9,13 +9,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Gridsum.DataflowEx.Test
 {
     [TestClass]
-    public class TestDataCopier
+    public class TestDataBrancher
     {
         [TestMethod]
-        public async Task TestDataCopier1()
+        public async Task TestDataBrancher1()
         {
             var random = new Random();
-            var dataCopier = new DataCopier<int>();
+            var dataCopier = new DataBrancher<int>();
 
             int sum1 = 0;
             int sum2 = 0;
