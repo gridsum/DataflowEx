@@ -3,8 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 using Gridsum.DataflowEx.PatternMatch;
 
 namespace Gridsum.DataflowEx
@@ -33,7 +35,7 @@ namespace Gridsum.DataflowEx
         {
             m_containerOptions = containerOptions;
             m_defaultLinkOption = new DataflowLinkOptions() { PropagateCompletion = true };
-            m_completionTask = new Lazy<Task>(GetCompletionTask);
+            m_completionTask = new Lazy<Task>(GetCompletionTask, LazyThreadSafetyMode.ExecutionAndPublication);
 
             string friendlyName = Utils.GetFriendlyName(this.GetType());
             int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
@@ -44,7 +46,7 @@ namespace Gridsum.DataflowEx
                 StartPerformanceMonitorAsync();
             }
         }
-        
+
         /// <summary>
         /// Display name of the container
         /// </summary>
@@ -53,7 +55,6 @@ namespace Gridsum.DataflowEx
             get { return m_defaultName; }
         }
         
-        //todo: needs a mandatory way to force block registeration
         /// <summary>
         /// Register this block to block meta. Also make sure the container will fail if the registered block fails.
         /// </summary>
@@ -69,9 +70,13 @@ namespace Gridsum.DataflowEx
                 throw new InvalidOperationException("You cannot register block after completion task has been generated. Please ensure you are calling RegisterBlock() inside constructor.");
             }
 
+            if (m_blockMetas.Any(m => m.Block.Equals(block)))
+            {
+                throw new ArgumentException("Duplicate block registered in " + this.Name);
+            }
+
             var tcs = new TaskCompletionSource<object>();
             
-
             block.Completion.ContinueWith(task =>
             {
                 Exception originalException = null;
@@ -134,6 +139,19 @@ namespace Gridsum.DataflowEx
             });
         }
 
+        protected void RegisterChildContainer(BlockContainer childContainer)
+        {
+            if (m_completionTask.IsValueCreated)
+            {
+                throw new InvalidOperationException("You cannot register block container after completion task has been generated. Please ensure you are calling RegisterChildContainer() inside constructor.");
+            }
+
+            foreach (BlockMeta blockMeta in childContainer.m_blockMetas)
+            {
+                m_blockMetas.Add(blockMeta);
+            }
+        }
+
         //todo: add completion condition and cancellation token support
         private async Task StartPerformanceMonitorAsync()
         {
@@ -169,6 +187,11 @@ namespace Gridsum.DataflowEx
 
         protected virtual Task GetCompletionTask()
         {
+            if (m_blockMetas.Count == 0)
+            {
+                throw new NoBlockRegisteredException(this);
+            }
+
             var taskAll = Task.WhenAll(m_blockMetas.Select(b => b.CompletionTask));
 
             //the following is just to flatten exceptions.

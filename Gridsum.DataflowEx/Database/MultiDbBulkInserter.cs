@@ -43,7 +43,7 @@ namespace Gridsum.DataflowEx.Database
                         () => new DbBulkInserter<T>(m_connectionGetter(p), m_destTable, m_options, destLabel, m_bulkSize, string.Format("{0}_{1}", this.Name, p))
                     );
 
-            RegisterBlock(m_bufferBlock, () => m_bufferBlock.Count, t => 
+            RegisterBlock(m_bufferBlock, () => m_bufferBlock.Count, t =>
             {
                 if (t.IsFaulted || t.IsCanceled)
                 {

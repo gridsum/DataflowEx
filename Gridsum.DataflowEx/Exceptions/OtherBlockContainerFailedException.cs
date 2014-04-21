@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Gridsum.DataflowEx
+namespace Gridsum.DataflowEx.Exceptions
 {
     public class OtherBlockContainerFailedException : Exception
     {
@@ -21,6 +21,13 @@ namespace Gridsum.DataflowEx
     {
         public OtherBlockCanceledException()
             : base("Some other block was canceled so I am down")
+        {
+        }
+    }
+
+    public class NoBlockRegisteredException : Exception
+    {
+        public NoBlockRegisteredException(BlockContainer blockContainer) : base("No block has been registered in container " + blockContainer.Name)
         {
         }
     }

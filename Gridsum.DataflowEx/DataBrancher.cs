@@ -34,9 +34,6 @@ namespace Gridsum.DataflowEx
                 return arg;
             });
 
-            RegisterBlock(m_copyBuffer);
-            RegisterBlock(m_transformBlock);
-
             m_transformBlock.Completion.ContinueWith(t =>
             {
                 //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
@@ -45,6 +42,9 @@ namespace Gridsum.DataflowEx
                     m_copyBuffer.Complete();
                 }
             });
+
+            RegisterBlock(m_copyBuffer);
+            RegisterBlock(m_transformBlock);
         }
 
         public override ITargetBlock<T> InputBlock

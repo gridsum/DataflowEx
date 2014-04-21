@@ -23,6 +23,9 @@ namespace Gridsum.DataflowEx
             m_b2 = b2;
 
             m_b1.LinkTo(m_b2);
+
+            RegisterChildContainer(m_b1);
+            RegisterChildContainer(m_b2);
         }
 
         public override ISourceBlock<T3> OutputBlock
@@ -37,6 +40,10 @@ namespace Gridsum.DataflowEx
 
         protected override async Task GetCompletionTask()
         {
+            //wait for the blocks
+            await base.GetCompletionTask();
+
+            //wait for the containers
             await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask);
             this.CleanUp();            
         }
@@ -82,6 +89,10 @@ namespace Gridsum.DataflowEx
 
             m_b1.LinkTo(m_b2);
             m_b2.LinkTo(m_b3);
+
+            RegisterChildContainer(m_b1);
+            RegisterChildContainer(m_b2);
+            RegisterChildContainer(m_b3);
         }
 
         public override ISourceBlock<T4> OutputBlock
@@ -96,7 +107,12 @@ namespace Gridsum.DataflowEx
 
         protected override async Task GetCompletionTask()
         {
+            //wait for the blocks
+            await base.GetCompletionTask();
+
+            //wait for the containers
             await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask, m_b3.CompletionTask);
+            
             this.CleanUp();
         }
 

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Gridsum.DataflowEx
+namespace Gridsum.DataflowEx.Exceptions
 {
     public class PostToInputBlockFailedException : Exception
     {

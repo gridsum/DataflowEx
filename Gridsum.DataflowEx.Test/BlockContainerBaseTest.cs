@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test
@@ -136,18 +137,18 @@ namespace Gridsum.DataflowEx.Test
                 Thread.Sleep(1000);
                 return s;
             });
-
-            this.RegisterBlock(m_inputBlock, null);
-
+            
             m_block2 = new TransformBlock<string, string>(s =>
             {
                 throw new SystemException("I'm done.");
 
                 return s;
             });
-
-            this.RegisterBlock(m_block2, null);
+            
             m_inputBlock.LinkTo(m_block2, m_defaultLinkOption);
+
+            this.RegisterBlock(m_inputBlock, null);
+            this.RegisterBlock(m_block2, null);
         }
 
         public override System.Threading.Tasks.Dataflow.ITargetBlock<string> InputBlock
