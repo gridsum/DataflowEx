@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Gridsum.DataflowEx.AutoCompletion;
+using Gridsum.DataflowEx.Exceptions;
 using Microsoft.CSharp.RuntimeBinder;
 
 namespace Gridsum.DataflowEx
@@ -33,6 +35,21 @@ namespace Gridsum.DataflowEx
                 autoCompletePair.After);
 
             return merged;
+        }
+
+        public static void SafePost<TIn>(this ITargetBlock<TIn> target, TIn item)
+        {
+            bool posted = target.Post(item);
+            if (posted) return;
+
+            for(int i = 1; i <=3 ;i ++)
+            {
+                Thread.Sleep(500 * i);
+                posted = target.Post(item);
+                if (posted) return;
+            }
+
+            throw new PostToInputBlockFailedException("Safe post to " + Utils.GetFriendlyName(target.GetType()) + " failed");
         }
     }
 }
