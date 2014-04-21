@@ -80,7 +80,7 @@ namespace Gridsum.DataflowEx.Database
 
                 int profileId = m_dispatchFunc(item);
                 var bulkInserter = m_bulkInserterMap.GetOrAdd(profileId, m_initer).Value;
-                bulkInserter.InputBlock.Post(item);
+                bulkInserter.InputBlock.SafePost(item);
 
                 awaited = false;
             }

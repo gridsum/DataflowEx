@@ -314,38 +314,16 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Helper method to read from a text reader and post everything in the text reader to the pipeline
         /// </summary>
-        public void PullFrom(IEnumerable<TIn> reader, bool allowPostFailure = false)
+        public void PullFrom(IEnumerable<TIn> reader)
         {
             long count = 0;
             foreach(var item in reader)
             {
-                bool posted = InputBlock.Post(item);
-
-                if (posted)
-                {
-                    count++;
-                }
-                else
-                {
-                    if (InputBlock.Completion.IsCompleted)
-                    {
-                        LogHelper.Logger.Info(h => h("<{0}> Post to the input block failed because it is completed. Stop posting...", this.Name));
-                        break;
-                    }
-                    else
-                    {
-                        if (!allowPostFailure)
-                        {
-                            throw new PostToInputBlockFailedException(string.Format("<{0}> Post to the input block failed", this.Name));
-                        }
-                        else
-                        {
-                            LogHelper.Logger.Warn(h => h("<{0}> Post to the input block failed. Ignore this item.", this.Name));
-                        }
-                    }
-                }
+                InputBlock.SafePost(item);
+                count++;
             }
-            LogHelper.Logger.Info(h => h("<{0}> Posted {1} {2}s to the input block {3}.", 
+
+            LogHelper.Logger.Info(h => h("<{0}> Pulled and posted {1} {2}s to the input block {3}.", 
                 this.Name, 
                 count, 
                 Utils.GetFriendlyName(typeof(TIn)), 

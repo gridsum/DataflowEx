@@ -44,7 +44,7 @@ namespace Gridsum.DataflowEx.Test
             container1.LinkTo(container2);
             container2.LinkLeftToNull();
 
-            container1.InputBlock.Post(1);
+            container1.InputBlock.SafePost(1);
             container1.InputBlock.Complete();
 
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
