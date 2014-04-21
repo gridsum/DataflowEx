@@ -15,6 +15,7 @@ By introducing the core concept of BlockContainer, Gridsum.DataflowEx is born to
 * Upstream failure propagation within block container
 * Built-in performance metrics monitor
 * Auto complete support for circular dataflow graph (NEW!)
+* Dataflow friendly sql bulk inserter (NEW!)
 * Helper methods to convert raw blocks to block containers
 
 Simply download Gridsum.DataflowEx and have a try!
