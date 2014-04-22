@@ -14,6 +14,16 @@ namespace Gridsum.DataflowEx
 {
     public static class BlockContainerUtils
     {
+        public static BlockContainer<TIn> FromBlock<TIn>(ITargetBlock<TIn> block)
+        {
+            return new TargetBlockContainer<TIn>(block);
+        }
+
+        public static BlockContainer<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, BlockContainerOptions options)
+        {
+            return new TargetBlockContainer<TIn>(block, options);
+        }
+
         public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
         {
             return new PropagatorBlockContainer<TIn, TOut>(block);
