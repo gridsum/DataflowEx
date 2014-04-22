@@ -79,56 +79,39 @@ namespace Gridsum.DataflowEx
             
             block.Completion.ContinueWith(task =>
             {
-                Exception originalException = null;
-                try
+                if (task.Status == TaskStatus.Faulted)
                 {
-                    if (task.Status == TaskStatus.Faulted)
-                    {
-                        task.Exception.Flatten().Handle(e =>
-                        {
-                            if (e is PropagatedException)
-                            {
-                                //do nothing if e is not an orignal exception
-                            }
-                            else
-                            {
-                                if (originalException == null) originalException = e;
-                            }
-                            return true;
-                        });
-                    }
-                   
-                    //call callback
-                    if (blockCompletionCallback != null)
-                    {
-                        blockCompletionCallback(task);
-                    }
-                }
-                catch (Exception e)
-                {
-                    LogHelper.Logger.Error(h => h("[{0}] Error when shutting down working blocks in block container", this.Name), e);
-                    if(originalException == null) originalException = e;
-                }
+                    var exception = TaskEx.UnwrapWithPriority(task.Exception);
+                    tcs.SetException(exception);
 
-                if (originalException != null)
-                {
-                    tcs.SetException(originalException);
-                    this.Fault(new OtherBlockFailedException());
-                }
-                else if (task.Status == TaskStatus.Faulted)
-                {
-                    //Don't need to fault the whole container there because it is a NonOrignalException
-                    Exception e = task.Exception.Flatten().InnerExceptions.First();
-                    tcs.SetException(e);
-                    Debug.Assert(e is PropagatedException);
+                    if (!(exception is PropagatedException))
+                    {
+                        this.Fault(exception); //fault other blocks if this is an original exception
+                    }
                 }
                 else if (task.Status == TaskStatus.Canceled)
                 {
                     tcs.SetCanceled();
-                    this.Fault(new OtherBlockCanceledException());
+                    this.Fault(new TaskCanceledException());
                 }
-                else
-                    tcs.SetResult(string.Empty);
+                else //success
+                {
+                    try
+                    {
+                        //call callback
+                        if (blockCompletionCallback != null)
+                        {
+                            blockCompletionCallback(task);
+                        }
+                        tcs.SetResult(string.Empty);
+                    }
+                    catch (Exception e)
+                    {
+                        LogHelper.Logger.Error(h => h("[{0}] Error when callback {1} on its completion", this.Name, Utils.GetFriendlyName(block.GetType())), e);
+                        tcs.SetException(e);
+                        this.Fault(e);
+                    }
+                }
             });
 
             m_blockMetas.Add(new BlockMeta
@@ -217,7 +200,7 @@ namespace Gridsum.DataflowEx
 
         public virtual void Fault(Exception exception)
         {
-            LogHelper.Logger.ErrorFormat("<{0}> Unrecoverable exception received. Shutting down my blocks...", exception, this.Name);
+            LogHelper.Logger.ErrorFormat("<{0}> Exception occur. Shutting down my working blocks...", exception, this.Name);
 
             foreach (var dataflowBlock in Blocks)
             {
@@ -225,7 +208,20 @@ namespace Gridsum.DataflowEx
                 {
                     string msg = string.Format("<{0}> Shutting down {1}", this.Name, Utils.GetFriendlyName(dataflowBlock.GetType()));
                     LogHelper.Logger.Error(msg);
-                    dataflowBlock.Fault(exception); //just use aggregation exception just like native link
+
+                    //just pass on PropagatedException (do not use original exception here)
+                    if (exception is PropagatedException)
+                    {
+                        dataflowBlock.Fault(exception);
+                    }
+                    else if (exception is TaskCanceledException)
+                    {
+                        dataflowBlock.Fault(new OtherBlockCanceledException());
+                    }
+                    else
+                    {
+                        dataflowBlock.Fault(new OtherBlockFailedException());
+                    }
                 }
             }
         }
@@ -298,9 +294,13 @@ namespace Gridsum.DataflowEx
                 {
                     if (!otherBlockContainer.CompletionTask.IsCompleted)
                     {
-                        if (whenAllTask.IsCanceled || whenAllTask.IsFaulted)
+                        if (whenAllTask.IsFaulted)
                         {
                             otherBlockContainer.Fault(new OtherBlockContainerFailedException());
+                        }
+                        else if (whenAllTask.IsCanceled)
+                        {
+                            otherBlockContainer.Fault(new OtherBlockContainerCanceledException());
                         }
                         else
                         {
@@ -309,7 +309,7 @@ namespace Gridsum.DataflowEx
                     }
                 });
 
-            //Make sure 
+            //Make sure other container also fails me
             otherBlockContainer.CompletionTask.ContinueWith(otherTask =>
                 {
                     if (this.CompletionTask.IsCompleted)
@@ -317,10 +317,15 @@ namespace Gridsum.DataflowEx
                         return;
                     }
 
-                    if (otherTask.IsCanceled || otherTask.IsFaulted)
+                    if (otherTask.IsFaulted)
                     {
-                        LogHelper.Logger.InfoFormat("<{0}>Downstream block container faulted before I am done. Shut down myself.", this.Name);
+                        LogHelper.Logger.InfoFormat("<{0}>Downstream block container faulted before I am done. Fault myself.", this.Name);
                         this.Fault(new OtherBlockContainerFailedException());
+                    }
+                    else if (otherTask.IsCanceled)
+                    {
+                        LogHelper.Logger.InfoFormat("<{0}>Downstream block container canceled before I am done. Cancel myself.", this.Name);
+                        this.Fault(new OtherBlockContainerCanceledException());
                     }
                 });
         }

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test
@@ -76,6 +77,28 @@ namespace Gridsum.DataflowEx.Test
             Assert.IsTrue(buffer.Post(1));
             Assert.IsTrue(buffer.Post(1));
             Assert.IsFalse(buffer.Post(1));
+        }
+
+        [TestMethod]
+        public async Task TestCancellation()
+        {
+            var cts = new CancellationTokenSource();
+            var actionBlock = new ActionBlock<int>(i => Console.WriteLine(i), new ExecutionDataflowBlockOptions {CancellationToken = cts.Token});
+
+            actionBlock.Post(1);
+            actionBlock.Post(2);
+            actionBlock.Post(3);
+
+            await Task.Delay(200);
+
+            cts.Cancel();
+
+            var c = actionBlock.Completion;
+            await c.ContinueWith(t =>
+            {
+                Assert.IsTrue(t.IsCanceled);
+                Assert.IsTrue(t.Exception == null);
+            });
         }
     }
 }

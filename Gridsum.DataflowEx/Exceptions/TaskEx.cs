@@ -24,7 +24,7 @@ namespace Gridsum.DataflowEx.Exceptions
                 {
                     if (t.IsFaulted)
                     {
-                        var highPriorityException = t.Exception.Flatten().InnerExceptions.OrderByDescending(e => e, s_ExceptionComparer).First();
+                        var highPriorityException = UnwrapWithPriority(t.Exception);
                         tcs.SetException(highPriorityException);
                     }
                     else if (t.IsCanceled)
@@ -45,5 +45,14 @@ namespace Gridsum.DataflowEx.Exceptions
             return tcs.Task;
         }
 
+        public static Exception UnwrapWithPriority(AggregateException ae)
+        {
+            if (ae == null)
+            {
+                throw new ArgumentNullException("ae");
+            };
+
+            return ae.Flatten().InnerExceptions.OrderByDescending(e => e, s_ExceptionComparer).FirstOrDefault() ?? ae;
+        }
     }
 }
