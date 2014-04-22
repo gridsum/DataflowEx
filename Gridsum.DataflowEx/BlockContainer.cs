@@ -362,6 +362,8 @@ namespace Gridsum.DataflowEx
                 });
         }
 
+
+
         public void Link(IBlockContainer<TOut> other)
         {
             //this.OutputBlock.LinkTo(other.InputBlock, m_defaultOption);
@@ -410,6 +412,8 @@ namespace Gridsum.DataflowEx
                 );
             this.OutputBlock.LinkTo(DataflowBlock.NullTarget<TOut>(), m_defaultLinkOption, left);
         }
+
+        //todo: add link left to error (an action block that will fail myself)
 
         protected virtual void OnOutputToNull(TOut output)
         {
