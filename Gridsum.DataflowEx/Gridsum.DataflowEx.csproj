@@ -62,12 +62,14 @@
     <Compile Include="Database\DBColumnMapping.cs" />
     <Compile Include="DataBrancher.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
+    <Compile Include="Exceptions\NoBlockRegisteredException.cs" />
+    <Compile Include="Exceptions\TaskEx.cs" />
     <Compile Include="IntHolder.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Database\DbBulkInserter.cs" />
     <Compile Include="IBlockContainer.cs" />
     <Compile Include="Database\MultiDbBulkInserter.cs" />
-    <Compile Include="Exceptions\OtherBlockContainerFailedException.cs" />
+    <Compile Include="Exceptions\PropagatedException.cs" />
     <Compile Include="PatternMatch\IMatchable.cs" />
     <Compile Include="PatternMatch\IMatchCondition.cs" />
     <Compile Include="PatternMatch\MatchNoneCondition.cs" />

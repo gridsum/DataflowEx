@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 
 namespace Gridsum.DataflowEx
 {
@@ -44,7 +45,7 @@ namespace Gridsum.DataflowEx
             await base.GetCompletionTask();
 
             //wait for the containers
-            await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask);
+            await TaskEx.AwaitableWhenAll(m_b1.CompletionTask, m_b2.CompletionTask);
             this.CleanUp();            
         }
         
@@ -111,7 +112,7 @@ namespace Gridsum.DataflowEx
             await base.GetCompletionTask();
 
             //wait for the containers
-            await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask, m_b3.CompletionTask);
+            await TaskEx.AwaitableWhenAll(m_b1.CompletionTask, m_b2.CompletionTask, m_b3.CompletionTask);
             
             this.CleanUp();
         }

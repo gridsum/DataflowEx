@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 
 namespace Gridsum.DataflowEx.Database
 {
@@ -37,8 +38,9 @@ namespace Gridsum.DataflowEx.Database
                 BoundedCapacity = m_containerOptions.RecommendedCapacity ?? -1,                
             });
 
-            m_dispatchTask = DispatchLoop();
+            m_dispatchTask = DispatchLoop(); //todo: use an ActionBlock
 
+            //todo: register dynamically generated blocks?
             m_initer = p => new Lazy<DbBulkInserter<T>>(
                         () => new DbBulkInserter<T>(m_connectionGetter(p), m_destTable, m_options, destLabel, m_bulkSize, string.Format("{0}_{1}", this.Name, p))
                     );
@@ -96,7 +98,7 @@ namespace Gridsum.DataflowEx.Database
             await m_bufferBlock.Completion;
             await m_dispatchTask;
             
-            await Task.WhenAll(m_bulkInserterMap.Select(kv => kv.Value.Value.CompletionTask));
+            await TaskEx.AwaitableWhenAll(m_bulkInserterMap.Select(kv => kv.Value.Value.CompletionTask).ToArray());
             this.CleanUp();
         }
     }

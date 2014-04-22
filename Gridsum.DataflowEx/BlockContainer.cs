@@ -86,7 +86,7 @@ namespace Gridsum.DataflowEx
                     {
                         task.Exception.Flatten().Handle(e =>
                         {
-                            if (e is OtherBlockFailedException || e is OtherBlockContainerFailedException || e is OtherBlockCanceledException)
+                            if (e is PropagatedException)
                             {
                                 //do nothing if e is not an orignal exception
                             }
@@ -120,7 +120,7 @@ namespace Gridsum.DataflowEx
                     //Don't need to fault the whole container there because it is a NonOrignalException
                     Exception e = task.Exception.Flatten().InnerExceptions.First();
                     tcs.SetException(e);
-                    Debug.Assert(e is OtherBlockFailedException || e is OtherBlockContainerFailedException || e is OtherBlockCanceledException);
+                    Debug.Assert(e is PropagatedException);
                 }
                 else if (task.Status == TaskStatus.Canceled)
                 {
@@ -185,43 +185,15 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        protected virtual Task GetCompletionTask()
+        protected virtual async Task GetCompletionTask()
         {
             if (m_blockMetas.Count == 0)
             {
                 throw new NoBlockRegisteredException(this);
             }
 
-            var taskAll = Task.WhenAll(m_blockMetas.Select(b => b.CompletionTask));
-
-            //the following is just to flatten exceptions.
-            var tcs = new TaskCompletionSource<string>();
-            taskAll.ContinueWith(t =>
-            {
-                if (t.IsFaulted)
-                {
-                    var highPriorityException = t.Exception.Flatten().InnerExceptions.OrderByDescending(e => e, new ExceptionComparer()).First();
-                    tcs.SetException(highPriorityException);
-                }
-                else if (t.IsCanceled)
-                {
-                    tcs.SetCanceled();
-                }
-                else
-                {
-                    try
-                    {
-                        this.CleanUp();
-                        tcs.SetResult(string.Empty);
-                    }
-                    catch (Exception e)
-                    {
-                        tcs.SetException(e);
-                    }
-                }
-            });
-
-            return tcs.Task;
+            await TaskEx.AwaitableWhenAll(m_blockMetas.Select(b => b.CompletionTask).ToArray());
+            this.CleanUp();
         }
 
         protected virtual void CleanUp()
@@ -268,39 +240,6 @@ namespace Gridsum.DataflowEx
                 return m_blockMetas.Select(bm => bm.CountGetter).Sum(countGetter => countGetter());
             }
         }
-
-        private class ExceptionComparer : IComparer<Exception>
-        {
-            public int Compare(Exception x, Exception y)
-            {
-                if (x.GetType() == y.GetType())
-                {
-                    return 0;
-                }
-
-                if (x is OtherBlockFailedException)
-                {
-                    return -1;
-                }
-
-                if (y is OtherBlockFailedException)
-                {
-                    return 1;
-                }
-
-                if (x is OtherBlockContainerFailedException)
-                {
-                    return -1;
-                }
-
-                if (y is OtherBlockContainerFailedException)
-                {
-                    return 1;
-                }
-
-                return 0;
-            }
-        }
     }
 
     public abstract class BlockContainer<TIn> : BlockContainer, IBlockContainer<TIn>
@@ -329,6 +268,11 @@ namespace Gridsum.DataflowEx
                 Utils.GetFriendlyName(typeof(TIn)), 
                 Utils.GetFriendlyName(this.InputBlock.GetType())
                 ));
+        }
+
+        public void LinkFrom(ISourceBlock<TIn> block)
+        {
+            block.LinkTo(this.InputBlock, m_defaultLinkOption);
         }
     }
 
