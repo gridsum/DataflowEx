@@ -30,7 +30,7 @@ namespace Gridsum.DataflowEx
 
             m_transformBlock = new TransformBlock<T, T>(arg =>
             {
-                m_copyBuffer.SafePost(copyFunc == null ? arg : copyFunc(arg)); //todo: should post safely
+                m_copyBuffer.SafePost(copyFunc == null ? arg : copyFunc(arg));
                 return arg;
             });
 

@@ -47,21 +47,5 @@ namespace Gridsum.DataflowEx
 
             return merged;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SafePost<TIn>(this ITargetBlock<TIn> target, TIn item, int interval = 200, int retryCount = 3)
-        {
-            bool posted = target.Post(item);
-            if (posted) return;
-
-            for(int i = 1; i <= retryCount ;i ++)
-            {
-                Thread.Sleep(interval * i);
-                posted = target.Post(item);
-                if (posted) return;
-            }
-
-            throw new PostToBlockFailedException("Safe post to " + Utils.GetFriendlyName(target.GetType()) + " failed");
-        }
     }
 }
