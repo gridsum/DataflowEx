@@ -14,7 +14,7 @@ namespace Gridsum.DataflowEx
     public interface IChildMeta
     {
         IEnumerable<IDataflowBlock> Blocks { get; }
-        Task UnitCompletion { get; }
+        Task ChildCompletion { get; }
         int BufferCount { get; }
         string DisplayName { get; }
     }
@@ -36,7 +36,7 @@ namespace Gridsum.DataflowEx
         public IDataflowBlock Block { get { return m_block; } }
 
         public IEnumerable<IDataflowBlock> Blocks { get { return new [] {m_block}; } }
-        public Task UnitCompletion { get { return m_completion; } }
+        public Task ChildCompletion { get { return m_completion; } }
         public int BufferCount { get { return m_block.GetBufferCount(); } }
         public string DisplayName { get { return Utils.GetFriendlyName(m_block.GetType()); } }
     }
@@ -53,7 +53,7 @@ namespace Gridsum.DataflowEx
         }
 
         public IEnumerable<IDataflowBlock> Blocks { get { return m_container.Blocks; } }
-        public Task UnitCompletion { get { return m_completion; } }
+        public Task ChildCompletion { get { return m_completion; } }
         public int BufferCount { get { return m_container.BufferedCount; } }
         public string DisplayName { get { return m_container.Name; } }
     }

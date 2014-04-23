@@ -59,11 +59,6 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("block");
             }
 
-            if (m_completionTask.IsValueCreated)
-            {
-                throw new InvalidOperationException("You cannot register block after completion task has been generated. Please ensure you are calling RegisterBlock() inside constructor.");
-            }
-
             if (m_children.Any(m => m.Blocks.Contains(block)))
             {
                 throw new ArgumentException("Duplicate block registered in " + this.Name);
@@ -75,10 +70,12 @@ namespace Gridsum.DataflowEx
 
         protected void RegisterChild(BlockContainer childContainer, Action<Task> containerCompletionCallback = null)
         {
-            if (m_completionTask.IsValueCreated)
+            if (childContainer == null)
             {
-                throw new InvalidOperationException("You cannot register block container after completion task has been generated. Please ensure you are calling RegisterChildContainer() inside constructor.");
+                throw new ArgumentNullException("childContainer");
             }
+            
+            //todo: duplicate block container check?
 
             var wrappedCompletion = WrapUnitCompletion(childContainer.CompletionTask, childContainer.Name, containerCompletionCallback);
             m_children = m_children.Add(new BlockContainerMeta(childContainer, wrappedCompletion));
@@ -173,7 +170,14 @@ namespace Gridsum.DataflowEx
                 throw new NoChildRegisteredException(this);
             }
 
-            await TaskEx.AwaitableWhenAll(m_children.Select(b => b.UnitCompletion).ToArray());
+            ImmutableList<IChildMeta> childrenSnapShot;
+
+            do
+            {
+                childrenSnapShot = m_children;
+                await TaskEx.AwaitableWhenAll(childrenSnapShot.Select(b => b.ChildCompletion).ToArray());
+            } while (!object.ReferenceEquals(m_children, childrenSnapShot));
+
             this.CleanUp();
         }
 
@@ -189,7 +193,6 @@ namespace Gridsum.DataflowEx
         {
             get
             {
-                //todo: check multiple access and block registration
                 return m_completionTask.Value;
             }
         }

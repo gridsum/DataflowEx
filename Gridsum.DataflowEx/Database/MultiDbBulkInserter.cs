@@ -77,13 +77,5 @@ namespace Gridsum.DataflowEx.Database
         {
             get { return m_dispatchBlock; }
         }
-
-        protected override async Task GetCompletionTask()
-        {
-            await m_dispatchBlock.Completion;
-            
-            await TaskEx.AwaitableWhenAll(m_bulkInserterMap.Select(kv => kv.Value.Value.CompletionTask).ToArray());
-            this.CleanUp();
-        }
     }
 }

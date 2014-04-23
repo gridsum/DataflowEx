@@ -38,16 +38,6 @@ namespace Gridsum.DataflowEx
         {
             get { return m_b1.InputBlock; }
         }
-
-        protected override async Task GetCompletionTask()
-        {
-            //wait for the blocks
-            await base.GetCompletionTask();
-
-            //wait for the containers
-            await TaskEx.AwaitableWhenAll(m_b1.CompletionTask, m_b2.CompletionTask);
-            this.CleanUp();            
-        }
         
         public override void Fault(Exception exception)
         {
@@ -105,18 +95,7 @@ namespace Gridsum.DataflowEx
         {
             get { return m_b1.InputBlock; }
         }
-
-        protected override async Task GetCompletionTask()
-        {
-            //wait for the blocks
-            await base.GetCompletionTask();
-
-            //wait for the containers
-            await TaskEx.AwaitableWhenAll(m_b1.CompletionTask, m_b2.CompletionTask, m_b3.CompletionTask);
-            
-            this.CleanUp();
-        }
-
+        
         public override void Fault(Exception exception)
         {
             m_b1.Fault(exception);
