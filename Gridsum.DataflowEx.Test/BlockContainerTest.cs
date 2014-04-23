@@ -3,12 +3,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test
 {
     [TestClass]
-    public class BlockContainerBaseTest
+    public class BlockContainerTest
     {
         private async Task EnsureTaskFail<TE>(Task task) where TE : Exception
         {
@@ -40,10 +41,10 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.FromBlock(block2);
 
-            container1.Link(container2);
+            container1.LinkTo(container2);
             container2.LinkLeftToNull();
 
-            container1.InputBlock.Post(1);
+            container1.InputBlock.SafePost(1);
             container1.InputBlock.Complete();
 
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
@@ -70,8 +71,8 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.FromBlock(block2);
 
-            container1.Link(container2);
-            container2.Link(container1); //circular
+            container1.LinkTo(container2);
+            container2.LinkTo(container1); //circular
 
             container1.InputBlock.Post(1);
             await Task.Delay(1000); //IMPORTANT: wait for block work done (nothing left in their input/output queue)
@@ -109,17 +110,18 @@ namespace Gridsum.DataflowEx.Test
             await EnsureTaskFail<SystemException>(faultyContainer.CompletionTask);
             await EnsureTaskFail<OtherBlockContainerFailedException>(involvedContainer.CompletionTask);
         }
-
+        
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException), AllowDerivedTypes = false)]
-        public void TestTaskRegistration()
+        public async Task TestDynamicRegistering()
         {
-            var faultyContainer = new FaultyBlocks();
-            var involvedContainer = new InnocentBlocks();
-            faultyContainer.TransformAndLink(involvedContainer);
-            faultyContainer.LinkLeftToNull();
-
-            faultyContainer.Register(new BufferBlock<int>());
+            var container = new DynamicContainer();
+            var completion = container.CompletionTask;
+            var dynamicBlock = container.RegisterBlockDynamically();
+            container.InputBlock.Complete();
+            Assert.IsFalse(await completion.FinishesIn(TimeSpan.FromMilliseconds(100)));
+            
+            dynamicBlock.Complete();
+            Assert.IsTrue(await completion.FinishesIn(TimeSpan.FromMilliseconds(100)));
         }
     }
 
@@ -136,21 +138,21 @@ namespace Gridsum.DataflowEx.Test
                 Thread.Sleep(1000);
                 return s;
             });
-
-            this.RegisterBlock(m_inputBlock, null);
-
+            
             m_block2 = new TransformBlock<string, string>(s =>
             {
                 throw new SystemException("I'm done.");
 
                 return s;
             });
-
-            this.RegisterBlock(m_block2, null);
+            
             m_inputBlock.LinkTo(m_block2, m_defaultLinkOption);
+
+            this.RegisterChild(m_inputBlock, null);
+            this.RegisterChild(m_block2, null);
         }
 
-        public override System.Threading.Tasks.Dataflow.ITargetBlock<string> InputBlock
+        public override ITargetBlock<string> InputBlock
         {
             get { return m_inputBlock; }
         }
@@ -162,7 +164,7 @@ namespace Gridsum.DataflowEx.Test
 
         public void Register(IDataflowBlock block)
         {
-            this.RegisterBlock(block, delegate { return 0; });
+            this.RegisterChild(block);
         }
     }
 
@@ -179,12 +181,44 @@ namespace Gridsum.DataflowEx.Test
                 return;
             });
 
-            this.RegisterBlock(m_inputBlock, null);
+            this.RegisterChild(m_inputBlock, null);
         }
 
-        public override System.Threading.Tasks.Dataflow.ITargetBlock<string> InputBlock
+        public override ITargetBlock<string> InputBlock
         {
             get { return m_inputBlock; }
+        }
+    }
+
+    class DynamicContainer : BlockContainer<int, int>
+    {
+        private IPropagatorBlock<int, int> m_block;
+
+        public DynamicContainer() : base(BlockContainerOptions.Default)
+        {
+            m_block = RegisterBlockDynamically();
+        }
+
+        public IPropagatorBlock<int, int> RegisterBlockDynamically()
+        {
+            var block = CreateBlock();
+            RegisterChild(block);
+            return block;
+        }
+
+        public IPropagatorBlock<int, int> CreateBlock()
+        {
+            return new BufferBlock<int>();
+        }
+        
+        public override ITargetBlock<int> InputBlock
+        {
+            get { return m_block; }
+        }
+
+        public override ISourceBlock<int> OutputBlock
+        {
+            get { return m_block; }
         }
     }
 }

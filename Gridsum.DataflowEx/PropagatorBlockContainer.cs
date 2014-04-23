@@ -10,7 +10,7 @@ namespace Gridsum.DataflowEx
     public class PropagatorBlockContainer<TIn, TOut> : BlockContainer<TIn, TOut>
     {
         private readonly IPropagatorBlock<TIn, TOut> m_block;
-
+        
         public PropagatorBlockContainer(IPropagatorBlock<TIn, TOut> block) : this(block, BlockContainerOptions.Default)
         {}
 
@@ -18,7 +18,7 @@ namespace Gridsum.DataflowEx
             : base(containerOptions)
         {
             m_block = block;
-            RegisterBlock(m_block, null);
+            RegisterChild(m_block, null);
         }
 
         public override ITargetBlock<TIn> InputBlock
@@ -30,5 +30,6 @@ namespace Gridsum.DataflowEx
         {
             get { return m_block; }
         }
+
     }
 }

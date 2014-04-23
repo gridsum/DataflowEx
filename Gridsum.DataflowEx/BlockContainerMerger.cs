@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx.Exceptions;
 
 namespace Gridsum.DataflowEx
 {
@@ -22,7 +23,10 @@ namespace Gridsum.DataflowEx
             m_b1 = b1;
             m_b2 = b2;
 
-            m_b1.Link(m_b2);
+            m_b1.LinkTo(m_b2);
+
+            RegisterChild(m_b1);
+            RegisterChild(m_b2);
         }
 
         public override ISourceBlock<T3> OutputBlock
@@ -34,16 +38,10 @@ namespace Gridsum.DataflowEx
         {
             get { return m_b1.InputBlock; }
         }
-
-        protected override async Task GetCompletionTask()
-        {
-            await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask);
-            this.CleanUp();            
-        }
         
-        public override void Fault(Exception exception, bool propagateException = false)
+        public override void Fault(Exception exception)
         {
-            m_b1.Fault(exception, propagateException);
+            m_b1.Fault(exception);
         }
 
         public override IEnumerable<IDataflowBlock> Blocks
@@ -80,8 +78,12 @@ namespace Gridsum.DataflowEx
             m_b2 = b2;
             m_b3 = b3;
 
-            m_b1.Link(m_b2);
-            m_b2.Link(m_b3);
+            m_b1.LinkTo(m_b2);
+            m_b2.LinkTo(m_b3);
+
+            RegisterChild(m_b1);
+            RegisterChild(m_b2);
+            RegisterChild(m_b3);
         }
 
         public override ISourceBlock<T4> OutputBlock
@@ -93,16 +95,10 @@ namespace Gridsum.DataflowEx
         {
             get { return m_b1.InputBlock; }
         }
-
-        protected override async Task GetCompletionTask()
+        
+        public override void Fault(Exception exception)
         {
-            await Task.WhenAll(m_b1.CompletionTask, m_b2.CompletionTask, m_b3.CompletionTask);
-            this.CleanUp();
-        }
-
-        public override void Fault(Exception exception, bool propagateException = false)
-        {
-            m_b1.Fault(exception, propagateException);
+            m_b1.Fault(exception);
         }
 
         public override IEnumerable<IDataflowBlock> Blocks

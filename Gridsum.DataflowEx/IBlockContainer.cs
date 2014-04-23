@@ -9,7 +9,7 @@ namespace Gridsum.DataflowEx
     {
         IEnumerable<IDataflowBlock> Blocks { get; }
         Task CompletionTask { get; }
-        void Fault(Exception exception, bool propagateException);
+        void Fault(Exception exception);
         string Name { get; }
     }
 

@@ -11,9 +11,8 @@ namespace Gridsum.DataflowEx.Test
     [TestClass]
     public class TestAutoComplete
     {
-        public class Int : ITracableItem
+        public class Int : TracableItemBase
         {
-            public Guid UniqueId { get; set; }
             public int Val { get; set; }
         }
 
@@ -38,10 +37,10 @@ namespace Gridsum.DataflowEx.Test
 
             var pair = new AutoCompleteContainerPair<Int, Int>(TimeSpan.FromSeconds(1));
 
-            container1.Link(pair.Before);
-            pair.Before.Link(container2);
-            container2.Link(pair.After);
-            pair.After.Link(container1);
+            container1.LinkTo(pair.Before);
+            pair.Before.LinkTo(container2);
+            container2.LinkTo(pair.After);
+            pair.After.LinkTo(container1);
 
             container1.InputBlock.Post(new Int() {Val = 1});
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
@@ -66,11 +65,33 @@ namespace Gridsum.DataflowEx.Test
             var container1 = BlockContainerUtils.FromBlock(block1);
             var container2 = BlockContainerUtils.AutoComplete(BlockContainerUtils.FromBlock(block2), TimeSpan.FromSeconds(1));
             
-            container1.Link(container2);
-            container2.Link(container1);
+            container1.LinkTo(container2);
+            container2.LinkTo(container1);
 
             container1.InputBlock.Post(new Int() { Val = 1 });
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
+        }
+
+        [TestMethod]
+        public async Task TestAutoComplete3()
+        {
+            var block1 = new TransformManyBlock<Int, Int>(i =>
+            {
+                return new[] { i }; //preserve the guid
+            });
+            var block2 = new TransformManyBlock<Int, Int>(i =>
+            {
+                return Enumerable.Empty<Int>();
+            });
+
+            var container1 = BlockContainerUtils.FromBlock(block1);
+            var container2 = BlockContainerUtils.AutoComplete(BlockContainerUtils.FromBlock(block2), TimeSpan.FromSeconds(1));
+
+            container1.LinkTo(container2);
+            container2.LinkTo(container1);
+
+            container1.InputBlock.Post(new Int() { Val = 1 });
+            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(2)));
         }
     }
 }

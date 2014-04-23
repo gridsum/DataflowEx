@@ -39,6 +39,9 @@
       <HintPath>..\packages\Common.Logging.Core.2.2.0\lib\net40\Common.Logging.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>..\packages\Microsoft.Bcl.Immutable.1.0.30\lib\portable-net45+win8+wp8\System.Collections.Immutable.dll</HintPath>
+    </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.14.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -56,21 +59,34 @@
     <Compile Include="AutoCompletion\ControlItem.cs" />
     <Compile Include="AutoCompletion\ControlType.cs" />
     <Compile Include="AutoCompletion\ITracableItem.cs" />
+    <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="BlockContainer.cs" />
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
     <Compile Include="BlockContainerUtils.cs" />
     <Compile Include="Database\BulkDataReader.cs" />
     <Compile Include="Database\DBColumnMapping.cs" />
+    <Compile Include="DataBrancher.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
+    <Compile Include="Exceptions\NoChildRegisteredException.cs" />
+    <Compile Include="Exceptions\TaskEx.cs" />
     <Compile Include="IntHolder.cs" />
+    <Compile Include="IChildMeta.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Database\DbBulkInserter.cs" />
     <Compile Include="IBlockContainer.cs" />
     <Compile Include="Database\MultiDbBulkInserter.cs" />
-    <Compile Include="OtherBlockContainerFailedException.cs" />
-    <Compile Include="PostToInputBlockFailedException.cs" />
+    <Compile Include="Exceptions\PropagatedException.cs" />
+    <Compile Include="PatternMatch\IMatchable.cs" />
+    <Compile Include="PatternMatch\IMatchCondition.cs" />
+    <Compile Include="PatternMatch\MatchNoneCondition.cs" />
+    <Compile Include="PatternMatch\MatchType.cs" />
+    <Compile Include="PatternMatch\MultiMatcher.cs" />
+    <Compile Include="PatternMatch\StringMatchCondition.cs" />
+    <Compile Include="PatternMatch\UrlStringMatchCondition.cs" />
+    <Compile Include="Exceptions\PostToBlockFailedException.cs" />
     <Compile Include="PropagatorBlockContainer.cs" />
+    <Compile Include="TargetBlockContainer.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Database\TypeAccessor.cs" />

@@ -35,7 +35,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
             foreach (var entity in entities)
             {
-                inserter.InputBlock.Post(entity);
+                inserter.InputBlock.SafePost(entity);
             }
             inserter.InputBlock.Complete();
             inserter.CompletionTask.Wait();
