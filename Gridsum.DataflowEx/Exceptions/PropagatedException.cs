@@ -12,15 +12,16 @@ namespace Gridsum.DataflowEx.Exceptions
 
     public class OtherBlockContainerFailedException : PropagatedException
     {
-        public OtherBlockContainerFailedException() : base("Some exception from other block container brings me down")
+        public OtherBlockContainerFailedException()
+            : base("Some other block container went wrong so I am down")
         {
         }
     }
 
-    public class OtherBlockFailedException : PropagatedException
+    public class SiblingUnitFailedException : PropagatedException
     {
-        public OtherBlockFailedException()
-            : base("Some exception from other block in the same block container brings me down")
+        public SiblingUnitFailedException()
+            : base("Some sibling went wrong so I am down")
         {
         }
     }
@@ -33,10 +34,10 @@ namespace Gridsum.DataflowEx.Exceptions
         }
     }
 
-    public class OtherBlockCanceledException : Exception
+    public class SiblingUnitCanceledException : Exception
     {
-        public OtherBlockCanceledException()
-            : base("Some other block was canceled so I am down")
+        public SiblingUnitCanceledException()
+            : base("Some sibling was canceled so I am down")
         {
         }
     }

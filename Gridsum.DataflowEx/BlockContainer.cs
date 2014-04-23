@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -21,15 +22,8 @@ namespace Gridsum.DataflowEx
         protected readonly BlockContainerOptions m_containerOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
-        protected IList<BlockMeta> m_blockMetas = new List<BlockMeta>();
+        protected ImmutableList<IChildMeta> m_children = ImmutableList.Create<IChildMeta>();
         protected string m_defaultName;
-
-        protected class BlockMeta
-        {
-            public IDataflowBlock Block { get; set; }
-            public Func<int> CountGetter { get; set; }
-            public Task CompletionTask { get; set; }
-        }
 
         public BlockContainer(BlockContainerOptions containerOptions)
         {
@@ -58,7 +52,7 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Register this block to block meta. Also make sure the container will fail if the registered block fails.
         /// </summary>
-        protected void RegisterBlock(IDataflowBlock block, Func<int> countGetter = null, Action<Task> blockCompletionCallback = null)
+        protected void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null)
         {
             if (block == null)
             {
@@ -70,14 +64,36 @@ namespace Gridsum.DataflowEx
                 throw new InvalidOperationException("You cannot register block after completion task has been generated. Please ensure you are calling RegisterBlock() inside constructor.");
             }
 
-            if (m_blockMetas.Any(m => m.Block.Equals(block)))
+            if (m_children.Any(m => m.Blocks.Contains(block)))
             {
                 throw new ArgumentException("Duplicate block registered in " + this.Name);
             }
 
+            var wrappedCompletion = WrapUnitCompletion(block.Completion, Utils.GetFriendlyName(block.GetType()),blockCompletionCallback);
+            m_children = m_children.Add(new BlockMeta(block, wrappedCompletion));
+        }
+
+        protected void RegisterChild(BlockContainer childContainer, Action<Task> containerCompletionCallback = null)
+        {
+            if (m_completionTask.IsValueCreated)
+            {
+                throw new InvalidOperationException("You cannot register block container after completion task has been generated. Please ensure you are calling RegisterChildContainer() inside constructor.");
+            }
+
+            var wrappedCompletion = WrapUnitCompletion(childContainer.CompletionTask, childContainer.Name, containerCompletionCallback);
+            m_children = m_children.Add(new BlockContainerMeta(childContainer, wrappedCompletion));
+        }
+
+        /// <summary>
+        /// The Wrapping does 2 things:
+        /// (1) propagate error to other units of the block container
+        /// (2) call completion back of the unit
+        /// </summary>
+        protected Task WrapUnitCompletion(Task unitCompletion, string unitName, Action<Task> completionCallback)
+        {
             var tcs = new TaskCompletionSource<object>();
-            
-            block.Completion.ContinueWith(task =>
+
+            unitCompletion.ContinueWith(task =>
             {
                 if (task.Status == TaskStatus.Faulted)
                 {
@@ -99,42 +115,24 @@ namespace Gridsum.DataflowEx
                     try
                     {
                         //call callback
-                        if (blockCompletionCallback != null)
+                        if (completionCallback != null)
                         {
-                            blockCompletionCallback(task);
+                            completionCallback(task);
                         }
                         tcs.SetResult(string.Empty);
                     }
                     catch (Exception e)
                     {
-                        LogHelper.Logger.Error(h => h("[{0}] Error when callback {1} on its completion", this.Name, Utils.GetFriendlyName(block.GetType())), e);
+                        LogHelper.Logger.Error(h => h("[{0}] Error when callback {1} on its completion", this.Name, unitName), e);
                         tcs.SetException(e);
                         this.Fault(e);
                     }
                 }
             });
 
-            m_blockMetas.Add(new BlockMeta
-            {
-                Block = block, 
-                CompletionTask = tcs.Task, 
-                CountGetter = countGetter ?? (() => block.GetBufferCount())
-            });
+            return tcs.Task;
         }
-
-        protected void RegisterChildContainer(BlockContainer childContainer)
-        {
-            if (m_completionTask.IsValueCreated)
-            {
-                throw new InvalidOperationException("You cannot register block container after completion task has been generated. Please ensure you are calling RegisterChildContainer() inside constructor.");
-            }
-
-            foreach (BlockMeta blockMeta in childContainer.m_blockMetas)
-            {
-                m_blockMetas.Add(blockMeta);
-            }
-        }
-
+        
         //todo: add completion condition and cancellation token support
         private async Task StartPerformanceMonitorAsync()
         {
@@ -154,10 +152,10 @@ namespace Gridsum.DataflowEx
 
                 if (m_containerOptions.BlockMonitorEnabled)
                 {
-                    foreach (BlockMeta bm in m_blockMetas)
+                    foreach (BlockMeta bm in m_children)
                     {
                         IDataflowBlock block = bm.Block;
-                        var count = bm.CountGetter();
+                        var count = bm.BufferCount;
 
                         if (count != 0 || m_containerOptions.PerformanceMonitorMode == BlockContainerOptions.PerformanceLogMode.Verbose)
                         {
@@ -170,12 +168,12 @@ namespace Gridsum.DataflowEx
 
         protected virtual async Task GetCompletionTask()
         {
-            if (m_blockMetas.Count == 0)
+            if (m_children.Count == 0)
             {
-                throw new NoBlockRegisteredException(this);
+                throw new NoChildRegisteredException(this);
             }
 
-            await TaskEx.AwaitableWhenAll(m_blockMetas.Select(b => b.CompletionTask).ToArray());
+            await TaskEx.AwaitableWhenAll(m_children.Select(b => b.UnitCompletion).ToArray());
             this.CleanUp();
         }
 
@@ -196,7 +194,7 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        public virtual IEnumerable<IDataflowBlock> Blocks { get { return m_blockMetas.Select(bm => bm.Block); } }
+        public virtual IEnumerable<IDataflowBlock> Blocks { get { return m_children.SelectMany(bm => bm.Blocks); } }
 
         public virtual void Fault(Exception exception)
         {
@@ -216,11 +214,11 @@ namespace Gridsum.DataflowEx
                     }
                     else if (exception is TaskCanceledException)
                     {
-                        dataflowBlock.Fault(new OtherBlockCanceledException());
+                        dataflowBlock.Fault(new SiblingUnitCanceledException());
                     }
                     else
                     {
-                        dataflowBlock.Fault(new OtherBlockFailedException());
+                        dataflowBlock.Fault(new SiblingUnitFailedException());
                     }
                 }
             }
@@ -233,7 +231,7 @@ namespace Gridsum.DataflowEx
         {
             get
             {
-                return m_blockMetas.Select(bm => bm.CountGetter).Sum(countGetter => countGetter());
+                return m_children.Sum(bm => bm.BufferCount);
             }
         }
     }

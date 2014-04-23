@@ -30,8 +30,8 @@ namespace Gridsum.DataflowEx.Database
             });
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
 
-            RegisterBlock(m_batchBlock, () => m_batchBlock.OutputCount * m_bulkSize);
-            RegisterBlock(m_actionBlock, () => m_actionBlock.InputCount * m_bulkSize);
+            RegisterChild(m_batchBlock);
+            RegisterChild(m_actionBlock);
         }
 
         private async Task DumpToDB(IEnumerable<T> data, string destTable, string connectionString, string destLabel)

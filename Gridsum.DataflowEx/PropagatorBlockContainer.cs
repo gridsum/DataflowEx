@@ -18,7 +18,7 @@ namespace Gridsum.DataflowEx
             : base(containerOptions)
         {
             m_block = block;
-            RegisterBlock(m_block, null);
+            RegisterChild(m_block, null);
         }
 
         public override ITargetBlock<TIn> InputBlock

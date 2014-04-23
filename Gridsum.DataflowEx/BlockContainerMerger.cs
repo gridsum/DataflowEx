@@ -25,8 +25,8 @@ namespace Gridsum.DataflowEx
 
             m_b1.LinkTo(m_b2);
 
-            RegisterChildContainer(m_b1);
-            RegisterChildContainer(m_b2);
+            RegisterChild(m_b1);
+            RegisterChild(m_b2);
         }
 
         public override ISourceBlock<T3> OutputBlock
@@ -91,9 +91,9 @@ namespace Gridsum.DataflowEx
             m_b1.LinkTo(m_b2);
             m_b2.LinkTo(m_b3);
 
-            RegisterChildContainer(m_b1);
-            RegisterChildContainer(m_b2);
-            RegisterChildContainer(m_b3);
+            RegisterChild(m_b1);
+            RegisterChild(m_b2);
+            RegisterChild(m_b3);
         }
 
         public override ISourceBlock<T4> OutputBlock

@@ -52,12 +52,12 @@ namespace Gridsum.DataflowEx.Database
                         m_bulkSize, string.Format("{0}_{1}", this.Name, p));
 
                     //Register dynamically generated blocks to enable upstream propagation
-                    this.RegisterChildContainer(singleInserter);
+                    this.RegisterChild(singleInserter);
 
                     return singleInserter;
                 });
 
-            RegisterBlock(m_dispatchBlock, null , t =>
+            RegisterChild(m_dispatchBlock, t =>
             {
                 //propagate completion to children as we don't have 'link'
                 if (t.Status == TaskStatus.RanToCompletion)

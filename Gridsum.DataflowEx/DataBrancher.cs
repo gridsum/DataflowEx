@@ -43,8 +43,8 @@ namespace Gridsum.DataflowEx
                 }
             });
 
-            RegisterBlock(m_copyBuffer);
-            RegisterBlock(m_transformBlock);
+            RegisterChild(m_copyBuffer);
+            RegisterChild(m_transformBlock);
         }
 
         public override ITargetBlock<T> InputBlock

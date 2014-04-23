@@ -48,6 +48,11 @@ namespace Gridsum.DataflowEx
                 return b.Count;
             }
 
+            if (blockGenericType == typeof (BatchBlock<>))
+            {
+                return b.OutputCount*b.BatchSize;
+            }
+
 //            if (typeof(ISourceBlock<>).IsInstanceOfType(block))
 //            {
 //                return b.OutputCount;
