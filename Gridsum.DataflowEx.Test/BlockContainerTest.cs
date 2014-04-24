@@ -93,8 +93,8 @@ namespace Gridsum.DataflowEx.Test
 
             Assert.AreEqual("PropagatorBlockContainer<String, String>1", container1.Name);
             Assert.AreEqual("PropagatorBlockContainer<String, String>2", container2.Name);
-            Assert.AreEqual("FaultyBlocks1", container3.Name);
-            Assert.AreEqual("FaultyBlocks2", container4.Name);
+            Assert.IsTrue(container3.Name.StartsWith("FaultyBlocks"));
+            Assert.IsTrue(container4.Name.StartsWith("FaultyBlocks"));
         }
         
         [TestMethod]
@@ -109,6 +109,34 @@ namespace Gridsum.DataflowEx.Test
 
             await EnsureTaskFail<SystemException>(faultyContainer.CompletionTask);
             await EnsureTaskFail<LinkedContainerFailedException>(involvedContainer.CompletionTask);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void TestLinkLeftToNull()
+        {
+            var faultyContainer = new FaultyBlocks();
+            var involvedContainer = new InnocentBlocks();
+            faultyContainer.TransformAndLink(involvedContainer);
+            faultyContainer.LinkLeftToNull();
+            faultyContainer.TransformAndLink(involvedContainer);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void TestLinkLeftToNull2()
+        {
+            var faultyContainer = new FaultyBlocks();
+            var involvedContainer = new InnocentBlocks();
+            faultyContainer.LinkLeftToNull();
+            faultyContainer.TransformAndLink(involvedContainer);
+        }
+
+        [TestMethod]
+        public void TestLinkLeftToNull3()
+        {
+            var faultyContainer = new FaultyBlocks();
+            faultyContainer.LinkLeftToNull();
         }
         
         [TestMethod]

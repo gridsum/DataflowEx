@@ -227,12 +227,18 @@ namespace Gridsum.DataflowEx
 
     public abstract class BlockContainer<TIn, TOut> : BlockContainer<TIn>, IBlockContainer<TIn, TOut>
     {
-        protected List<Predicate<TOut>> m_conditions = new List<Predicate<TOut>>();
+        protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
+        protected Lazy<ImmutableList<Predicate<TOut>>> m_frozenConditions;
         protected StatisticsRecorder GarbageRecorder { get; private set; }
 
         protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
         {
             this.GarbageRecorder = new StatisticsRecorder();
+            m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
+            m_frozenConditions = new Lazy<ImmutableList<Predicate<TOut>>>(() =>
+            {
+                return m_condBuilder.ToImmutable();
+            });
         }
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
@@ -295,7 +301,12 @@ namespace Gridsum.DataflowEx
 
         public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
         {
-            m_conditions.Add(predicate);
+            if (m_frozenConditions.IsValueCreated)
+            {
+                throw new InvalidOperationException("You cannot call TransformAndLink after LinkLeftToNull has been called");
+            }
+
+            m_condBuilder.Add(predicate);
             var converter = new TransformBlock<TOut, TTarget>(transform);
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
             
@@ -319,9 +330,10 @@ namespace Gridsum.DataflowEx
 
         public void LinkLeftToNull()
         {
+            var frozenConds = m_frozenConditions.Value;
             var left = new Predicate<TOut>(@out =>
                 {
-                    if (m_conditions.All(condition => !condition(@out)))
+                    if (frozenConds.All(condition => !condition(@out)))
                     {
                         OnOutputToNull(@out);
                         return true;
@@ -332,6 +344,7 @@ namespace Gridsum.DataflowEx
                     }
                 }
                 );
+
             this.OutputBlock.LinkTo(DataflowBlock.NullTarget<TOut>(), m_defaultLinkOption, left);
         }
 
