@@ -108,7 +108,7 @@ namespace Gridsum.DataflowEx.Test
             faultyContainer.InputBlock.Post("test");
 
             await EnsureTaskFail<SystemException>(faultyContainer.CompletionTask);
-            await EnsureTaskFail<OtherBlockContainerFailedException>(involvedContainer.CompletionTask);
+            await EnsureTaskFail<LinkedContainerFailedException>(involvedContainer.CompletionTask);
         }
         
         [TestMethod]
