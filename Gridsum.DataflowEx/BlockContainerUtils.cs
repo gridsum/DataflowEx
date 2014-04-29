@@ -38,14 +38,7 @@ namespace Gridsum.DataflowEx
             where TIn : ITracableItem
             where TOut : ITracableItem 
         {
-            var autoCompletePair = new AutoCompleteContainerPair<TIn, TOut>(timeout);
-
-            var merged = new BlockContainerMerger<TIn, TIn, TOut, TOut>(
-                autoCompletePair.Before, 
-                blockContainer,
-                autoCompletePair.After);
-
-            return merged;
+            return new AutoCompleteWrapper<TIn, TOut>(blockContainer, timeout);
         }
     }
 }
