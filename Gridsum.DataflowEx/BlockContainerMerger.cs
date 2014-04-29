@@ -38,24 +38,6 @@ namespace Gridsum.DataflowEx
         {
             get { return m_b1.InputBlock; }
         }
-        
-        public override void Fault(Exception exception)
-        {
-            m_b1.Fault(exception);
-        }
-
-        public override IEnumerable<IDataflowBlock> Blocks
-        {
-            get
-            {
-                return m_b1.Blocks.Concat(m_b2.Blocks);
-            }
-        }
-
-        public override int BufferedCount
-        {
-            get { return m_b1.BufferedCount + m_b2.BufferedCount; }
-        }
     }
 
     /// <summary>
@@ -94,24 +76,6 @@ namespace Gridsum.DataflowEx
         public override ITargetBlock<T1> InputBlock
         {
             get { return m_b1.InputBlock; }
-        }
-        
-        public override void Fault(Exception exception)
-        {
-            m_b1.Fault(exception);
-        }
-
-        public override IEnumerable<IDataflowBlock> Blocks
-        {
-            get
-            {
-                return m_b1.Blocks.Concat(m_b2.Blocks).Concat(m_b3.Blocks);
-            }
-        }
-
-        public override int BufferedCount
-        {
-            get { return m_b1.BufferedCount + m_b2.BufferedCount + m_b3.BufferedCount; }
         }
     }
 }

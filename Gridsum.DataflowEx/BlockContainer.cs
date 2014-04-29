@@ -59,13 +59,12 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("block");
             }
 
-            if (m_children.Any(m => m.Blocks.Contains(block)))
+            if (m_children.OfType<BlockMeta>().Any(bm => bm.Block.Equals(block)))
             {
                 throw new ArgumentException("Duplicate block registered in " + this.Name);
             }
 
-            var wrappedCompletion = WrapUnitCompletion(block.Completion, Utils.GetFriendlyName(block.GetType()),blockCompletionCallback);
-            m_children = m_children.Add(new BlockMeta(block, wrappedCompletion));
+            m_children = m_children.Add(new BlockMeta(block, this, blockCompletionCallback));
         }
 
         protected void RegisterChild(BlockContainer childContainer, Action<Task> containerCompletionCallback = null)
@@ -74,60 +73,13 @@ namespace Gridsum.DataflowEx
             {
                 throw new ArgumentNullException("childContainer");
             }
-            
-            //todo: duplicate block container check?
 
-            var wrappedCompletion = WrapUnitCompletion(childContainer.CompletionTask, childContainer.Name, containerCompletionCallback);
-            m_children = m_children.Add(new BlockContainerMeta(childContainer, wrappedCompletion));
-        }
-
-        /// <summary>
-        /// The Wrapping does 2 things:
-        /// (1) propagate error to other units of the block container
-        /// (2) call completion back of the unit
-        /// </summary>
-        protected Task WrapUnitCompletion(Task unitCompletion, string unitName, Action<Task> completionCallback)
-        {
-            var tcs = new TaskCompletionSource<object>();
-
-            unitCompletion.ContinueWith(task =>
+            if (m_children.OfType<BlockContainerMeta>().Any(cm => cm.Container.Equals(childContainer)))
             {
-                if (task.Status == TaskStatus.Faulted)
-                {
-                    var exception = TaskEx.UnwrapWithPriority(task.Exception);
-                    tcs.SetException(exception);
+                throw new ArgumentException("Duplicate block container registered in " + this.Name);
+            }
 
-                    if (!(exception is PropagatedException))
-                    {
-                        this.Fault(exception); //fault other blocks if this is an original exception
-                    }
-                }
-                else if (task.Status == TaskStatus.Canceled)
-                {
-                    tcs.SetCanceled();
-                    this.Fault(new TaskCanceledException());
-                }
-                else //success
-                {
-                    try
-                    {
-                        //call callback
-                        if (completionCallback != null)
-                        {
-                            completionCallback(task);
-                        }
-                        tcs.SetResult(string.Empty);
-                    }
-                    catch (Exception e)
-                    {
-                        LogHelper.Logger.Error(h => h("[{0}] Error when callback {1} on its completion", this.Name, unitName), e);
-                        tcs.SetException(e);
-                        this.Fault(e);
-                    }
-                }
-            });
-
-            return tcs.Task;
+            m_children = m_children.Add(new BlockContainerMeta(childContainer, this, containerCompletionCallback));
         }
         
         //todo: add completion condition and cancellation token support
@@ -149,14 +101,14 @@ namespace Gridsum.DataflowEx
 
                 if (m_containerOptions.BlockMonitorEnabled)
                 {
-                    foreach (BlockMeta bm in m_children)
+                    foreach(var child in m_children)
                     {
-                        IDataflowBlock block = bm.Block;
-                        var count = bm.BufferCount;
+                        var count = child.BufferCount;
 
                         if (count != 0 || m_containerOptions.PerformanceMonitorMode == BlockContainerOptions.PerformanceLogMode.Verbose)
                         {
-                            LogHelper.Logger.Debug(h => h("[{0}->{1}] has {2} todo items at this moment.", this.Name, Utils.GetFriendlyName(block.GetType()), count));
+                            IChildMeta c = child;
+                            LogHelper.Logger.Debug(h => h("{0} has {1} todo items at this moment.", c.DisplayName, count));
                         }
                     }
                 }
@@ -203,25 +155,25 @@ namespace Gridsum.DataflowEx
         {
             LogHelper.Logger.ErrorFormat("<{0}> Exception occur. Shutting down my working blocks...", exception, this.Name);
 
-            foreach (var dataflowBlock in Blocks)
+            foreach (var child in m_children)
             {
-                if (!dataflowBlock.Completion.IsCompleted)
+                if (!child.ChildCompletion.IsCompleted)
                 {
-                    string msg = string.Format("<{0}> Shutting down {1}", this.Name, Utils.GetFriendlyName(dataflowBlock.GetType()));
+                    string msg = string.Format("{0} is shutting down", child.DisplayName);
                     LogHelper.Logger.Error(msg);
 
                     //just pass on PropagatedException (do not use original exception here)
                     if (exception is PropagatedException)
                     {
-                        dataflowBlock.Fault(exception);
+                        child.Fault(exception);
                     }
                     else if (exception is TaskCanceledException)
                     {
-                        dataflowBlock.Fault(new SiblingUnitCanceledException());
+                        child.Fault(new SiblingUnitCanceledException());
                     }
                     else
                     {
-                        dataflowBlock.Fault(new SiblingUnitFailedException());
+                        child.Fault(new SiblingUnitFailedException());
                     }
                 }
             }
@@ -275,12 +227,18 @@ namespace Gridsum.DataflowEx
 
     public abstract class BlockContainer<TIn, TOut> : BlockContainer<TIn>, IBlockContainer<TIn, TOut>
     {
-        protected List<Predicate<TOut>> m_conditions = new List<Predicate<TOut>>();
+        protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
+        protected Lazy<ImmutableList<Predicate<TOut>>> m_frozenConditions;
         protected StatisticsRecorder GarbageRecorder { get; private set; }
 
         protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
         {
             this.GarbageRecorder = new StatisticsRecorder();
+            m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
+            m_frozenConditions = new Lazy<ImmutableList<Predicate<TOut>>>(() =>
+            {
+                return m_condBuilder.ToImmutable();
+            });
         }
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
@@ -297,11 +255,11 @@ namespace Gridsum.DataflowEx
                     {
                         if (whenAllTask.IsFaulted)
                         {
-                            otherBlockContainer.Fault(new OtherBlockContainerFailedException());
+                            otherBlockContainer.Fault(new LinkedContainerFailedException());
                         }
                         else if (whenAllTask.IsCanceled)
                         {
-                            otherBlockContainer.Fault(new OtherBlockContainerCanceledException());
+                            otherBlockContainer.Fault(new LinkedContainerCanceledException());
                         }
                         else
                         {
@@ -321,12 +279,12 @@ namespace Gridsum.DataflowEx
                     if (otherTask.IsFaulted)
                     {
                         LogHelper.Logger.InfoFormat("<{0}>Downstream block container faulted before I am done. Fault myself.", this.Name);
-                        this.Fault(new OtherBlockContainerFailedException());
+                        this.Fault(new LinkedContainerFailedException());
                     }
                     else if (otherTask.IsCanceled)
                     {
                         LogHelper.Logger.InfoFormat("<{0}>Downstream block container canceled before I am done. Cancel myself.", this.Name);
-                        this.Fault(new OtherBlockContainerCanceledException());
+                        this.Fault(new LinkedContainerCanceledException());
                     }
                 });
         }
@@ -343,7 +301,12 @@ namespace Gridsum.DataflowEx
 
         public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
         {
-            m_conditions.Add(predicate);
+            if (m_frozenConditions.IsValueCreated)
+            {
+                throw new InvalidOperationException("You cannot call TransformAndLink after LinkLeftToNull has been called");
+            }
+
+            m_condBuilder.Add(predicate);
             var converter = new TransformBlock<TOut, TTarget>(transform);
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
             
@@ -367,9 +330,10 @@ namespace Gridsum.DataflowEx
 
         public void LinkLeftToNull()
         {
+            var frozenConds = m_frozenConditions.Value;
             var left = new Predicate<TOut>(@out =>
                 {
-                    if (m_conditions.All(condition => !condition(@out)))
+                    if (frozenConds.All(condition => !condition(@out)))
                     {
                         OnOutputToNull(@out);
                         return true;
@@ -380,6 +344,7 @@ namespace Gridsum.DataflowEx
                     }
                 }
                 );
+
             this.OutputBlock.LinkTo(DataflowBlock.NullTarget<TOut>(), m_defaultLinkOption, left);
         }
 
