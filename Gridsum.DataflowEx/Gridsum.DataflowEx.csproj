@@ -54,7 +54,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AutoCompletion\AutoCompleteContainerPair.cs" />
+    <Compile Include="AutoCompletion\AutoCompleteWrapper.cs" />
+    <Compile Include="AutoCompletion\ControlItem.cs" />
+    <Compile Include="AutoCompletion\ControlType.cs" />
     <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="BlockContainer.cs" />

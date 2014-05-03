@@ -348,6 +348,8 @@ namespace Gridsum.DataflowEx
             this.OutputBlock.LinkTo(DataflowBlock.NullTarget<TOut>(), m_defaultLinkOption, left);
         }
 
+        //todo: add link left to error (an action block that will fail myself)
+
         protected virtual void OnOutputToNull(TOut output)
         {
             this.GarbageRecorder.RecordType(output.GetType());
