@@ -57,6 +57,7 @@ namespace Gridsum.DataflowEx
                     if (!(exception is PropagatedException))
                     {
                         m_host.Fault(exception); //fault other blocks if this is an original exception
+                        //todo: log this original exception
                     }
                 }
                 else if (task.Status == TaskStatus.Canceled)
