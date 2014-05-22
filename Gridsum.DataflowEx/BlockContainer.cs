@@ -131,6 +131,8 @@ namespace Gridsum.DataflowEx
             } while (!object.ReferenceEquals(m_children, childrenSnapShot));
 
             this.CleanUp();
+
+            LogHelper.Logger.Info(string.Format("{0} is completed", this.Name));
         }
 
         protected virtual void CleanUp()

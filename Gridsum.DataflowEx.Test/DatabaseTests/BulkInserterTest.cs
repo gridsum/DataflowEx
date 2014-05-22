@@ -2,7 +2,6 @@
 using System.Data.Entity;
 using System.Linq;
 using System.Threading.Tasks.Dataflow;
-using Gridsum.DataflowEx.Database;
 using Gridsum.DataflowEx.Databases;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
