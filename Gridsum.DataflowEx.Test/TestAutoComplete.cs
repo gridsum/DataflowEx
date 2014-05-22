@@ -19,11 +19,7 @@ namespace Gridsum.DataflowEx.Test
         [TestMethod]
         public async Task TestAutoComplete1()
         {
-            var block1 = new TransformManyBlock<Int, Int>(i =>
-            {
-                return new[] { i }; //preserve the guid
-            });
-            var block2 = new TransformManyBlock<Int, Int>(i =>
+            var block = new TransformManyBlock<Int, Int>(i =>
             {
                 int j = i.Val + 1;
                 Console.WriteLine("block2: i = {0}, j = {1}", i.Val, j);
@@ -32,8 +28,8 @@ namespace Gridsum.DataflowEx.Test
                 else return Enumerable.Empty<Int>();
             });
 
-            var dataflow1 = DataflowUtils.FromBlock(block1);
-            var dataflow2 = DataflowUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
+            var dataflow1 = DataflowUtils.FromDelegate<Int, Int>(i => i);
+            var dataflow2 = DataflowUtils.FromBlock(block).AutoComplete(TimeSpan.FromSeconds(1));
             
             dataflow1.LinkTo(dataflow2);
             dataflow2.LinkTo(dataflow1);
@@ -45,16 +41,12 @@ namespace Gridsum.DataflowEx.Test
         [TestMethod]
         public async Task TestAutoComplete2()
         {
-            var block1 = new TransformManyBlock<Int, Int>(i =>
-            {
-                return new[] { i }; //preserve the guid
-            });
             var block2 = new TransformManyBlock<Int, Int>(i =>
             {
                 return Enumerable.Empty<Int>();
             });
 
-            var dataflow1 = DataflowUtils.FromBlock(block1);
+            var dataflow1 = DataflowUtils.FromDelegate<Int, Int>(i => new[] { i }); //preserve the guid
             var dataflow2 = DataflowUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
 
             dataflow1.LinkTo(dataflow2);

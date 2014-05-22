@@ -14,9 +14,19 @@ namespace Gridsum.DataflowEx
 {
     public static class DataflowUtils
     {
+        public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action)
+        {
+            return FromBlock(new ActionBlock<TIn>(action));
+        }
+
         public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block)
         {
             return new TargetDataflow<TIn>(block);
+        }
+
+        public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action, DataflowOptions options)
+        {
+            return FromBlock(new ActionBlock<TIn>(action), options);
         }
 
         public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, DataflowOptions options)
@@ -24,9 +34,29 @@ namespace Gridsum.DataflowEx
             return new TargetDataflow<TIn>(block, options);
         }
 
+        public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, TOut> transform)
+        {
+            return FromBlock(new TransformBlock<TIn, TOut>(transform));
+        }
+
+        public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, IEnumerable<TOut>> transformMany)
+        {
+            return FromBlock(new TransformManyBlock<TIn, TOut>(transformMany));
+        }
+
         public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
         {
             return new PropagatorDataflow<TIn, TOut>(block);
+        }
+
+        public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, TOut> func, DataflowOptions options)
+        {
+            return FromBlock(new TransformBlock<TIn, TOut>(func), options);
+        }
+
+        public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, IEnumerable<TOut>> transformMany, DataflowOptions options)
+        {
+            return FromBlock(new TransformManyBlock<TIn, TOut>(transformMany), options);
         }
 
         public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, DataflowOptions options)
