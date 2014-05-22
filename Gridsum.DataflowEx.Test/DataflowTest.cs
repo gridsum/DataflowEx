@@ -82,7 +82,7 @@ namespace Gridsum.DataflowEx.Test
         }
 
         [TestMethod]
-        public async Task TestContainerName()
+        public void TestContainerName()
         {
             var block1 = new TransformBlock<string, string>(i => i);
             var block2 = new TransformBlock<string, string>(i => i);
@@ -170,7 +170,6 @@ namespace Gridsum.DataflowEx.Test
             m_block2 = new TransformBlock<string, string>(s =>
             {
                 throw new SystemException("I'm done.");
-
                 return s;
             });
             
