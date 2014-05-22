@@ -134,12 +134,12 @@ namespace Gridsum.DataflowEx.Databases
 
         public bool GetBoolean(int i)
         {
-            return GetValue(i);
+            return (bool) GetValue(i);
         }
 
         public byte GetByte(int i)
         {
-            return GetValue(i);
+            return (byte) GetValue(i);
         }
 
         public long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
@@ -149,7 +149,7 @@ namespace Gridsum.DataflowEx.Databases
 
         public char GetChar(int i)
         {
-            return GetValue(i);
+            return (char) GetValue(i);
         }
 
         public long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length)
@@ -205,7 +205,7 @@ namespace Gridsum.DataflowEx.Databases
 
         public DateTime GetDateTime(int i)
         {
-            return GetValue(i);
+            return (DateTime) GetValue(i);
         }
 
         public decimal GetDecimal(int i)
@@ -215,37 +215,37 @@ namespace Gridsum.DataflowEx.Databases
 
         public double GetDouble(int i)
         {
-            return GetValue(i);
+            return (double) GetValue(i);
         }
 
         public float GetFloat(int i)
         {
-            return GetValue(i);
+            return (float) GetValue(i);
         }
 
         public Guid GetGuid(int i)
         {
-            return GetValue(i);
+            return (Guid) GetValue(i);
         }
 
         public short GetInt16(int i)
         {
-            return GetValue(i);
+            return (short) GetValue(i);
         }
 
         public int GetInt32(int i)
         {
-            return GetValue(i);
+            return (int) GetValue(i);
         }
 
         public long GetInt64(int i)
         {
-            return GetValue(i);
+            return (long) GetValue(i);
         }
 
         public string GetString(int i)
         {
-            return GetValue(i);
+            return (string) GetValue(i);
         }
 
         #endregion
@@ -255,9 +255,9 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="i">column index</param>
         /// <returns></returns>
-        public dynamic GetValue(int i)
+        public object GetValue(int i)
         {
-            Func<T, dynamic> func = m_typeAccessor.GetPropertyAccessor(i);
+            Func<T, object> func = m_typeAccessor.GetPropertyAccessor(i);
             /*var value = func(Current);
             var mapping = m_typeAccessor.GetColumnMapping(i);
 

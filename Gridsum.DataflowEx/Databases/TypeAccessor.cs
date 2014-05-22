@@ -51,7 +51,7 @@ namespace Gridsum.DataflowEx.Databases
         private readonly IList<DBColumnMapping> m_dbColumnMappings;
         private readonly string m_destinationTablename;
         private readonly string m_destLabel;
-        private readonly Dictionary<int, Func<T, dynamic>> m_properties;
+        private readonly Dictionary<int, Func<T, object>> m_properties;
 
         private DataTable m_schemaTable;
 
@@ -614,7 +614,7 @@ namespace Gridsum.DataflowEx.Databases
             get { return m_properties.Count; }
         }
 
-        public Func<T, dynamic> GetPropertyAccessor(int columnOffset)
+        public Func<T, object> GetPropertyAccessor(int columnOffset)
         {
             return m_properties[columnOffset];
         }
