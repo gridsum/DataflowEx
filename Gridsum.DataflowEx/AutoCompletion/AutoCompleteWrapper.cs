@@ -17,11 +17,11 @@ namespace Gridsum.DataflowEx.AutoCompletion
         private Guid? m_last;
         private Dataflow<TIn, TIn> m_before;
         private Dataflow<TOut, TOut> m_after;
-        private Dataflow<TIn, TOut> m_container;
+        private Dataflow<TIn, TOut> m_Dataflow;
 
-        public AutoCompleteWrapper(Dataflow<TIn, TOut> container, TimeSpan processTimeout) : base(BlockContainerOptions.Default)
+        public AutoCompleteWrapper(Dataflow<TIn, TOut> dataflow, TimeSpan processTimeout) : base(DataflowOptions.Default)
         {
-            m_container = container;
+            m_Dataflow = dataflow;
             m_processTimeout = processTimeout;
             m_timer = new Timer();
             m_timer.Interval = m_processTimeout.TotalMilliseconds;
@@ -38,7 +38,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
                 return @in;
             });
 
-            m_before = BlockContainerUtils.FromBlock(before);
+            m_before = DataflowUtils.FromBlock(before);
 
             var after = new TransformBlock<TOut, TOut>(@out =>
             {
@@ -55,19 +55,19 @@ namespace Gridsum.DataflowEx.AutoCompletion
                 return @out;
             });
 
-            m_after = BlockContainerUtils.FromBlock(after);
+            m_after = DataflowUtils.FromBlock(after);
 
-            m_before.LinkTo(container);
-            container.LinkTo(m_after);
+            m_before.LinkTo(dataflow);
+            dataflow.LinkTo(m_after);
 
             RegisterChild(m_before);
-            RegisterChild(container);
+            RegisterChild(dataflow);
             RegisterChild(m_after);
         }
 
         void OnTimerElapsed(object sender, ElapsedEventArgs e)
         {
-            LogHelper.Logger.InfoFormat("Auto complete timer elapsed. Shutting down block containers..");
+            LogHelper.Logger.InfoFormat("Auto complete timer elapsed. Shutting down the inner dataflow ({0})..", m_Dataflow.Name);
 
             m_before.InputBlock.Complete(); //pass completion down to the chain
         }
@@ -86,7 +86,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         {
             get
             {
-                return string.Format("{0}-AutoComplete", m_container.Name);
+                return string.Format("{0}-AutoComplete", m_Dataflow.Name);
             }
         }
     }

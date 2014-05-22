@@ -9,10 +9,10 @@ using Gridsum.DataflowEx.Exceptions;
 namespace Gridsum.DataflowEx
 {
     /// <summary>
-    /// Represents a unit/child of a container whose lifecycle should be observed and managed
-    /// by a host container
+    /// Represents a unit/child of a dataflow whose lifecycle should be observed and managed
+    /// by a host dataflow
     /// </summary>
-    public interface IChildMeta
+    public interface IDataflowChildMeta
     {
         IEnumerable<IDataflowBlock> Blocks { get; }
         Task ChildCompletion { get; }
@@ -21,7 +21,7 @@ namespace Gridsum.DataflowEx
         void Fault(Exception e);
     }
 
-    internal abstract class ChildMetaBase : IChildMeta
+    internal abstract class DataflowChildMeta : IDataflowChildMeta
     {
         protected readonly Dataflow m_host;
         private readonly Action<Task> m_completionCallback;
@@ -32,7 +32,7 @@ namespace Gridsum.DataflowEx
         public abstract string DisplayName { get; }
         public abstract void Fault(Exception e);
 
-        protected ChildMetaBase(Dataflow host, Action<Task> completionCallback)
+        protected DataflowChildMeta(Dataflow host, Action<Task> completionCallback)
         {
             m_host = host;
             m_completionCallback = completionCallback;
@@ -92,7 +92,7 @@ namespace Gridsum.DataflowEx
     /// <summary>
     /// A block as child
     /// </summary>
-    internal class BlockMeta : ChildMetaBase
+    internal class BlockMeta : DataflowChildMeta
     {
         private readonly IDataflowBlock m_block;
         private readonly Task m_completion;
@@ -121,33 +121,33 @@ namespace Gridsum.DataflowEx
     }
 
     /// <summary>
-    /// A block container as child
+    /// A data flow as child
     /// </summary>
-    internal class BlockContainerMeta : ChildMetaBase
+    internal class ChildDataflowMeta : DataflowChildMeta
     {
-        private readonly Dataflow m_childContainer;
+        private readonly Dataflow m_childFlow;
         private readonly Task m_completion;
 
-        public BlockContainerMeta(Dataflow childContainer, Dataflow host, Action<Task> completionCallback = null) : base(host, completionCallback)
+        public ChildDataflowMeta(Dataflow childFlow, Dataflow host, Action<Task> completionCallback = null) : base(host, completionCallback)
         {
-            m_childContainer = childContainer;
-            m_completion = GetWrappedCompletion(m_childContainer.CompletionTask);
+            m_childFlow = childFlow;
+            m_completion = GetWrappedCompletion(m_childFlow.CompletionTask);
         }
 
-        public Dataflow Container { get { return m_childContainer; } }
+        public Dataflow Flow { get { return m_childFlow; } }
 
-        public override IEnumerable<IDataflowBlock> Blocks { get { return m_childContainer.Blocks; } }
+        public override IEnumerable<IDataflowBlock> Blocks { get { return m_childFlow.Blocks; } }
         public override Task ChildCompletion { get { return m_completion; } }
-        public override int BufferCount { get { return m_childContainer.BufferedCount; } }
+        public override int BufferCount { get { return m_childFlow.BufferedCount; } }
 
         public override string DisplayName
         {
-            get { return string.Format("[{0}]->[{1}]", m_host.Name, m_childContainer.Name); }
+            get { return string.Format("[{0}]->[{1}]", m_host.Name, m_childFlow.Name); }
         }
 
         public override void Fault(Exception e)
         {
-            m_childContainer.Fault(e);
+            m_childFlow.Fault(e);
         }
     }
 }

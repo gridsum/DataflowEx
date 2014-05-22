@@ -8,7 +8,7 @@ using Gridsum.DataflowEx.Exceptions;
 namespace Gridsum.DataflowEx
 {
     /// <summary>
-    /// Merges two underlying block containers so that the combined one looks like a single block container from outside
+    /// Merges two underlying dataflows so that the combined one looks like a single dataflow from outside
     /// </summary>
     /// <typeparam name="T1">Block1 In Type</typeparam>
     /// <typeparam name="T2">Block1 Out Type & Block2 In Type</typeparam>
@@ -18,7 +18,7 @@ namespace Gridsum.DataflowEx
         protected readonly Dataflow<T1, T2> m_b1;
         protected readonly Dataflow<T2, T3> m_b2;
         
-        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2) : base(BlockContainerOptions.Default)
+        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2) : base(DataflowOptions.Default)
         {
             m_b1 = b1;
             m_b2 = b2;
@@ -41,7 +41,7 @@ namespace Gridsum.DataflowEx
     }
 
     /// <summary>
-    /// Merges 3 underlying block containers so that the combined one looks like a single block container from outside
+    /// Merges 3 underlying dataflows so that the combined one looks like a single dataflow from outside
     /// </summary>
     /// <typeparam name="T1">Block1 In Type</typeparam>
     /// <typeparam name="T2">Block1 Out Type & Block2 In Type</typeparam>
@@ -54,7 +54,7 @@ namespace Gridsum.DataflowEx
         protected readonly Dataflow<T3, T4> m_b3;
 
         public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2, Dataflow<T3, T4> b3)
-            : base(BlockContainerOptions.Default)
+            : base(DataflowOptions.Default)
         {
             m_b1 = b1;
             m_b2 = b2;

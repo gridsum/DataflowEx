@@ -16,7 +16,7 @@ namespace Gridsum.DataflowEx.Databases
         private readonly BatchBlock<T> m_batchBlock;
         private readonly ActionBlock<T[]> m_actionBlock;
 
-        public DbBulkInserter(string connectionString, string destTable, BlockContainerOptions options, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null) 
+        public DbBulkInserter(string connectionString, string destTable, DataflowOptions options, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null) 
             : base(options)
         {
             m_bulkSize = bulkSize;

@@ -23,7 +23,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             context.Inits.Add(new Init2());
             context.SaveChanges();
 
-            var inserter = new DbBulkInserter<Entity2>(connectString, "dbo.Seods", BlockContainerOptions.Default,
+            var inserter = new DbBulkInserter<Entity2>(connectString, "dbo.Seods", DataflowOptions.Default,
                 GSProduct.SEOD);
 
             var entities = new Entity2[]
@@ -66,7 +66,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             var profileDispatch = new Func<Entity2, int>(e => e.ProfileId);
             var connectionGetter = new Func<int, string>(id => string.Format(connectString, id, id));
 
-            var multiDbBulkInserter = new MultiDbBulkInserter<Entity2>(BlockContainerOptions.Default, profileDispatch,
+            var multiDbBulkInserter = new MultiDbBulkInserter<Entity2>(DataflowOptions.Default, profileDispatch,
                 connectionGetter, "dbo.Seods", GSProduct.SEOD);
 
             var entities = new[]

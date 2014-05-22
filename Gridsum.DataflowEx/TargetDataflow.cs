@@ -11,12 +11,12 @@ namespace Gridsum.DataflowEx
     {
         private readonly ITargetBlock<TIn> m_block;
 
-        public TargetDataflow(ITargetBlock<TIn> block) : this(block, BlockContainerOptions.Default)
+        public TargetDataflow(ITargetBlock<TIn> block) : this(block, DataflowOptions.Default)
         {
         }
 
-        public TargetDataflow(ITargetBlock<TIn> block, BlockContainerOptions containerOptions)
-            : base(containerOptions)
+        public TargetDataflow(ITargetBlock<TIn> block, DataflowOptions dataflowOptions)
+            : base(dataflowOptions)
         {
             m_block = block;
             RegisterChild(m_block);

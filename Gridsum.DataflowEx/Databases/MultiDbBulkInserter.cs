@@ -15,12 +15,12 @@ namespace Gridsum.DataflowEx.Databases
         private ConcurrentDictionary<int, Lazy<DbBulkInserter<T>>> m_bulkInserterMap;
         private Func<int, string> m_connectionGetter;
         private string m_destTable;
-        private BlockContainerOptions m_options;
+        private DataflowOptions m_options;
         private int m_bulkSize;
         private Func<int, Lazy<DbBulkInserter<T>>> m_initer;
         private ActionBlock<T> m_dispatchBlock;
 
-        public MultiDbBulkInserter(BlockContainerOptions options, Func<T, int> dispatchFunc, Func<int, string> connectionGetter, string destTable, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null)
+        public MultiDbBulkInserter(DataflowOptions options, Func<T, int> dispatchFunc, Func<int, string> connectionGetter, string destTable, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null)
             : base(options)
         {
             m_options = options;
@@ -36,7 +36,7 @@ namespace Gridsum.DataflowEx.Databases
                 var bulkInserter = m_bulkInserterMap.GetOrAdd(profileId, m_initer).Value;
                 bulkInserter.InputBlock.SafePost(item);
             }, new ExecutionDataflowBlockOptions {
-                BoundedCapacity = m_containerOptions.RecommendedCapacity ?? int.MaxValue,
+                BoundedCapacity = m_dataflowOptions.RecommendedCapacity ?? int.MaxValue,
             });
             
             m_initer = p => new Lazy<DbBulkInserter<T>>(

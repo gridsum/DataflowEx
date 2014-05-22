@@ -12,14 +12,14 @@ using Microsoft.CSharp.RuntimeBinder;
 
 namespace Gridsum.DataflowEx
 {
-    public static class BlockContainerUtils
+    public static class DataflowUtils
     {
         public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block)
         {
             return new TargetDataflow<TIn>(block);
         }
 
-        public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, BlockContainerOptions options)
+        public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, DataflowOptions options)
         {
             return new TargetDataflow<TIn>(block, options);
         }
@@ -29,7 +29,7 @@ namespace Gridsum.DataflowEx
             return new PropagatorDataflow<TIn, TOut>(block);
         }
 
-        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions options)
+        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, DataflowOptions options)
         {
             return new PropagatorDataflow<TIn, TOut>(block, options);
         }
@@ -40,5 +40,7 @@ namespace Gridsum.DataflowEx
         {
             return new AutoCompleteWrapper<TIn, TOut>(dataflow, timeout);
         }
+
+        //todo: from delegate, from existing dataflows
     }
 }

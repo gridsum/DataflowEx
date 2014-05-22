@@ -17,15 +17,15 @@ namespace Gridsum.DataflowEx
         private readonly BufferBlock<T> m_copyBuffer;
         private readonly TransformBlock<T, T> m_transformBlock;
 
-        public DataBrancher() : this(BlockContainerOptions.Default) {}
+        public DataBrancher() : this(DataflowOptions.Default) {}
 
-        public DataBrancher(BlockContainerOptions containerOptions) : this(null, containerOptions) {}
+        public DataBrancher(DataflowOptions dataflowOptions) : this(null, dataflowOptions) {}
 
-        public DataBrancher(Func<T,T> copyFunc, BlockContainerOptions containerOptions) : base(containerOptions)
+        public DataBrancher(Func<T,T> copyFunc, DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
             m_copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
             {
-                BoundedCapacity = containerOptions.RecommendedCapacity ?? int.MaxValue
+                BoundedCapacity = dataflowOptions.RecommendedCapacity ?? int.MaxValue
             });
 
             m_transformBlock = new TransformBlock<T, T>(arg =>
@@ -70,7 +70,7 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public void LinkSecondlyTo(IDataflow<T> other)
         {
-            LinkBlockToContainer(this.CopiedOutputBlock, other);
+            LinkBlockToFlow(this.CopiedOutputBlock, other);
         }
     }
 }

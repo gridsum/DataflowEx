@@ -11,11 +11,11 @@ namespace Gridsum.DataflowEx
     {
         private readonly IPropagatorBlock<TIn, TOut> m_block;
         
-        public PropagatorDataflow(IPropagatorBlock<TIn, TOut> block) : this(block, BlockContainerOptions.Default)
+        public PropagatorDataflow(IPropagatorBlock<TIn, TOut> block) : this(block, DataflowOptions.Default)
         {}
 
-        public PropagatorDataflow(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions containerOptions)
-            : base(containerOptions)
+        public PropagatorDataflow(IPropagatorBlock<TIn, TOut> block, DataflowOptions dataflowOptions)
+            : base(dataflowOptions)
         {
             m_block = block;
             RegisterChild(m_block, null);

@@ -9,7 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Gridsum.DataflowEx.Test
 {
     [TestClass]
-    public class BlockContainerTest
+    public class DataflowTest
     {
         private async Task EnsureTaskFail<TE>(Task task) where TE : Exception
         {
@@ -38,8 +38,8 @@ namespace Gridsum.DataflowEx.Test
         {
             var block1 = new TransformBlock<int, int>(i => 2*i);
             var block2 = new TransformBlock<int, int>(i => 2*i);
-            var container1 = BlockContainerUtils.FromBlock(block1);
-            var container2 = BlockContainerUtils.FromBlock(block2);
+            var container1 = DataflowUtils.FromBlock(block1);
+            var container2 = DataflowUtils.FromBlock(block2);
 
             container1.LinkTo(container2);
             container2.LinkLeftToNull();
@@ -68,8 +68,8 @@ namespace Gridsum.DataflowEx.Test
                 else return Enumerable.Empty<int>();
             });
 
-            var container1 = BlockContainerUtils.FromBlock(block1);
-            var container2 = BlockContainerUtils.FromBlock(block2);
+            var container1 = DataflowUtils.FromBlock(block1);
+            var container2 = DataflowUtils.FromBlock(block2);
 
             container1.LinkTo(container2);
             container2.LinkTo(container1); //circular
@@ -86,8 +86,8 @@ namespace Gridsum.DataflowEx.Test
         {
             var block1 = new TransformBlock<string, string>(i => i);
             var block2 = new TransformBlock<string, string>(i => i);
-            var container1 = BlockContainerUtils.FromBlock(block1);
-            var container2 = BlockContainerUtils.FromBlock(block2);
+            var container1 = DataflowUtils.FromBlock(block1);
+            var container2 = DataflowUtils.FromBlock(block2);
             var container3 = new FaultyBlocks();
             var container4 = new FaultyBlocks();
 
@@ -108,7 +108,7 @@ namespace Gridsum.DataflowEx.Test
             faultyContainer.InputBlock.Post("test");
 
             await EnsureTaskFail<SystemException>(faultyContainer.CompletionTask);
-            await EnsureTaskFail<LinkedContainerFailedException>(involvedContainer.CompletionTask);
+            await EnsureTaskFail<LinkedDataflowFailedException>(involvedContainer.CompletionTask);
         }
 
         [TestMethod]
@@ -159,7 +159,7 @@ namespace Gridsum.DataflowEx.Test
         private TransformBlock<string, string> m_block2;
 
         public FaultyBlocks()
-            : base(BlockContainerOptions.Default)
+            : base(DataflowOptions.Default)
         {
             m_inputBlock = new TransformBlock<string, string>(s =>
             {
@@ -201,7 +201,7 @@ namespace Gridsum.DataflowEx.Test
         private ActionBlock<string> m_inputBlock;
 
         public InnocentBlocks()
-            : base(BlockContainerOptions.Default)
+            : base(DataflowOptions.Default)
         {
             m_inputBlock = new ActionBlock<string>(s =>
             {
@@ -222,7 +222,7 @@ namespace Gridsum.DataflowEx.Test
     {
         private IPropagatorBlock<int, int> m_block;
 
-        public DynamicContainer() : base(BlockContainerOptions.Default)
+        public DynamicContainer() : base(DataflowOptions.Default)
         {
             m_block = RegisterBlockDynamically();
         }

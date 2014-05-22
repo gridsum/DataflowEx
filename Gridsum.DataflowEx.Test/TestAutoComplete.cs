@@ -32,14 +32,14 @@ namespace Gridsum.DataflowEx.Test
                 else return Enumerable.Empty<Int>();
             });
 
-            var container1 = BlockContainerUtils.FromBlock(block1);
-            var container2 = BlockContainerUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
+            var dataflow1 = DataflowUtils.FromBlock(block1);
+            var dataflow2 = DataflowUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
             
-            container1.LinkTo(container2);
-            container2.LinkTo(container1);
+            dataflow1.LinkTo(dataflow2);
+            dataflow2.LinkTo(dataflow1);
 
-            container1.InputBlock.Post(new Int() { Val = 1 });
-            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
+            dataflow1.InputBlock.Post(new Int() { Val = 1 });
+            Assert.IsTrue(await dataflow2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
         }
 
         [TestMethod]
@@ -54,15 +54,15 @@ namespace Gridsum.DataflowEx.Test
                 return Enumerable.Empty<Int>();
             });
 
-            var container1 = BlockContainerUtils.FromBlock(block1);
-            var container2 = BlockContainerUtils.AutoComplete(BlockContainerUtils.FromBlock(block2), TimeSpan.FromSeconds(1));
+            var dataflow1 = DataflowUtils.FromBlock(block1);
+            var dataflow2 = DataflowUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
 
-            container1.LinkTo(container2);
-            container2.LinkTo(container1);
+            dataflow1.LinkTo(dataflow2);
+            dataflow2.LinkTo(dataflow1);
 
-            container1.InputBlock.Post(new Int() { Val = 1 });
-            Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(2)));
-            Assert.IsTrue(container2.Name.EndsWith("AutoComplete"));
+            dataflow1.InputBlock.Post(new Int() { Val = 1 });
+            Assert.IsTrue(await dataflow2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(2)));
+            Assert.IsTrue(dataflow2.Name.EndsWith("AutoComplete"));
         }
     }
 }

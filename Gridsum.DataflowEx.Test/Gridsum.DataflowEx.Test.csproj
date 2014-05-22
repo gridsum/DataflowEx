@@ -76,7 +76,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="BlockContainerTest.cs" />
+    <Compile Include="DataflowTest.cs" />
     <Compile Include="DatabaseTests\BulkInserterTest.cs" />
     <Compile Include="DatabaseTests\GSProduct.cs" />
     <Compile Include="DatabaseTests\ReferenceLoopDepthTest.cs" />

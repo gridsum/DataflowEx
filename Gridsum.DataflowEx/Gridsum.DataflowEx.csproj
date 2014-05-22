@@ -61,8 +61,8 @@
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="Dataflow.cs" />
     <Compile Include="DataflowMerger.cs" />
-    <Compile Include="BlockContainerOptions.cs" />
-    <Compile Include="BlockContainerUtils.cs" />
+    <Compile Include="DataflowOptions.cs" />
+    <Compile Include="DataflowUtils.cs" />
     <Compile Include="Databases\BulkDataReader.cs" />
     <Compile Include="Databases\DBColumnMapping.cs" />
     <Compile Include="DataBrancher.cs" />
@@ -70,7 +70,7 @@
     <Compile Include="Exceptions\NoChildRegisteredException.cs" />
     <Compile Include="Exceptions\TaskEx.cs" />
     <Compile Include="IntHolder.cs" />
-    <Compile Include="IChildMeta.cs" />
+    <Compile Include="IDataflowChildMeta.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Databases\DbBulkInserter.cs" />
     <Compile Include="IDataflow.cs" />
