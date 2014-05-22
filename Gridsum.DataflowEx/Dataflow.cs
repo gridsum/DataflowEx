@@ -16,18 +16,18 @@ namespace Gridsum.DataflowEx
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
     /// may contain one or multiple blocks. Inheritors should call RegisterBlock in their constructors.
     /// </summary>
-    public abstract class BlockContainer : IBlockContainer
+    public abstract class Dataflow : IDataflow
     {
         private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
-        protected readonly BlockContainerOptions m_containerOptions;
+        protected readonly DataflowOptions m_dataflowOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
-        protected ImmutableList<IChildMeta> m_children = ImmutableList.Create<IChildMeta>();
+        protected ImmutableList<IDataflowChildMeta> m_children = ImmutableList.Create<IDataflowChildMeta>();
         protected string m_defaultName;
 
-        public BlockContainer(BlockContainerOptions containerOptions)
+        public Dataflow(DataflowOptions dataflowOptions)
         {
-            m_containerOptions = containerOptions;
+            m_dataflowOptions = dataflowOptions;
             m_defaultLinkOption = new DataflowLinkOptions() { PropagateCompletion = true };
             m_completionTask = new Lazy<Task>(GetCompletionTask, LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -35,14 +35,14 @@ namespace Gridsum.DataflowEx
             int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
             m_defaultName = friendlyName + count;
             
-            if (m_containerOptions.ContainerMonitorEnabled || m_containerOptions.BlockMonitorEnabled)
+            if (m_dataflowOptions.FlowMonitorEnabled || m_dataflowOptions.BlockMonitorEnabled)
             {
                 StartPerformanceMonitorAsync();
             }
         }
 
         /// <summary>
-        /// Display name of the container
+        /// Display name of the dataflow
         /// </summary>
         public virtual string Name
         {
@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx
         }
         
         /// <summary>
-        /// Register this block to block meta. Also make sure the container will fail if the registered block fails.
+        /// Register this block to block meta. Also make sure the dataflow will fail if the registered block fails.
         /// </summary>
         protected void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null)
         {
@@ -67,19 +67,19 @@ namespace Gridsum.DataflowEx
             m_children = m_children.Add(new BlockMeta(block, this, blockCompletionCallback));
         }
 
-        protected void RegisterChild(BlockContainer childContainer, Action<Task> containerCompletionCallback = null)
+        protected void RegisterChild(Dataflow childFlow, Action<Task> dataflowCompletionCallback = null)
         {
-            if (childContainer == null)
+            if (childFlow == null)
             {
-                throw new ArgumentNullException("childContainer");
+                throw new ArgumentNullException("childFlow");
             }
 
-            if (m_children.OfType<BlockContainerMeta>().Any(cm => cm.Container.Equals(childContainer)))
+            if (m_children.OfType<ChildDataflowMeta>().Any(cm => cm.Flow.Equals(childFlow)))
             {
-                throw new ArgumentException("Duplicate block container registered in " + this.Name);
+                throw new ArgumentException("Duplicate child dataflow registered in " + this.Name);
             }
 
-            m_children = m_children.Add(new BlockContainerMeta(childContainer, this, containerCompletionCallback));
+            m_children = m_children.Add(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback));
         }
         
         //todo: add completion condition and cancellation token support
@@ -87,27 +87,27 @@ namespace Gridsum.DataflowEx
         {
             while (true)
             {
-                await Task.Delay(m_containerOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
+                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
 
-                if (m_containerOptions.ContainerMonitorEnabled)
+                if (m_dataflowOptions.FlowMonitorEnabled)
                 {
                     int count = this.BufferedCount;
 
-                    if (count != 0 || m_containerOptions.PerformanceMonitorMode == BlockContainerOptions.PerformanceLogMode.Verbose)
+                    if (count != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                     {
                         LogHelper.Logger.Debug(h => h("[{0}] has {1} todo items at this moment.", this.Name, count));
                     }
                 }
 
-                if (m_containerOptions.BlockMonitorEnabled)
+                if (m_dataflowOptions.BlockMonitorEnabled)
                 {
                     foreach(var child in m_children)
                     {
                         var count = child.BufferCount;
 
-                        if (count != 0 || m_containerOptions.PerformanceMonitorMode == BlockContainerOptions.PerformanceLogMode.Verbose)
+                        if (count != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                         {
-                            IChildMeta c = child;
+                            IDataflowChildMeta c = child;
                             LogHelper.Logger.Debug(h => h("{0} has {1} todo items at this moment.", c.DisplayName, count));
                         }
                     }
@@ -122,7 +122,7 @@ namespace Gridsum.DataflowEx
                 throw new NoChildRegisteredException(this);
             }
 
-            ImmutableList<IChildMeta> childrenSnapShot;
+            ImmutableList<IDataflowChildMeta> childrenSnapShot;
 
             do
             {
@@ -141,7 +141,7 @@ namespace Gridsum.DataflowEx
         }
 
         /// <summary>
-        /// Represents the completion of the whole container
+        /// Represents the completion of the whole dataflow
         /// </summary>
         public Task CompletionTask
         {
@@ -182,7 +182,7 @@ namespace Gridsum.DataflowEx
         }
 
         /// <summary>
-        /// Sum of the buffer size of all blocks in the container
+        /// Sum of the buffer size of all blocks in the dataflow
         /// </summary>
         public virtual int BufferedCount
         {
@@ -193,9 +193,9 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainer<TIn> : BlockContainer, IBlockContainer<TIn>
+    public abstract class Dataflow<TIn> : Dataflow, IDataflow<TIn>
     {
-        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
         }
 
@@ -227,13 +227,13 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainer<TIn, TOut> : BlockContainer<TIn>, IBlockContainer<TIn, TOut>
+    public abstract class Dataflow<TIn, TOut> : Dataflow<TIn>, IDataflow<TIn, TOut>
     {
         protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
         protected Lazy<ImmutableList<Predicate<TOut>>> m_frozenConditions;
         protected StatisticsRecorder GarbageRecorder { get; private set; }
 
-        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
             this.GarbageRecorder = new StatisticsRecorder();
             m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
@@ -245,33 +245,33 @@ namespace Gridsum.DataflowEx
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
         
-        protected void LinkBlockToContainer<T>(ISourceBlock<T> block, IBlockContainer<T> otherBlockContainer)
+        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
         {
-            block.LinkTo(otherBlockContainer.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
+            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
 
-            //manullay handle inter-container problem
-            //we use WhenAll here to make sure this container fails before propogating to other container
+            //manullay handle inter-dataflow problem
+            //we use WhenAll here to make sure this dataflow fails before propogating to other dataflow
             Task.WhenAll(block.Completion, this.CompletionTask).ContinueWith(whenAllTask => 
                 {
-                    if (!otherBlockContainer.CompletionTask.IsCompleted)
+                    if (!otherDataflow.CompletionTask.IsCompleted)
                     {
                         if (whenAllTask.IsFaulted)
                         {
-                            otherBlockContainer.Fault(new LinkedContainerFailedException());
+                            otherDataflow.Fault(new LinkedDataflowFailedException());
                         }
                         else if (whenAllTask.IsCanceled)
                         {
-                            otherBlockContainer.Fault(new LinkedContainerCanceledException());
+                            otherDataflow.Fault(new LinkedDataflowCanceledException());
                         }
                         else
                         {
-                            otherBlockContainer.InputBlock.Complete();
+                            otherDataflow.InputBlock.Complete();
                         }
                     }
                 });
 
-            //Make sure other container also fails me
-            otherBlockContainer.CompletionTask.ContinueWith(otherTask =>
+            //Make sure other dataflow also fails me
+            otherDataflow.CompletionTask.ContinueWith(otherTask =>
                 {
                     if (this.CompletionTask.IsCompleted)
                     {
@@ -280,28 +280,28 @@ namespace Gridsum.DataflowEx
 
                     if (otherTask.IsFaulted)
                     {
-                        LogHelper.Logger.InfoFormat("<{0}>Downstream block container faulted before I am done. Fault myself.", this.Name);
-                        this.Fault(new LinkedContainerFailedException());
+                        LogHelper.Logger.InfoFormat("<{0}>Downstream dataflow faulted before I am done. Fault myself.", this.Name);
+                        this.Fault(new LinkedDataflowFailedException());
                     }
                     else if (otherTask.IsCanceled)
                     {
-                        LogHelper.Logger.InfoFormat("<{0}>Downstream block container canceled before I am done. Cancel myself.", this.Name);
-                        this.Fault(new LinkedContainerCanceledException());
+                        LogHelper.Logger.InfoFormat("<{0}>Downstream dataflow canceled before I am done. Cancel myself.", this.Name);
+                        this.Fault(new LinkedDataflowCanceledException());
                     }
                 });
         }
 
-        public void LinkTo(IBlockContainer<TOut> other)
+        public void LinkTo(IDataflow<TOut> other)
         {
-            LinkBlockToContainer(this.OutputBlock, other);
+            LinkBlockToFlow(this.OutputBlock, other);
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
         {
             this.TransformAndLink(other, transform, new Predicate<TOut>(condition.Matches));
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
         {
             if (m_frozenConditions.IsValueCreated)
             {
@@ -312,20 +312,20 @@ namespace Gridsum.DataflowEx
             var converter = new TransformBlock<TOut, TTarget>(transform);
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
             
-            LinkBlockToContainer(converter, other);            
+            LinkBlockToFlow(converter, other);            
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform)
         {
             this.TransformAndLink(other, transform, @out => true);
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other) where TTarget : TOut
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
             this.TransformAndLink(other, @out => { return ((TTarget)@out); }, @out => @out is TTarget);
         }
 
-        public void TransformAndLink<TTarget, TOutSubType>(IBlockContainer<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
+        public void TransformAndLink<TTarget, TOutSubType>(IDataflow<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
         {
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
         }
