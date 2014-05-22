@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Gridsum.DataflowEx.Database
+namespace Gridsum.DataflowEx.Databases
 {
     /// <summary>
     /// 采用尽可能匹配的原则，即如果发现用户设置的参数与数据库的不匹配，一般情况下打印Warn级别的日志，不会直接报错退出。

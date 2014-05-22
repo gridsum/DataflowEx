@@ -63,8 +63,8 @@
     <Compile Include="BlockContainerMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
     <Compile Include="BlockContainerUtils.cs" />
-    <Compile Include="Database\BulkDataReader.cs" />
-    <Compile Include="Database\DBColumnMapping.cs" />
+    <Compile Include="Databases\BulkDataReader.cs" />
+    <Compile Include="Databases\DBColumnMapping.cs" />
     <Compile Include="DataBrancher.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
     <Compile Include="Exceptions\NoChildRegisteredException.cs" />
@@ -72,9 +72,9 @@
     <Compile Include="IntHolder.cs" />
     <Compile Include="IChildMeta.cs" />
     <Compile Include="LogHelper.cs" />
-    <Compile Include="Database\DbBulkInserter.cs" />
+    <Compile Include="Databases\DbBulkInserter.cs" />
     <Compile Include="IBlockContainer.cs" />
-    <Compile Include="Database\MultiDbBulkInserter.cs" />
+    <Compile Include="Databases\MultiDbBulkInserter.cs" />
     <Compile Include="Exceptions\PropagatedException.cs" />
     <Compile Include="PatternMatch\IMatchable.cs" />
     <Compile Include="PatternMatch\IMatchCondition.cs" />
@@ -88,7 +88,7 @@
     <Compile Include="TargetBlockContainer.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Database\TypeAccessor.cs" />
+    <Compile Include="Databases\TypeAccessor.cs" />
     <Compile Include="StatisticsRecorder.cs" />
   </ItemGroup>
   <ItemGroup>

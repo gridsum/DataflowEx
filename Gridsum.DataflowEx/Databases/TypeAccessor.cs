@@ -5,9 +5,8 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using Gridsum.DataflowEx.Database;
 
-namespace Gridsum.DataflowEx
+namespace Gridsum.DataflowEx.Databases
 {
     public class TypeAccessorManager<T> where T : class
     {

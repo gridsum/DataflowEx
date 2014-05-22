@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 
-namespace Gridsum.DataflowEx.Database
+namespace Gridsum.DataflowEx.Databases
 {
     /// <summary>
     /// 这个类完整实现IDataReader<T>的功能，并更新属性与数据库列的对应功能。
