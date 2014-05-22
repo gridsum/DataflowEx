@@ -59,8 +59,8 @@
     <Compile Include="AutoCompletion\ControlType.cs" />
     <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
-    <Compile Include="BlockContainer.cs" />
-    <Compile Include="BlockContainerMerger.cs" />
+    <Compile Include="Dataflow.cs" />
+    <Compile Include="DataflowMerger.cs" />
     <Compile Include="BlockContainerOptions.cs" />
     <Compile Include="BlockContainerUtils.cs" />
     <Compile Include="Databases\BulkDataReader.cs" />
@@ -73,7 +73,7 @@
     <Compile Include="IChildMeta.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Databases\DbBulkInserter.cs" />
-    <Compile Include="IBlockContainer.cs" />
+    <Compile Include="IDataflow.cs" />
     <Compile Include="Databases\MultiDbBulkInserter.cs" />
     <Compile Include="Exceptions\PropagatedException.cs" />
     <Compile Include="PatternMatch\IMatchable.cs" />
@@ -84,8 +84,8 @@
     <Compile Include="PatternMatch\StringMatchCondition.cs" />
     <Compile Include="PatternMatch\UrlStringMatchCondition.cs" />
     <Compile Include="Exceptions\PostToBlockFailedException.cs" />
-    <Compile Include="PropagatorBlockContainer.cs" />
-    <Compile Include="TargetBlockContainer.cs" />
+    <Compile Include="PropagatorDataflow.cs" />
+    <Compile Include="TargetDataflow.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Databases\TypeAccessor.cs" />

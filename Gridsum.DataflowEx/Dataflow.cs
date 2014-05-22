@@ -16,7 +16,7 @@ namespace Gridsum.DataflowEx
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
     /// may contain one or multiple blocks. Inheritors should call RegisterBlock in their constructors.
     /// </summary>
-    public abstract class BlockContainer : IBlockContainer
+    public abstract class Dataflow : IDataflow
     {
         private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
         protected readonly BlockContainerOptions m_containerOptions;
@@ -25,7 +25,7 @@ namespace Gridsum.DataflowEx
         protected ImmutableList<IChildMeta> m_children = ImmutableList.Create<IChildMeta>();
         protected string m_defaultName;
 
-        public BlockContainer(BlockContainerOptions containerOptions)
+        public Dataflow(BlockContainerOptions containerOptions)
         {
             m_containerOptions = containerOptions;
             m_defaultLinkOption = new DataflowLinkOptions() { PropagateCompletion = true };
@@ -67,19 +67,19 @@ namespace Gridsum.DataflowEx
             m_children = m_children.Add(new BlockMeta(block, this, blockCompletionCallback));
         }
 
-        protected void RegisterChild(BlockContainer childContainer, Action<Task> containerCompletionCallback = null)
+        protected void RegisterChild(Dataflow childFlow, Action<Task> containerCompletionCallback = null)
         {
-            if (childContainer == null)
+            if (childFlow == null)
             {
-                throw new ArgumentNullException("childContainer");
+                throw new ArgumentNullException("childFlow");
             }
 
-            if (m_children.OfType<BlockContainerMeta>().Any(cm => cm.Container.Equals(childContainer)))
+            if (m_children.OfType<BlockContainerMeta>().Any(cm => cm.Container.Equals(childFlow)))
             {
                 throw new ArgumentException("Duplicate block container registered in " + this.Name);
             }
 
-            m_children = m_children.Add(new BlockContainerMeta(childContainer, this, containerCompletionCallback));
+            m_children = m_children.Add(new BlockContainerMeta(childFlow, this, containerCompletionCallback));
         }
         
         //todo: add completion condition and cancellation token support
@@ -193,9 +193,9 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainer<TIn> : BlockContainer, IBlockContainer<TIn>
+    public abstract class Dataflow<TIn> : Dataflow, IDataflow<TIn>
     {
-        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected Dataflow(BlockContainerOptions containerOptions) : base(containerOptions)
         {
         }
 
@@ -227,13 +227,13 @@ namespace Gridsum.DataflowEx
         }
     }
 
-    public abstract class BlockContainer<TIn, TOut> : BlockContainer<TIn>, IBlockContainer<TIn, TOut>
+    public abstract class Dataflow<TIn, TOut> : Dataflow<TIn>, IDataflow<TIn, TOut>
     {
         protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
         protected Lazy<ImmutableList<Predicate<TOut>>> m_frozenConditions;
         protected StatisticsRecorder GarbageRecorder { get; private set; }
 
-        protected BlockContainer(BlockContainerOptions containerOptions) : base(containerOptions)
+        protected Dataflow(BlockContainerOptions containerOptions) : base(containerOptions)
         {
             this.GarbageRecorder = new StatisticsRecorder();
             m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
@@ -245,33 +245,33 @@ namespace Gridsum.DataflowEx
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
         
-        protected void LinkBlockToContainer<T>(ISourceBlock<T> block, IBlockContainer<T> otherBlockContainer)
+        protected void LinkBlockToContainer<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
         {
-            block.LinkTo(otherBlockContainer.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
+            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
 
             //manullay handle inter-container problem
             //we use WhenAll here to make sure this container fails before propogating to other container
             Task.WhenAll(block.Completion, this.CompletionTask).ContinueWith(whenAllTask => 
                 {
-                    if (!otherBlockContainer.CompletionTask.IsCompleted)
+                    if (!otherDataflow.CompletionTask.IsCompleted)
                     {
                         if (whenAllTask.IsFaulted)
                         {
-                            otherBlockContainer.Fault(new LinkedContainerFailedException());
+                            otherDataflow.Fault(new LinkedContainerFailedException());
                         }
                         else if (whenAllTask.IsCanceled)
                         {
-                            otherBlockContainer.Fault(new LinkedContainerCanceledException());
+                            otherDataflow.Fault(new LinkedContainerCanceledException());
                         }
                         else
                         {
-                            otherBlockContainer.InputBlock.Complete();
+                            otherDataflow.InputBlock.Complete();
                         }
                     }
                 });
 
             //Make sure other container also fails me
-            otherBlockContainer.CompletionTask.ContinueWith(otherTask =>
+            otherDataflow.CompletionTask.ContinueWith(otherTask =>
                 {
                     if (this.CompletionTask.IsCompleted)
                     {
@@ -291,17 +291,17 @@ namespace Gridsum.DataflowEx
                 });
         }
 
-        public void LinkTo(IBlockContainer<TOut> other)
+        public void LinkTo(IDataflow<TOut> other)
         {
             LinkBlockToContainer(this.OutputBlock, other);
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
         {
             this.TransformAndLink(other, transform, new Predicate<TOut>(condition.Matches));
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
         {
             if (m_frozenConditions.IsValueCreated)
             {
@@ -315,17 +315,17 @@ namespace Gridsum.DataflowEx
             LinkBlockToContainer(converter, other);            
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other, Func<TOut, TTarget> transform)
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform)
         {
             this.TransformAndLink(other, transform, @out => true);
         }
 
-        public void TransformAndLink<TTarget>(IBlockContainer<TTarget> other) where TTarget : TOut
+        public void TransformAndLink<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
             this.TransformAndLink(other, @out => { return ((TTarget)@out); }, @out => @out is TTarget);
         }
 
-        public void TransformAndLink<TTarget, TOutSubType>(IBlockContainer<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
+        public void TransformAndLink<TTarget, TOutSubType>(IDataflow<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
         {
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
         }

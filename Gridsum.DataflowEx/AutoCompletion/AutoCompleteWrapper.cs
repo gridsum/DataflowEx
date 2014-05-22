@@ -8,18 +8,18 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx.AutoCompletion
 {
-    public class AutoCompleteWrapper<TIn, TOut> : BlockContainer<TIn, TOut>
+    public class AutoCompleteWrapper<TIn, TOut> : Dataflow<TIn, TOut>
         where TIn : ITracableItem
         where TOut : ITracableItem 
     {
         private readonly TimeSpan m_processTimeout;
         private readonly Timer m_timer;
         private Guid? m_last;
-        private BlockContainer<TIn, TIn> m_before;
-        private BlockContainer<TOut, TOut> m_after;
-        private BlockContainer<TIn, TOut> m_container;
+        private Dataflow<TIn, TIn> m_before;
+        private Dataflow<TOut, TOut> m_after;
+        private Dataflow<TIn, TOut> m_container;
 
-        public AutoCompleteWrapper(BlockContainer<TIn, TOut> container, TimeSpan processTimeout) : base(BlockContainerOptions.Default)
+        public AutoCompleteWrapper(Dataflow<TIn, TOut> container, TimeSpan processTimeout) : base(BlockContainerOptions.Default)
         {
             m_container = container;
             m_processTimeout = processTimeout;

@@ -23,7 +23,7 @@ namespace Gridsum.DataflowEx
 
     internal abstract class ChildMetaBase : IChildMeta
     {
-        protected readonly BlockContainer m_host;
+        protected readonly Dataflow m_host;
         private readonly Action<Task> m_completionCallback;
 
         public abstract IEnumerable<IDataflowBlock> Blocks { get; }
@@ -32,7 +32,7 @@ namespace Gridsum.DataflowEx
         public abstract string DisplayName { get; }
         public abstract void Fault(Exception e);
 
-        protected ChildMetaBase(BlockContainer host, Action<Task> completionCallback)
+        protected ChildMetaBase(Dataflow host, Action<Task> completionCallback)
         {
             m_host = host;
             m_completionCallback = completionCallback;
@@ -97,7 +97,7 @@ namespace Gridsum.DataflowEx
         private readonly IDataflowBlock m_block;
         private readonly Task m_completion;
 
-        public BlockMeta(IDataflowBlock block, BlockContainer host, Action<Task> completionCallback = null) : base(host, completionCallback)
+        public BlockMeta(IDataflowBlock block, Dataflow host, Action<Task> completionCallback = null) : base(host, completionCallback)
         {
             m_block = block;
             m_completion = GetWrappedCompletion(m_block.Completion);
@@ -125,16 +125,16 @@ namespace Gridsum.DataflowEx
     /// </summary>
     internal class BlockContainerMeta : ChildMetaBase
     {
-        private readonly BlockContainer m_childContainer;
+        private readonly Dataflow m_childContainer;
         private readonly Task m_completion;
 
-        public BlockContainerMeta(BlockContainer childContainer, BlockContainer host, Action<Task> completionCallback = null) : base(host, completionCallback)
+        public BlockContainerMeta(Dataflow childContainer, Dataflow host, Action<Task> completionCallback = null) : base(host, completionCallback)
         {
             m_childContainer = childContainer;
             m_completion = GetWrappedCompletion(m_childContainer.CompletionTask);
         }
 
-        public BlockContainer Container { get { return m_childContainer; } }
+        public Dataflow Container { get { return m_childContainer; } }
 
         public override IEnumerable<IDataflowBlock> Blocks { get { return m_childContainer.Blocks; } }
         public override Task ChildCompletion { get { return m_completion; } }

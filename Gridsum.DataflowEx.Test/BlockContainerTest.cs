@@ -91,8 +91,8 @@ namespace Gridsum.DataflowEx.Test
             var container3 = new FaultyBlocks();
             var container4 = new FaultyBlocks();
 
-            Assert.AreEqual("PropagatorBlockContainer<String, String>1", container1.Name);
-            Assert.AreEqual("PropagatorBlockContainer<String, String>2", container2.Name);
+            Assert.AreEqual("PropagatorDataflow<String, String>1", container1.Name);
+            Assert.AreEqual("PropagatorDataflow<String, String>2", container2.Name);
             Assert.IsTrue(container3.Name.StartsWith("FaultyBlocks"));
             Assert.IsTrue(container4.Name.StartsWith("FaultyBlocks"));
         }
@@ -153,7 +153,7 @@ namespace Gridsum.DataflowEx.Test
         }
     }
 
-    class FaultyBlocks : BlockContainer<string, string>
+    class FaultyBlocks : Dataflow<string, string>
     {
         private TransformBlock<string, string> m_inputBlock;
         private TransformBlock<string, string> m_block2;
@@ -196,7 +196,7 @@ namespace Gridsum.DataflowEx.Test
         }
     }
 
-    class InnocentBlocks : BlockContainer<string>
+    class InnocentBlocks : Dataflow<string>
     {
         private ActionBlock<string> m_inputBlock;
 
@@ -218,7 +218,7 @@ namespace Gridsum.DataflowEx.Test
         }
     }
 
-    class DynamicContainer : BlockContainer<int, int>
+    class DynamicContainer : Dataflow<int, int>
     {
         private IPropagatorBlock<int, int> m_block;
 

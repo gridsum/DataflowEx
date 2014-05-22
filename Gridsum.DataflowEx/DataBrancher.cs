@@ -12,7 +12,7 @@ namespace Gridsum.DataflowEx
     /// That's why we need DataCopier which preserves a 100% same copy of the data stream through CopiedOutputBlock
     /// </summary>
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
-    public class DataBrancher<T> : BlockContainer<T, T>
+    public class DataBrancher<T> : Dataflow<T, T>
     {
         private readonly BufferBlock<T> m_copyBuffer;
         private readonly TransformBlock<T, T> m_transformBlock;
@@ -68,7 +68,7 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Link the copied data stream to another block
         /// </summary>
-        public void LinkSecondlyTo(IBlockContainer<T> other)
+        public void LinkSecondlyTo(IDataflow<T> other)
         {
             LinkBlockToContainer(this.CopiedOutputBlock, other);
         }

@@ -14,31 +14,31 @@ namespace Gridsum.DataflowEx
 {
     public static class BlockContainerUtils
     {
-        public static BlockContainer<TIn> FromBlock<TIn>(ITargetBlock<TIn> block)
+        public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block)
         {
-            return new TargetBlockContainer<TIn>(block);
+            return new TargetDataflow<TIn>(block);
         }
 
-        public static BlockContainer<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, BlockContainerOptions options)
+        public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, BlockContainerOptions options)
         {
-            return new TargetBlockContainer<TIn>(block, options);
+            return new TargetDataflow<TIn>(block, options);
         }
 
-        public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
+        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block)
         {
-            return new PropagatorBlockContainer<TIn, TOut>(block);
+            return new PropagatorDataflow<TIn, TOut>(block);
         }
 
-        public static BlockContainer<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions options)
+        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, BlockContainerOptions options)
         {
-            return new PropagatorBlockContainer<TIn, TOut>(block, options);
+            return new PropagatorDataflow<TIn, TOut>(block, options);
         }
 
-        public static BlockContainer<TIn, TOut> AutoComplete<TIn, TOut>(this BlockContainer<TIn, TOut> blockContainer, TimeSpan timeout)
+        public static Dataflow<TIn, TOut> AutoComplete<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, TimeSpan timeout)
             where TIn : ITracableItem
             where TOut : ITracableItem 
         {
-            return new AutoCompleteWrapper<TIn, TOut>(blockContainer, timeout);
+            return new AutoCompleteWrapper<TIn, TOut>(dataflow, timeout);
         }
     }
 }
