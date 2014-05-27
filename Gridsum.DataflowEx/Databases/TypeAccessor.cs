@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -10,11 +11,11 @@ namespace Gridsum.DataflowEx.Databases
 {
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly Dictionary<string, TypeAccessor<T>> m_accessors;
+        private static readonly ConcurrentDictionary<string, TypeAccessor<T>> m_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new Dictionary<string, TypeAccessor<T>>();
+            m_accessors = new ConcurrentDictionary<string, TypeAccessor<T>>();
         }
 
         private TypeAccessorManager()
@@ -32,16 +33,7 @@ namespace Gridsum.DataflowEx.Databases
         public static TypeAccessor<T> GetAccessorByDestLabel(string destLabel, string connectionString,
             string dataTableName)
         {
-            lock (m_accessors)
-            {
-                TypeAccessor<T> accessor = null;
-                if (m_accessors.TryGetValue(destLabel, out accessor) == false)
-                {
-                    accessor = new TypeAccessor<T>(destLabel, connectionString, dataTableName);
-                    m_accessors.Add(destLabel, accessor);
-                }
-                return accessor;
-            }
+            return m_accessors.GetOrAdd(destLabel, s => new TypeAccessor<T>(s, connectionString, dataTableName));
         }
     }
 
@@ -69,13 +61,13 @@ namespace Gridsum.DataflowEx.Databases
 
             //create property accessor delegate for properties and coloumn mapping to database
 
-            m_properties = new Dictionary<int, Func<T, dynamic>>();
+            m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();
 
-            CreateTypeVistor();
+            CreateTypeVisitor();
         }
 
-        private void CreateTypeVistor()
+        private void CreateTypeVisitor()
         {
             ParameterExpression paraExpression = Expression.Parameter(typeof (T), "t");
 
@@ -93,7 +85,7 @@ namespace Gridsum.DataflowEx.Databases
                 //父节点类型为根类型，即T
                 if (value.ParentKey==0)
                 {
-                    value.Expression = CreatePropertyAccesorExpression(value.PropertyInfo, paraExpression, null);
+                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, paraExpression, null);
                 }
                 else
                 {
@@ -103,7 +95,7 @@ namespace Gridsum.DataflowEx.Databases
                     {
                         LogHelper.Logger.Error("failed to get parent ReferenceTypeDepthException.");
                     }
-                    value.Expression = CreatePropertyAccesorExpression(value.PropertyInfo, parent.Expression, null);
+                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, parent.Expression, null);
                 }
             }
 
@@ -130,7 +122,7 @@ namespace Gridsum.DataflowEx.Databases
                     parentExpression = parent.Expression;
                 }
 
-                    BlockExpression curExpression = CreatePropertyAccesorExpression(valueType.CurrentPropertyInfo,
+                    BlockExpression curExpression = CreatePropertyAccessorExpression(valueType.CurrentPropertyInfo,
                         parentExpression,
                         valueType.DbColumnMapping.DefaultValue);
                     m_dbColumnMappings.Add(valueType.DbColumnMapping);
@@ -147,7 +139,7 @@ namespace Gridsum.DataflowEx.Databases
         }
 
 
-        private BlockExpression CreatePropertyAccesorExpression(PropertyInfo prop, Expression parentExpr,
+        private BlockExpression CreatePropertyAccessorExpression(PropertyInfo prop, Expression parentExpr,
             object defaultValue)
         {
             #region 对于值类型， Nullable<值类型>的默认值进行处理
