@@ -14,7 +14,8 @@ namespace Gridsum.DataflowEx
 {
     /// <summary>
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
-    /// may contain one or multiple blocks. Inheritors should call RegisterBlock in their constructors.
+    /// may contain one or multiple children. A child could be either a block or a dataflow
+    /// Inheritors of this class should call RegisterBlock in their constructors.
     /// </summary>
     public abstract class Dataflow : IDataflow
     {
