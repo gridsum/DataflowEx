@@ -16,7 +16,7 @@ namespace Gridsum.DataflowEx
     {
         IEnumerable<IDataflowBlock> Blocks { get; }
         Task ChildCompletion { get; }
-        int BufferCount { get; }
+        Tuple<int,int> BufferStatus { get; }
         string DisplayName { get; }
         void Fault(Exception e);
     }
@@ -28,7 +28,7 @@ namespace Gridsum.DataflowEx
 
         public abstract IEnumerable<IDataflowBlock> Blocks { get; }
         public abstract Task ChildCompletion { get; }
-        public abstract int BufferCount { get; }
+        public abstract Tuple<int,int> BufferStatus { get; }
         public abstract string DisplayName { get; }
         public abstract void Fault(Exception e);
 
@@ -107,7 +107,7 @@ namespace Gridsum.DataflowEx
 
         public override IEnumerable<IDataflowBlock> Blocks { get { return new [] {m_block}; } }
         public override Task ChildCompletion { get { return m_completion; } }
-        public override int BufferCount { get { return m_block.GetBufferCount(); } }
+        public override Tuple<int,int> BufferStatus { get { return m_block.GetBufferCount(); } }
 
         public override string DisplayName
         {
@@ -138,7 +138,7 @@ namespace Gridsum.DataflowEx
 
         public override IEnumerable<IDataflowBlock> Blocks { get { return m_childFlow.Blocks; } }
         public override Task ChildCompletion { get { return m_completion; } }
-        public override int BufferCount { get { return m_childFlow.BufferedCount; } }
+        public override Tuple<int, int> BufferStatus { get { return m_childFlow.BufferStatus; } }
 
         public override string DisplayName
         {

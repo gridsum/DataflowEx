@@ -72,5 +72,10 @@ namespace Gridsum.DataflowEx
         }
 
         //todo: from delegate, from existing dataflows
+
+        public static int Total(this Tuple<int, int> tuple)
+        {
+            return tuple.Item1 + tuple.Item2;
+        }
     }
 }

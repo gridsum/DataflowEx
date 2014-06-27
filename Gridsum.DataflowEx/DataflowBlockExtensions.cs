@@ -28,29 +28,29 @@ namespace Gridsum.DataflowEx
             throw new PostToBlockFailedException("Safe post to " + Utils.GetFriendlyName(target.GetType()) + " failed");
         }
 
-        public static int GetBufferCount(this IDataflowBlock block)
+        public static Tuple<int,int> GetBufferCount(this IDataflowBlock block)
         {
             dynamic b = block;
 
             var blockGenericType = block.GetType().GetGenericTypeDefinition();
             if (blockGenericType == typeof(TransformBlock<,>) || blockGenericType == typeof(TransformManyBlock<,>))
             {
-                return b.InputCount + b.OutputCount;
+                return new Tuple<int, int>(b.InputCount, b.OutputCount);
             }
 
             if (blockGenericType == typeof(ActionBlock<>))
             {
-                return b.InputCount;
+                return new Tuple<int, int>(b.InputCount, 0);
             }
 
             if (blockGenericType == typeof (BufferBlock<>))
             {
-                return b.Count;
+                return new Tuple<int, int>(0, b.Count);;
             }
 
             if (blockGenericType == typeof (BatchBlock<>))
             {
-                return b.OutputCount*b.BatchSize;
+                return new Tuple<int, int>(0, b.OutputCount * b.BatchSize);                
             }
 
 //            if (typeof(ISourceBlock<>).IsInstanceOfType(block))

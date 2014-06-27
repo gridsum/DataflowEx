@@ -26,9 +26,9 @@ namespace Gridsum.DataflowEx.Test
 
             await Task.Delay(200);
 
-            Assert.AreEqual(1, block1.GetBufferCount());
-            Assert.AreEqual(2, block2.GetBufferCount());
-            Assert.AreEqual(2, block3.GetBufferCount());
+            Assert.AreEqual(1, block1.GetBufferCount().Total());
+            Assert.AreEqual(2, block2.GetBufferCount().Total());
+            Assert.AreEqual(2, block3.GetBufferCount().Total());
         }
     }
 }

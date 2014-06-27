@@ -91,11 +91,11 @@ namespace Gridsum.DataflowEx
 
                 if (m_dataflowOptions.FlowMonitorEnabled)
                 {
-                    int count = this.BufferedCount;
+                    var bufferStatus = this.BufferStatus;
 
-                    if (count != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                    if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                     {
-                        LogHelper.Logger.Debug(h => h("[{0}] has {1} todo items at this moment.", this.Name, count));
+                        LogHelper.Logger.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                     }
                 }
 
@@ -103,12 +103,12 @@ namespace Gridsum.DataflowEx
                 {
                     foreach(var child in m_children)
                     {
-                        var count = child.BufferCount;
+                        var bufferStatus = child.BufferStatus;
 
-                        if (count != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                        if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                         {
                             IDataflowChildMeta c = child;
-                            LogHelper.Logger.Debug(h => h("{0} has {1} todo items at this moment.", c.DisplayName, count));
+                            LogHelper.Logger.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                         }
                     }
                 }
@@ -182,13 +182,30 @@ namespace Gridsum.DataflowEx
         }
 
         /// <summary>
-        /// Sum of the buffer size of all blocks in the dataflow
+        /// By default, sum of the buffer size of all children in the dataflow
         /// </summary>
-        public virtual int BufferedCount
+        public virtual Tuple<int, int> BufferStatus
         {
             get
             {
-                return m_children.Sum(bm => bm.BufferCount);
+                int i = 0;
+                int o = 0;
+                foreach(var c in m_children)
+                {
+                    var pair = c.BufferStatus;
+                    i += pair.Item1;
+                    o += pair.Item2;
+                }
+
+                return new Tuple<int, int>(i, o);
+            }
+        }
+
+        public int BufferedCount
+        {
+            get
+            {
+                return BufferStatus.Total();                
             }
         }
     }
