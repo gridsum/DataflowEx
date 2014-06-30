@@ -70,6 +70,14 @@ namespace Gridsum.DataflowEx
         {
             return new AutoCompleteWrapper<TIn, TOut>(dataflow, timeout);
         }
+                
+        public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, IDataflow<TOut> out1, IDataflow<TOut> out2, Func<TOut, TOut> copyFunc = null)
+        {
+            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            dataflow.LinkTo(brancher);
+            brancher.LinkTo(out1);
+            brancher.LinkSecondlyTo(out2);
+        }
 
         //todo: from delegate, from existing dataflows
 

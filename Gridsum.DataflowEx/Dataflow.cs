@@ -113,6 +113,8 @@ namespace Gridsum.DataflowEx
                         }
                     }
                 }
+
+                CustomPerfMonBehavior();
             }
         }
 
@@ -139,6 +141,13 @@ namespace Gridsum.DataflowEx
         protected virtual void CleanUp()
         {
             //
+        }
+
+        /// <summary>
+        /// Customization entry point for custom performance monitoring codes. Default impl is empty
+        /// </summary>
+        protected virtual void CustomPerfMonBehavior()
+        {
         }
 
         /// <summary>

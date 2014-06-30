@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
@@ -38,6 +39,23 @@ namespace Gridsum.DataflowEx
             {
                 return s_defaultOptions;
             }
+        }
+
+        public ExecutionDataflowBlockOptions ExtractToBlockOption(bool isBlockMultiThreaded = false)
+        {
+            var option = new ExecutionDataflowBlockOptions();
+
+            if (this.RecommendedCapacity != null)
+            {
+                option.BoundedCapacity = this.RecommendedCapacity.Value;
+            }
+
+            if (isBlockMultiThreaded)
+            {
+                option.MaxDegreeOfParallelism = this.RecommendedParallelismIfMultiThreaded ?? Environment.ProcessorCount;
+            }
+
+            return option;
         }
 
         public enum PerformanceLogMode
