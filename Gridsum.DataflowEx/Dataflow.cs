@@ -96,7 +96,7 @@ namespace Gridsum.DataflowEx
 
                     if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                     {
-                        LogHelper.Logger.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                        LogHelper.PerfMon.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                     }
                 }
 
@@ -109,7 +109,7 @@ namespace Gridsum.DataflowEx
                         if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                         {
                             IDataflowChildMeta c = child;
-                            LogHelper.Logger.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                            LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                         }
                     }
                 }

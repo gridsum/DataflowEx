@@ -7,12 +7,21 @@ namespace Gridsum.DataflowEx
     internal static class LogHelper
     {
         private static readonly ILog s_logger = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name);
+        private static readonly ILog s_perfMon = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name + ".PerfMon");
 
         internal static ILog Logger
         {
             get
             {
                 return s_logger;
+            }
+        }
+
+        internal static ILog PerfMon
+        {
+            get
+            {
+                return s_perfMon;
             }
         }
 
