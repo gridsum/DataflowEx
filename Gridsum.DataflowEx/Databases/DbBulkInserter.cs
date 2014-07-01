@@ -68,5 +68,14 @@ namespace Gridsum.DataflowEx.Databases
                 return m_dbBulkInserterName ?? base.Name;
             }
         }
+
+        public override System.Tuple<int, int> BufferStatus
+        {
+            get
+            {
+                var bs = base.BufferStatus;
+                return new System.Tuple<int, int>(bs.Item1 * m_bulkSize, bs.Item2 * m_bulkSize);
+            }
+        }
     }
 }
