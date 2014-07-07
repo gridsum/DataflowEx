@@ -185,11 +185,11 @@ namespace Gridsum.DataflowEx.Databases
                 LogHelper.Logger.ErrorFormat(
                     "failed to create constant expression for property: {0}, with default value:{1}", e,
                     prop.PropertyType, defaultValue);
+                throw;
             }
-
-
+            
             //测试当前属性的“父属性”是否非空
-            BinaryExpression test = Expression.NotEqual(parentExpr, Expression.Constant(null));
+            BinaryExpression ifParentNotNull = Expression.NotEqual(parentExpr, Expression.Constant(null));
 
             //“父属性”非空时的返回值
             MemberExpression propExpr = Expression.Property(parentExpr, prop);
@@ -197,27 +197,46 @@ namespace Gridsum.DataflowEx.Databases
             LabelTarget labelTarget = Expression.Label(prop.PropertyType);
 
             //局部变量，用于存放最终的返回值
-            ParameterExpression locExpr = Expression.Variable(prop.PropertyType);
+            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
 
-            //测试并赋值
-            ConditionalExpression ifesleTestExpr = Expression.IfThenElse(test, Expression.Assign(locExpr, propExpr),
-                Expression.Assign(locExpr, defaultExpr));
+            var defaultOfT = underType.IsValueType ? Activator.CreateInstance(prop.PropertyType) : null;
+            
+            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(defaultOfT));
+            
+            //assign conditionally
+            //if (p != null)
+            //{
+            //  if (p.P != null)
+            //      tmp = p.P;
+            //  else
+            //      tmp = default;
+            //}
+            //else
+            //{
+            //  tmp = default;
+            //}
+            ConditionalExpression assignConditionally = Expression.IfThenElse(
+                ifParentNotNull, 
+                Expression.IfThenElse(
+                    ifPropNotNull, 
+                    Expression.Assign(localVarExpr, propExpr), 
+                    Expression.Assign(localVarExpr, defaultExpr)),
+                Expression.Assign(localVarExpr, defaultExpr));
 
             //返回值
-            GotoExpression retExpr = Expression.Return(labelTarget, locExpr);
+            GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
 
-            LabelExpression labelExpr = Expression.Label(labelTarget, locExpr);
+            LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
 
             BlockExpression block = Expression.Block(
-                new[] {locExpr},
-                ifesleTestExpr,
+                new[] {localVarExpr},
+                assignConditionally,
                 retExpr,
                 labelExpr
                 );
             return block;
         }
-
-
+        
         private DataTable GetSchemaTable()
         {
             if (string.IsNullOrWhiteSpace(m_connectionString))
