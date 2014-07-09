@@ -77,4 +77,16 @@ namespace Gridsum.DataflowEx.PatternMatch
             }
         }
     }
+
+    public class FastMultiMatcher<TInput, TOutput> : MultiMatchCondition<TInput> where TOutput : IMatchable<TInput>
+    {
+        private readonly TOutput[] m_matchables;
+
+        public FastMultiMatcher(TOutput[] matchables) : base(matchables.Select(o => o.Condition).ToArray())
+        {
+            m_matchables = matchables;
+        }
+
+
+    }
 }
