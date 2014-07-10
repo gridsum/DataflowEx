@@ -5,6 +5,8 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx.Databases
 {
+    using System.Data.SqlClient;
+
     /// <summary>
     /// The class helps you to bulk insert parsed objects to multiple database tables (e.g. group by profileId)
     /// </summary>
@@ -20,7 +22,14 @@ namespace Gridsum.DataflowEx.Databases
         private Func<int, Lazy<DbBulkInserter<T>>> m_initer;
         private ActionBlock<T> m_dispatchBlock;
 
-        public MultiDbBulkInserter(DataflowOptions options, Func<T, int> dispatchFunc, Func<int, string> connectionGetter, string destTable, string destLabel, int bulkSize = 4096 * 2, string dbBulkInserterName = null)
+        public MultiDbBulkInserter(DataflowOptions options, 
+            Func<T, int> dispatchFunc, 
+            Func<int, string> connectionGetter, 
+            string destTable, 
+            string destLabel, 
+            int bulkSize = 4096 * 2, 
+            string dbBulkInserterName = null,
+            PostBulkInsertDelegate postBulkInsert = null)
             : base(options)
         {
             m_options = options;
@@ -47,7 +56,9 @@ namespace Gridsum.DataflowEx.Databases
                         m_destTable, 
                         m_options, 
                         destLabel,
-                        m_bulkSize, string.Format("{0}_{1}", this.Name, p));
+                        m_bulkSize, 
+                        string.Format("{0}_{1}", this.Name, p), 
+                        postBulkInsert);
 
                     //Register dynamically generated blocks to enable upstream propagation
                     this.RegisterChild(singleInserter);
