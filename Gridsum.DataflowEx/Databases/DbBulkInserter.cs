@@ -41,7 +41,7 @@ namespace Gridsum.DataflowEx.Databases
             RegisterChild(m_actionBlock);
         }
 
-        private async Task DumpToDB(IEnumerable<T> data, string destTable, string connectionString, string destLabel)
+        protected async virtual Task DumpToDB(IEnumerable<T> data, string destTable, string connectionString, string destLabel)
         {
             using (var bulkReader = new BulkDataReader<T>(TypeAccessorManager<T>.GetAccessorByDestLabel(destLabel, connectionString, destTable), data))
             {
@@ -49,21 +49,35 @@ namespace Gridsum.DataflowEx.Databases
                 {
                     await conn.OpenAsync();
 
-                    using (var bulkCopy = new SqlBulkCopy(conn))
+                    var transaction = conn.BeginTransaction();
+                    try
                     {
-                        foreach (SqlBulkCopyColumnMapping map in bulkReader.ColumnMappings)
+                        using (var bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.TableLock, transaction))
                         {
-                            bulkCopy.ColumnMappings.Add(map);
+                            foreach (SqlBulkCopyColumnMapping map in bulkReader.ColumnMappings)
+                            {
+                                bulkCopy.ColumnMappings.Add(map);
+                            }
+
+                            bulkCopy.DestinationTableName = destTable;
+                            bulkCopy.BulkCopyTimeout = (int) TimeSpan.FromMinutes(30).TotalMilliseconds;
+                            bulkCopy.BatchSize = m_bulkSize;
+
+                            // Write from the source to the destination.
+                            await bulkCopy.WriteToServerAsync(bulkReader);
                         }
-
-                        bulkCopy.DestinationTableName = destTable;
-                        bulkCopy.BulkCopyTimeout = 0;
-                        bulkCopy.BatchSize = m_bulkSize;
-
-                        // Write from the source to the destination.
-                        await bulkCopy.WriteToServerAsync(bulkReader);
                     }
+                    catch (Exception e)
+                    {
+                        LogHelper.Logger.ErrorFormat("[{0}] Bulk insertion failed. Rolling back all changes...", this.Name, e);
+                        transaction.Rollback();
+                        LogHelper.Logger.InfoFormat("[{0}] Changes successfully rolled back", this.Name);
 
+                        //As this is an unrecoverable exception, rethrow it
+                        throw;
+                    }
+                    
+                    transaction.Commit();
                     await this.OnPostBulkInsert(conn, destTable, destLabel);
                 }
             }

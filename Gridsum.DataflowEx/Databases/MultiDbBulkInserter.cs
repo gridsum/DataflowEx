@@ -19,6 +19,7 @@ namespace Gridsum.DataflowEx.Databases
         private string m_destTable;
         private DataflowOptions m_options;
         private int m_bulkSize;
+        private readonly string m_displayName;
         private Func<int, Lazy<DbBulkInserter<T>>> m_initer;
         private ActionBlock<T> m_dispatchBlock;
 
@@ -28,7 +29,7 @@ namespace Gridsum.DataflowEx.Databases
             string destTable, 
             string destLabel, 
             int bulkSize = 4096 * 2, 
-            string dbBulkInserterName = null,
+            string displayName = null,
             PostBulkInsertDelegate postBulkInsert = null)
             : base(options)
         {
@@ -38,7 +39,8 @@ namespace Gridsum.DataflowEx.Databases
             m_connectionGetter = connectionGetter;
             m_destTable = destTable;
             m_bulkSize = bulkSize;
-            
+            m_displayName = displayName;
+
             m_dispatchBlock = new ActionBlock<T>(item =>
             {
                 int profileId = m_dispatchFunc(item);
@@ -48,17 +50,10 @@ namespace Gridsum.DataflowEx.Databases
                 BoundedCapacity = m_dataflowOptions.RecommendedCapacity ?? int.MaxValue,
             });
             
-            m_initer = p => new Lazy<DbBulkInserter<T>>(
+            m_initer = pid => new Lazy<DbBulkInserter<T>>(
                 () =>
                 {
-                    var singleInserter = new DbBulkInserter<T>(
-                        m_connectionGetter(p), 
-                        m_destTable, 
-                        m_options, 
-                        destLabel,
-                        m_bulkSize, 
-                        string.Format("{0}_{1}", this.Name, p), 
-                        postBulkInsert);
+                    var singleInserter = this.CreateDbBulkInserter(destLabel, postBulkInsert, pid);
 
                     //Register dynamically generated blocks to enable upstream propagation
                     this.RegisterChild(singleInserter);
@@ -81,10 +76,30 @@ namespace Gridsum.DataflowEx.Databases
                 //no need to propagate errors as register handles that (given that dyamic blocks are registered)
             });
         }
-        
+
+        protected virtual DbBulkInserter<T> CreateDbBulkInserter(string destLabel, PostBulkInsertDelegate postBulkInsert, int pid)
+        {
+            return new DbBulkInserter<T>(
+                this.m_connectionGetter(pid), 
+                this.m_destTable, 
+                this.m_options, 
+                destLabel,
+                this.m_bulkSize, 
+                string.Format("{0}_{1}", this.Name, pid), 
+                postBulkInsert);
+        }
+
         public override ITargetBlock<T> InputBlock
         {
             get { return m_dispatchBlock; }
+        }
+
+        public override string Name
+        {
+            get
+            {
+                return m_displayName ?? base.Name;
+            }
         }
     }
 }
