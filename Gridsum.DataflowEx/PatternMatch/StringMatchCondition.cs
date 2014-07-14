@@ -60,5 +60,11 @@ namespace Gridsum.DataflowEx.PatternMatch
                     return input.Contains(MatchPattern);
             }
 	    }
+
+        public IMatchCondition<string> MatchesExact(string input)
+        {
+            if (this.Matches(input)) return this;
+            else return null;
+        }
 	}
 }

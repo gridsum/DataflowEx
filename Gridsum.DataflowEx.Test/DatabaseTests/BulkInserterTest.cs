@@ -47,7 +47,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         }
 
         [TestMethod]
-        public void TestMultiDbBulkINserter()
+        public void TestMultiDbBulkInserter()
         {
             System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);

@@ -9,6 +9,12 @@
             return false;
         }
 
+        public IMatchCondition<T> MatchesExact(T input)
+        {
+            if (this.Matches(input)) return this;
+            else return null;
+        }
+
         public static MatchNoneCondition<T> Instance
         {
             get

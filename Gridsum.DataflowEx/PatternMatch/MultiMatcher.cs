@@ -17,6 +17,22 @@ namespace Gridsum.DataflowEx.PatternMatch
         {
             return m_matchConditions.Any(matchCondition => matchCondition.Matches(input));
         }
+
+        public IMatchCondition<TInput> MatchesExact(TInput input)
+        {
+            foreach (IMatchCondition<TInput> child in m_matchConditions)
+            {
+                IMatchCondition<TInput> childMatch = child.MatchesExact(input);
+
+                if (childMatch != null)
+                {
+                    return childMatch;
+                }
+            }
+
+            return null;
+        }
+
     }
 
     //todo:  input-output caching
@@ -43,6 +59,26 @@ namespace Gridsum.DataflowEx.PatternMatch
             }
 
             matchable = default (TOutput);
+            return false;
+        }
+
+
+        public bool TryMatchExact(TInput input, out TOutput matchable, out IMatchCondition<TInput> exactMatch)
+        {
+            for (int i = 0; i < m_matchables.Length; i++)
+            {
+                IMatchCondition<TInput> cond = m_matchables[i].Condition.MatchesExact(input);
+
+                if (cond != null)
+                {
+                    matchable = m_matchables[i];
+                    exactMatch = cond;
+                    return true;
+                }
+            }
+
+            matchable = default(TOutput);
+            exactMatch = null;
             return false;
         }
 

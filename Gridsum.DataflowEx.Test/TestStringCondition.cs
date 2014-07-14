@@ -64,5 +64,70 @@ namespace Gridsum.DataflowEx.Test
             Assert.IsTrue(cond.Matches("https://www.gridsum.com/3.txt"));
             Assert.IsFalse(cond.Matches("https://www.gridsum.com/3.txta"));
         }
+
+        [TestMethod]
+        public void TestExactMatch()
+        {
+            var cond1 = new StringMatchCondition("1", MatchType.Contains);
+            var cond2 = new StringMatchCondition("2", MatchType.Contains);
+            var cond3 = new StringMatchCondition("3", MatchType.Contains);
+
+            var multi = new MultiMatchCondition<string>(new[] { cond1, cond2, cond3 });
+
+            Assert.IsTrue(multi.Matches("432"));
+            Assert.IsTrue(multi.Matches("123"));
+            Assert.AreEqual(cond2, multi.MatchesExact("432"));
+            Assert.AreEqual(cond1, multi.MatchesExact("123"));
+
+        }
+
+        [TestMethod]
+        public void TestExactMatch2()
+        {
+            var cond1 = new StringMatchable("1", MatchType.Contains);
+            var cond2 = new StringMatchable("2", MatchType.Contains);
+            var cond3 = new StringMatchable("3", MatchType.EndsWith);
+
+            var multi = new MultiMatcher<string, StringMatchable>(new[] { cond1, cond2, cond3 });
+
+            Assert.IsTrue(multi.Matches("432"));
+            Assert.IsTrue(multi.Matches("123"));
+            Assert.AreEqual(cond2.Condition, multi.MatchesExact("432"));
+            Assert.AreEqual(cond1.Condition, multi.MatchesExact("123"));
+
+            StringMatchable m;
+            IMatchCondition<string> c;
+            Assert.IsTrue(multi.TryMatchExact("9873", out m, out c));
+            Assert.AreEqual(cond3, m);
+            Assert.AreEqual(cond3.Condition, c);
+        }
+
+        internal class StringMatchable : IMatchable<string>
+        {
+            private readonly string m_pattern;
+            private UrlStringMatchCondition m_cond;
+
+            public StringMatchable(string pattern, MatchType matchType)
+            {
+                this.m_pattern = pattern;
+                m_cond = new UrlStringMatchCondition(pattern, matchType, false);
+            }
+
+            public string Pattern
+            {
+                get
+                {
+                    return m_pattern;
+                }
+            }
+
+            public IMatchCondition<string> Condition
+            {
+                get
+                {
+                    return m_cond;
+                }
+            }
+        }
     }
 }
