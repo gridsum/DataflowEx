@@ -97,11 +97,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
         }
     }
-
-
-
-
-
+    
     public class Entity2
     {
         public Entity2() { }
@@ -121,6 +117,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [DBColumnMapping(GSProduct.SEOD, "Name", "default", null)]
         public string Key { get; set; }
     }
+    
     #region test entity and dbcontext
 
     public class Init2
