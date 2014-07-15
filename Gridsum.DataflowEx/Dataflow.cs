@@ -24,6 +24,8 @@ namespace Gridsum.DataflowEx
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
         protected ImmutableList<IDataflowChildMeta> m_children = ImmutableList.Create<IDataflowChildMeta>();
+        protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
+        protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
         protected string m_defaultName;
 
         public Dataflow(DataflowOptions dataflowOptions)
@@ -82,7 +84,27 @@ namespace Gridsum.DataflowEx
 
             m_children = m_children.Add(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback));
         }
-        
+
+        /// <summary>
+        /// Register a post dataflow job, which will be executed and awaited after all children of the dataflow is done.
+        /// The gived job effects the completion task of the dataflow
+        /// </summary>
+        /// <param name="postDataflowTask"></param>
+        public void RegisterPostDataflowTask(Func<Task> postDataflowTask)
+        {
+            m_postDataflowTasks = m_postDataflowTasks.Add(postDataflowTask);
+        }
+
+        /// <summary>
+        /// Register a cancellation token source which will be signaled to external components 
+        /// if this dataflow runs into error. (Useful to terminate input stream to the dataflow
+        /// together with PullFromAsync)
+        /// </summary>
+        public void RegisterCancellationTokenSource(CancellationTokenSource cts)
+        {
+            m_ctsList = m_ctsList.Add(cts);
+        }
+
         //todo: add completion condition and cancellation token support
         private async Task StartPerformanceMonitorAsync()
         {
@@ -125,17 +147,22 @@ namespace Gridsum.DataflowEx
                 throw new NoChildRegisteredException(this);
             }
 
-            ImmutableList<IDataflowChildMeta> childrenSnapShot;
-
-            do
+            try
             {
-                childrenSnapShot = m_children;
-                await TaskEx.AwaitableWhenAll(childrenSnapShot.Select(b => b.ChildCompletion).ToArray());
-            } while (!object.ReferenceEquals(m_children, childrenSnapShot));
-
-            this.CleanUp();
-
-            LogHelper.Logger.Info(string.Format("{0} is completed", this.Name));
+                await TaskEx.AwaitableWhenAll(() => m_children, b => b.ChildCompletion);
+                await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
+                
+                this.CleanUp();
+                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.Name));
+            }
+            catch (Exception)
+            {
+                foreach (var cts in m_ctsList)
+                {
+                    cts.Cancel();
+                }
+                throw;
+            }
         }
 
         protected virtual void CleanUp()
@@ -231,21 +258,33 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Helper method to read from a text reader and post everything in the text reader to the pipeline
         /// </summary>
-        public void PullFrom(IEnumerable<TIn> reader)
+        public Task PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
         {
-            long count = 0;
-            foreach(var item in reader)
-            {
-                InputBlock.SafePost(item);
-                count++;
-            }
+            return Task.Run(
+                () =>
+                    {
+                        long count = 0;
+                        foreach (var item in reader)
+                        {
+                            if (ct.IsCancellationRequested)
+                            {
+                                ct.ThrowIfCancellationRequested();
+                            }
 
-            LogHelper.Logger.Info(h => h("<{0}> Pulled and posted {1} {2}s to the input block {3}.", 
-                this.Name, 
-                count, 
-                Utils.GetFriendlyName(typeof(TIn)), 
-                Utils.GetFriendlyName(this.InputBlock.GetType())
-                ));
+                            InputBlock.SafePost(item);
+                            count++;
+                        }
+
+                        LogHelper.Logger.Info(
+                            h =>
+                            h(
+                                "<{0}> Pulled and posted {1} {2}s to the input block {3}.",
+                                this.Name,
+                                count,
+                                Utils.GetFriendlyName(typeof(TIn)),
+                                Utils.GetFriendlyName(this.InputBlock.GetType())));
+                    },
+                ct);
         }
 
         public void LinkFrom(ISourceBlock<TIn> block)

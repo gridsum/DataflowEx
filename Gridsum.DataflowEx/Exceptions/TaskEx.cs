@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace Gridsum.DataflowEx.Exceptions
 {
+    using System.Collections.Immutable;
+
     public static class TaskEx
     {
         public static ExceptionComparer s_ExceptionComparer = new ExceptionComparer();
@@ -43,6 +45,17 @@ namespace Gridsum.DataflowEx.Exceptions
             });
 
             return tcs.Task;
+        }
+
+        public static async Task AwaitableWhenAll<T>(Func<ImmutableList<T>> listGetter, Func<T, Task> itemCompletion)
+        {
+            ImmutableList<T> childrenSnapShot;
+            do
+            {
+                childrenSnapShot = listGetter();
+                await TaskEx.AwaitableWhenAll(childrenSnapShot.Select(itemCompletion).ToArray());
+            }
+            while (!object.ReferenceEquals(listGetter(), childrenSnapShot));
         }
 
         public static Exception UnwrapWithPriority(AggregateException ae)

@@ -41,6 +41,13 @@ namespace Gridsum.DataflowEx.Test
             var container1 = DataflowUtils.FromBlock(block1);
             var container2 = DataflowUtils.FromBlock(block2);
 
+            bool postTaskDone = false;
+            container2.RegisterPostDataflowTask(() => Task.Run(
+                () =>
+                    {
+                        postTaskDone = true;
+                    }));
+
             container1.LinkTo(container2);
             container2.LinkLeftToNull();
 
@@ -48,6 +55,7 @@ namespace Gridsum.DataflowEx.Test
             container1.InputBlock.Complete();
 
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
+            Assert.IsTrue(postTaskDone);
         }
 
         [TestMethod]
@@ -105,10 +113,16 @@ namespace Gridsum.DataflowEx.Test
             faultyContainer.TransformAndLink(involvedContainer);
             faultyContainer.LinkLeftToNull();
 
+            var cts = new CancellationTokenSource();
+            faultyContainer.RegisterCancellationTokenSource(cts);
             faultyContainer.InputBlock.Post("test");
+
+            var sleepingTask = Task.Delay(TimeSpan.FromDays(1), cts.Token);
 
             await EnsureTaskFail<SystemException>(faultyContainer.CompletionTask);
             await EnsureTaskFail<LinkedDataflowFailedException>(involvedContainer.CompletionTask);
+
+            Assert.IsTrue(await sleepingTask.FinishesIn(TimeSpan.FromSeconds(1)));
         }
 
         [TestMethod]
