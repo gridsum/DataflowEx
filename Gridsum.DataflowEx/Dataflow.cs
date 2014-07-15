@@ -105,38 +105,47 @@ namespace Gridsum.DataflowEx
             m_ctsList = m_ctsList.Add(cts);
         }
 
-        //todo: add completion condition and cancellation token support
         private async Task StartPerformanceMonitorAsync()
         {
-            while (true)
+            //Wait for the dataflow startup and block initialization
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            try
             {
-                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
-
-                if (m_dataflowOptions.FlowMonitorEnabled)
+                while (!this.CompletionTask.IsCompleted)
                 {
-                    var bufferStatus = this.BufferStatus;
-
-                    if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                    if (m_dataflowOptions.FlowMonitorEnabled)
                     {
-                        LogHelper.PerfMon.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
-                    }
-                }
-
-                if (m_dataflowOptions.BlockMonitorEnabled)
-                {
-                    foreach(var child in m_children)
-                    {
-                        var bufferStatus = child.BufferStatus;
+                        var bufferStatus = this.BufferStatus;
 
                         if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                         {
-                            IDataflowChildMeta c = child;
-                            LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                            LogHelper.PerfMon.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                         }
                     }
-                }
 
-                CustomPerfMonBehavior();
+                    if (m_dataflowOptions.BlockMonitorEnabled)
+                    {
+                        foreach(var child in m_children)
+                        {
+                            var bufferStatus = child.BufferStatus;
+
+                            if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                            {
+                                IDataflowChildMeta c = child;
+                                LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                            }
+                        }
+                    }
+
+                    CustomPerfMonBehavior();
+
+                    await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
+                }
+            }
+            catch (Exception e)
+            {
+                LogHelper.Logger.ErrorFormat("{0} Error occurred in my performance monitor loop. Monitoring stopped.", e, this.Name);
             }
         }
 
