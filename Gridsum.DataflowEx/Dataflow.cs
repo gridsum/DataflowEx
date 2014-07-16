@@ -405,6 +405,16 @@ namespace Gridsum.DataflowEx
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
         }
 
+        /// <summary>
+        /// Link all outputs that are in a certain sub type to the given dataflow which accepts the sub type
+        /// </summary>
+        /// <typeparam name="TTarget">The type the given dataflow accepts. Must be subtype of the output type of this dataflow</typeparam>
+        /// <param name="other">The given dataflow which is linked to</param>
+        public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
+        {
+            this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
+        }
+        
         public void LinkLeftToNull()
         {
             var frozenConds = m_frozenConditions.Value;
