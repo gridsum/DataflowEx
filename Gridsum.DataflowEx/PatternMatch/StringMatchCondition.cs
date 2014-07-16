@@ -6,7 +6,7 @@ namespace Gridsum.DataflowEx.PatternMatch
     /// <summary>
     /// A simple condition implementation for string. 
     /// </summary>
-	public class StringMatchCondition : IMatchCondition<string>
+	public class StringMatchCondition : MatchConditionBase<string>
 	{
 	    public StringMatchCondition(string matchPattern, MatchType matchType = MatchType.ExactMatch)
 		{
@@ -29,7 +29,7 @@ namespace Gridsum.DataflowEx.PatternMatch
         
 		public Regex Regex { get; set; }
 
-	    public virtual bool Matches(string input)
+	    public override bool Matches(string input)
 	    {
 	        if (input == null)
 	        {
@@ -60,11 +60,5 @@ namespace Gridsum.DataflowEx.PatternMatch
                     return input.Contains(MatchPattern);
             }
 	    }
-
-        public IMatchCondition<string> MatchesExact(string input)
-        {
-            if (this.Matches(input)) return this;
-            else return null;
-        }
 	}
 }
