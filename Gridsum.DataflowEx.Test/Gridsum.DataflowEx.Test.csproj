@@ -90,6 +90,7 @@
     <Compile Include="TestAutoComplete.cs" />
     <Compile Include="TestStringCondition.cs" />
     <Compile Include="TestImmutable.cs" />
+    <Compile Include="TestStatisticsRecorder.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj">
