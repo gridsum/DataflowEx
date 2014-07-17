@@ -133,12 +133,9 @@ namespace Gridsum.DataflowEx
 
         private async Task StartPerformanceMonitorAsync()
         {
-            //Wait for the dataflow startup and block initialization
-            await Task.Delay(TimeSpan.FromSeconds(3));
-
             try
             {
-                while (!this.CompletionTask.IsCompleted)
+                while (m_children.Count == 0 || !this.CompletionTask.IsCompleted)
                 {
                     if (m_dataflowOptions.FlowMonitorEnabled)
                     {
