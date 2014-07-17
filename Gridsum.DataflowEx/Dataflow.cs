@@ -17,7 +17,7 @@ namespace Gridsum.DataflowEx
     /// may contain one or multiple children. A child could be either a block or a dataflow
     /// Inheritors of this class should call RegisterBlock in their constructors.
     /// </summary>
-    public abstract class Dataflow : IDataflow
+    public class Dataflow : IDataflow
     {
         private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
         protected readonly DataflowOptions m_dataflowOptions;
@@ -227,7 +227,7 @@ namespace Gridsum.DataflowEx
 
         public virtual void Fault(Exception exception)
         {
-            LogHelper.Logger.ErrorFormat("<{0}> Exception occur. Shutting down my working blocks...", exception, this.Name);
+            LogHelper.Logger.ErrorFormat("<{0}> Exception occur. Shutting down my children...", exception, this.Name);
 
             foreach (var child in m_children)
             {

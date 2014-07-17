@@ -165,6 +165,53 @@ namespace Gridsum.DataflowEx.Test
             dynamicBlock.Complete();
             Assert.IsTrue(await completion.FinishesIn(TimeSpan.FromMilliseconds(100)));
         }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void TestCircularDependency()
+        {
+            var d1 = new Dataflow(DataflowOptions.Default);
+            var d2 = new Dataflow(DataflowOptions.Default);
+            var block = new ActionBlock<int>(i => { });
+            d2.RegisterChild(block);
+            
+            d1.RegisterChild(d2);
+            d2.RegisterChild(d1);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void TestDuplicateRegistration()
+        {
+            var d1 = new Dataflow(DataflowOptions.Default);
+            var d2 = new Dataflow(DataflowOptions.Default);
+
+            d1.RegisterChild(d2);
+            d1.RegisterChild(d2);
+        }
+
+        [TestMethod]
+        public async Task TestDuplicateRegistration2()
+        {
+            var d1 = new Dataflow(DataflowOptions.Default);
+            var d2 = new Dataflow(DataflowOptions.Default);
+
+            var block = new ActionBlock<int>(i => { });
+
+            d2.RegisterChild(block);
+            d1.RegisterChild(d2);
+            d1.RegisterChild(d2, allowDuplicate: true);
+
+            Task.Run(
+                async () =>
+                    {
+                        await Task.Delay(500);
+                        block.Complete();
+                    });
+
+            await d1.CompletionTask;
+            await d2.CompletionTask;
+        }
     }
 
     class FaultyBlocks : Dataflow<string, string>
