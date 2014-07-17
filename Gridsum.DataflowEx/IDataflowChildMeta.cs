@@ -19,6 +19,11 @@ namespace Gridsum.DataflowEx
         Tuple<int,int> BufferStatus { get; }
         string DisplayName { get; }
         void Fault(Exception e);
+
+        /// <summary>
+        /// Return the real inner child object wrapped by the metadata (IDataflowBlock or Dataflow)
+        /// </summary>
+        object Unwrap();
     }
 
     internal abstract class DataflowChildMeta : IDataflowChildMeta
@@ -31,6 +36,7 @@ namespace Gridsum.DataflowEx
         public abstract Tuple<int,int> BufferStatus { get; }
         public abstract string DisplayName { get; }
         public abstract void Fault(Exception e);
+        public abstract object Unwrap();
 
         protected DataflowChildMeta(Dataflow host, Action<Task> completionCallback)
         {
@@ -118,6 +124,11 @@ namespace Gridsum.DataflowEx
         {
             m_block.Fault(e);
         }
+
+        public override object Unwrap()
+        {
+            return m_block;
+        }
     }
 
     /// <summary>
@@ -148,6 +159,11 @@ namespace Gridsum.DataflowEx
         public override void Fault(Exception e)
         {
             m_childFlow.Fault(e);
+        }
+
+        public override object Unwrap()
+        {
+            return m_childFlow;
         }
     }
 }

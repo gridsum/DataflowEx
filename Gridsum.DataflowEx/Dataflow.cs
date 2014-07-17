@@ -51,38 +51,64 @@ namespace Gridsum.DataflowEx
         {
             get { return m_defaultName; }
         }
+
+        public ImmutableList<IDataflowChildMeta> Children
+        {
+            get
+            {
+                return m_children;
+            }
+        }
         
         /// <summary>
         /// Register this block to block meta. Also make sure the dataflow will fail if the registered block fails.
         /// </summary>
-        protected void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null)
+        public void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null, bool allowDuplicate = false)
         {
             if (block == null)
             {
                 throw new ArgumentNullException("block");
             }
 
-            if (m_children.OfType<BlockMeta>().Any(bm => bm.Block.Equals(block)))
-            {
-                throw new ArgumentException("Duplicate block registered in " + this.Name);
-            }
-
-            m_children = m_children.Add(new BlockMeta(block, this, blockCompletionCallback));
+            RegisterChild(new BlockMeta(block, this, blockCompletionCallback), allowDuplicate);
         }
 
-        protected void RegisterChild(Dataflow childFlow, Action<Task> dataflowCompletionCallback = null)
+        public void RegisterChild(Dataflow childFlow, Action<Task> dataflowCompletionCallback = null, bool allowDuplicate = false)
         {
             if (childFlow == null)
             {
                 throw new ArgumentNullException("childFlow");
             }
 
-            if (m_children.OfType<ChildDataflowMeta>().Any(cm => cm.Flow.Equals(childFlow)))
+            if (childFlow.Children.Any(c => object.ReferenceEquals(this, c.Unwrap())))
             {
-                throw new ArgumentException("Duplicate child dataflow registered in " + this.Name);
+                throw new ArgumentException(
+                    string.Format("[{0}] Cannot register a child {1} who is already my parent", this.Name, childFlow.Name));
+
+                //todo: to be more defensive here, detect deeper reference loop 
             }
 
-            m_children = m_children.Add(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback));
+            RegisterChild(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback), allowDuplicate);
+        }
+
+        internal void RegisterChild(IDataflowChildMeta childMeta, bool allowDuplicate)
+        {
+            var child = childMeta.Unwrap();
+
+            if (m_children.Any(cm => object.ReferenceEquals(cm.Unwrap(), child)))
+            {
+                if (allowDuplicate)
+                {
+                    LogHelper.Logger.DebugFormat("Duplicate child registration ignored in {0}: {1}", this.Name, childMeta.DisplayName);
+                    return;
+                }
+                else
+                {
+                    throw new ArgumentException("Duplicate child to register in " + this.Name);
+                }
+            }
+
+            m_children = m_children.Add(childMeta);
         }
 
         /// <summary>
