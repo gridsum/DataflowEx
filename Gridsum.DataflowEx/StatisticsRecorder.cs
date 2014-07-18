@@ -52,7 +52,28 @@ namespace Gridsum.DataflowEx
                 {
                     return counter.Count;
                 }
-                else return 0;
+                else
+                {
+                    if (fr.Level2 == null)
+                    {
+                        //sum up all counters with same level1 if the query only has level1
+                        return this.m_eventCounter.
+                            Where(kvPair => kvPair.Key.Level1 == fr.Level1).
+                            Sum(kvPair => kvPair.Value.Count);
+                    }
+                    else
+                    {
+                        return 0;    
+                    }
+                }
+            }
+        }
+
+        public int this[string level1]
+        {
+            get
+            {
+                return this[new DataflowEvent(level1)];
             }
         }
 
@@ -205,6 +226,11 @@ namespace Gridsum.DataflowEx
 
         public string Level1 { get { return m_level1; } }
         public string Level2 { get { return m_level2; } }
+
+        public override string ToString()
+        {
+            return m_level2 == null ? m_level1 : string.Concat(m_level1, "-", m_level2);
+        }
     }
 
     internal class DataflowEventComparer : IEqualityComparer<DataflowEvent>

@@ -25,11 +25,21 @@ namespace Gridsum.DataflowEx.Test
             recorder.RecordEvent("ev1");
             recorder.RecordEvent("ev1");
             recorder.RecordEvent("ev1");
+            recorder.RecordEvent("ev2", "1");
+            recorder.RecordEvent("ev2", "2");
+            recorder.RecordEvent("ev3", "1");
+            recorder.RecordEvent("ev3", "1");
+            recorder.RecordEvent("ev3", "1");
             
             Assert.AreEqual(3, recorder[typeof(string)]);
             Assert.AreEqual(3, recorder[typeof(EventHolder)]);
             Assert.AreEqual(4, recorder[typeof(int)]);
-            Assert.AreEqual(5 + 3, recorder[new DataflowEvent("ev1")]);
+            Assert.AreEqual(5 + 3, recorder["ev1"]);
+            Assert.AreEqual(2, recorder["ev2"]);
+            Assert.AreEqual(3, recorder[new DataflowEvent("ev3", "1")]);
+
+            Assert.AreEqual("a-b", new DataflowEvent("a", "b").ToString());
+            Assert.AreEqual("a", new DataflowEvent("a").ToString());
         }
 
         internal class EventHolder : IEventProvider
