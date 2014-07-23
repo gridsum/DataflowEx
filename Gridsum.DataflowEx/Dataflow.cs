@@ -12,6 +12,8 @@ using Gridsum.DataflowEx.PatternMatch;
 
 namespace Gridsum.DataflowEx
 {
+    using System.IO;
+
     /// <summary>
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
     /// may contain one or multiple children. A child could be either a block or a dataflow
@@ -391,6 +393,7 @@ namespace Gridsum.DataflowEx
 
         public void LinkTo(IDataflow<TOut> other)
         {
+            m_condBuilder.Add(new Predicate<TOut>(@out => true));
             LinkBlockToFlow(this.OutputBlock, other);
         }
 
@@ -438,6 +441,12 @@ namespace Gridsum.DataflowEx
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
         
+        /// <summary>
+        /// After this dataflow has linked to some targets conditionally, it is possible that some output objects
+        /// are 'left' (i.e. matches none of the conditions). This methods provides a way to easily dump these left objects
+        /// as garbage to the Null target. Otherwise these objects will stay in the buffer this dataflow which will never
+        /// come to an end state.
+        /// </summary>
         public void LinkLeftToNull()
         {
             var frozenConds = m_frozenConditions.Value;
@@ -458,7 +467,29 @@ namespace Gridsum.DataflowEx
             this.OutputBlock.LinkTo(DataflowBlock.NullTarget<TOut>(), m_defaultLinkOption, left);
         }
 
-        //todo: add link left to error (an action block that will fail myself)
+        /// <summary>
+        /// After this dataflow has linked to some targets conditionally, it is possible that some output objects
+        /// are 'left' (i.e. matches none of the conditions). This methods provides a way to fail the whole dataflow 
+        /// fast in case any output object is 'left' behind, which is unexpected.
+        /// </summary>
+        public void LinkLeftToError()
+        {
+            var frozenConds = m_frozenConditions.Value;
+            var left = new Predicate<TOut>(@out => frozenConds.All(condition => !condition(@out)));
+
+            var actionBlock = new ActionBlock<TOut>(
+                (survivor) =>
+                    {
+                        LogHelper.Logger.ErrorFormat(
+                            "[{0}] This is my error destination. Data should not arrive here: {1}", 
+                            this.Name, 
+                            survivor);
+                        throw new InvalidDataException(string.Format("An object came to error region of {0}: {1}", this.Name, survivor));
+                    });
+
+            this.OutputBlock.LinkTo(actionBlock, m_defaultLinkOption, left);
+            this.RegisterChild(actionBlock);
+        }
 
         protected virtual void OnOutputToNull(TOut output)
         {

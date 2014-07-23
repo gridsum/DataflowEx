@@ -8,6 +8,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test
 {
+    using System.IO;
+
     [TestClass]
     public class DataflowTest
     {
@@ -151,6 +153,31 @@ namespace Gridsum.DataflowEx.Test
         {
             var faultyContainer = new FaultyBlocks();
             faultyContainer.LinkLeftToNull();
+        }
+
+        [TestMethod]
+        public async Task TestLinkLeftToNull4()
+        {
+            var flow = DataflowUtils.FromBlock(new BufferBlock<object>());
+            flow.LinkSubTypeTo(DataflowUtils.FromBlock(DataflowBlock.NullTarget<string>()));
+            flow.LinkLeftToNull();
+            flow.InputBlock.SafePost("abc");
+            flow.InputBlock.SafePost(new object());
+            flow.InputBlock.Complete();
+            await flow.CompletionTask;
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidDataException))]
+        public async Task TestLinkLeftToError()
+        {
+            var flow = DataflowUtils.FromBlock(new BufferBlock<object>());
+            flow.LinkSubTypeTo(DataflowUtils.FromBlock(DataflowBlock.NullTarget<string>()));
+            flow.LinkLeftToError();
+            flow.InputBlock.SafePost("abc");
+            flow.InputBlock.SafePost(new object());
+            flow.InputBlock.Complete();
+            await flow.CompletionTask;
         }
         
         [TestMethod]
