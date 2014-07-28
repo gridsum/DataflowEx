@@ -22,6 +22,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\Gridsum.DataflowEx.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,6 +31,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\Gridsum.DataflowEx.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Common.Logging">
@@ -44,6 +46,7 @@
       <HintPath>..\packages\Microsoft.Bcl.Immutable.1.0.34\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
     </Reference>
     <Reference Include="System.Core" />
+    <Reference Include="System.IO" />
     <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.20.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.20\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
@@ -77,6 +80,7 @@
     <Compile Include="IDataflow.cs" />
     <Compile Include="Databases\MultiDbBulkInserter.cs" />
     <Compile Include="Exceptions\PropagatedException.cs" />
+    <Compile Include="LogReader.cs" />
     <Compile Include="PatternMatch\MatchConditionBase.cs" />
     <Compile Include="PatternMatch\IMatchable.cs" />
     <Compile Include="PatternMatch\IMatchCondition.cs" />

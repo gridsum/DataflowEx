@@ -290,9 +290,9 @@ namespace Gridsum.DataflowEx
         public abstract ITargetBlock<TIn> InputBlock { get; }
         
         /// <summary>
-        /// Helper method to read from a text reader and post everything in the text reader to the pipeline
+        /// Helper method to pull from a data source and post everything from the data source to the pipeline
         /// </summary>
-        public Task PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
+        public Task<long> PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
         {
             return Task.Run(
                 () =>
@@ -317,6 +317,8 @@ namespace Gridsum.DataflowEx
                                 count,
                                 Utils.GetFriendlyName(typeof(TIn)),
                                 Utils.GetFriendlyName(this.InputBlock.GetType())));
+
+                        return count;
                     },
                 ct);
         }
@@ -331,7 +333,11 @@ namespace Gridsum.DataflowEx
     {
         protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
         protected Lazy<ImmutableList<Predicate<TOut>>> m_frozenConditions;
-        protected StatisticsRecorder GarbageRecorder { get; private set; }
+
+        /// <summary>
+        /// History recorder of the objects dumped to null from this dataflow (by using LinkLeftToNull() ).
+        /// </summary>
+        public StatisticsRecorder GarbageRecorder { get; private set; }
 
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
@@ -493,7 +499,7 @@ namespace Gridsum.DataflowEx
 
         protected virtual void OnOutputToNull(TOut output)
         {
-            this.GarbageRecorder.RecordType(output.GetType());
+            this.GarbageRecorder.Record(output);
         }
     }
 }

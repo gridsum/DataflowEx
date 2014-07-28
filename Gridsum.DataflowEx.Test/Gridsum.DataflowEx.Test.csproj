@@ -86,6 +86,7 @@
     <Compile Include="BlockExtensionTest.cs" />
     <Compile Include="TestBlockBehaviors.cs" />
     <Compile Include="TestDataBrancher.cs" />
+    <Compile Include="TestLogReader.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TestAutoComplete.cs" />
     <Compile Include="TestStringCondition.cs" />

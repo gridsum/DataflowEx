@@ -12,6 +12,8 @@ using Microsoft.CSharp.RuntimeBinder;
 
 namespace Gridsum.DataflowEx
 {
+    using System.IO;
+
     public static class DataflowUtils
     {
         public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action)
@@ -80,10 +82,22 @@ namespace Gridsum.DataflowEx
         }
 
         //todo: from delegate, from existing dataflows
-
         public static int Total(this Tuple<int, int> tuple)
         {
             return tuple.Item1 + tuple.Item2;
+        }
+
+        /// <summary>
+        /// Read from the reader line by line to act as an IEnumerable of string.
+        /// </summary>
+        public static IEnumerable<string> ToEnumerable(this TextReader reader)
+        {
+            string s;
+
+            while ((s = reader.ReadLine()) != null)
+            {
+                yield return s;
+            }
         }
     }
 }
