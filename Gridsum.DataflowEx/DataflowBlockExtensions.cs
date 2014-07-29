@@ -18,6 +18,16 @@ namespace Gridsum.DataflowEx
             bool posted = target.Post(item);
             if (posted) return;
 
+            if (target.Completion.IsCompleted)
+            {
+                string msg = string.Format(
+                    "Safe post to {0} failed as the block is {1}",
+                    Utils.GetFriendlyName(target.GetType()),
+                    target.Completion.Status);
+
+                throw new PostToBlockFailedException(msg);
+            }
+
             for (int i = 1; i <= retryCount; i++)
             {
                 Thread.Sleep(interval * i);
@@ -25,7 +35,8 @@ namespace Gridsum.DataflowEx
                 if (posted) return;
             }
 
-            throw new PostToBlockFailedException("Safe post to " + Utils.GetFriendlyName(target.GetType()) + " failed");
+            throw new PostToBlockFailedException(
+                string.Format("Safe post to {0} failed after {1} retries", Utils.GetFriendlyName(target.GetType()), retryCount));
         }
 
         public static Tuple<int,int> GetBufferCount(this IDataflowBlock block)
