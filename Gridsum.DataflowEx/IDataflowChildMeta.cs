@@ -84,7 +84,7 @@ namespace Gridsum.DataflowEx
                     }
                     catch (Exception e)
                     {
-                        LogHelper.Logger.Error(h => h("[{0}] Error when callback {1} on its completion", m_host.Name, this.DisplayName), e);
+                        LogHelper.Logger.Error(h => h("{0} Error when callback {1} on its completion", m_host.FullName, this.DisplayName), e);
                         tcs.SetException(e);
                         m_host.Fault(e);
                     }
@@ -117,7 +117,7 @@ namespace Gridsum.DataflowEx
 
         public override string DisplayName
         {
-            get { return string.Format("[{0}]->[{1}]", m_host.Name, Utils.GetFriendlyName(m_block.GetType())); }
+            get { return string.Format("{0}->({1})", m_host.FullName, this.m_block.GetType().GetFriendlyName()); }
         }
 
         public override void Fault(Exception e)
@@ -153,7 +153,7 @@ namespace Gridsum.DataflowEx
 
         public override string DisplayName
         {
-            get { return string.Format("[{0}]->[{1}]", m_host.Name, m_childFlow.Name); }
+            get { return m_childFlow.FullName; }
         }
 
         public override void Fault(Exception e)

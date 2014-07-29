@@ -31,9 +31,9 @@ namespace Gridsum.DataflowEx.Databases
             m_batchBlock = new BatchBlock<T>(bulkSize);
             m_actionBlock = new ActionBlock<T[]>(async array =>
             {
-                LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, destTable, this.Name));
+                LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, destTable, this.FullName));
                 await DumpToDB(array, destTable, connectionString, destLabel);
-                LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, destTable, this.Name));
+                LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, destTable, this.FullName));
             });
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
 
@@ -69,9 +69,9 @@ namespace Gridsum.DataflowEx.Databases
                     }
                     catch (Exception e)
                     {
-                        LogHelper.Logger.ErrorFormat("[{0}] Bulk insertion failed. Rolling back all changes...", this.Name, e);
+                        LogHelper.Logger.ErrorFormat("{0} Bulk insertion failed. Rolling back all changes...", this.FullName, e);
                         transaction.Rollback();
-                        LogHelper.Logger.InfoFormat("[{0}] Changes successfully rolled back", this.Name);
+                        LogHelper.Logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
 
                         //As this is an unrecoverable exception, rethrow it
                         throw;

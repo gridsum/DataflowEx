@@ -26,6 +26,7 @@ namespace Gridsum.DataflowEx
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
         protected ImmutableList<IDataflowChildMeta> m_children = ImmutableList.Create<IDataflowChildMeta>();
+        protected ImmutableList<Dataflow> m_parents = ImmutableList.Create<Dataflow>();
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
         protected string m_defaultName;
@@ -54,11 +55,39 @@ namespace Gridsum.DataflowEx
             get { return m_defaultName; }
         }
 
+        public string FullName
+        {
+            get
+            {
+                if (m_parents.IsEmpty)
+                {
+                    return string.Format("[{0}]", this.Name);
+                }
+                else if (m_parents.Count == 1)
+                {
+                    return string.Format("{0}->[{1}]", m_parents[0].FullName, this.Name);
+                }
+                else
+                {
+                    var parentPaths = string.Join("|", m_parents.Select(p => p.FullName));
+                    return string.Format("({0})->[{1}]", parentPaths, this.Name);
+                }
+            }
+        }
+
         public ImmutableList<IDataflowChildMeta> Children
         {
             get
             {
                 return m_children;
+            }
+        }
+
+        public ImmutableList<Dataflow> Parents
+        {
+            get
+            {
+                return m_parents;
             }
         }
         
@@ -82,15 +111,30 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("childFlow");
             }
 
-            if (childFlow.Children.Any(c => object.ReferenceEquals(this, c.Unwrap())))
+            if (this.HasCircularDependency(childFlow))
             {
                 throw new ArgumentException(
-                    string.Format("[{0}] Cannot register a child {1} who is already my parent", this.Name, childFlow.Name));
+                    string.Format("{0} Cannot register a child {1} who is already my ancestor", this.FullName, childFlow.FullName));
+            }
+         
+            //add myself as parents
+            childFlow.m_parents = childFlow.m_parents.Add(this);
+            RegisterChild(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback), allowDuplicate);
+        }
 
-                //todo: to be more defensive here, detect deeper reference loop 
+        private bool HasCircularDependency(Dataflow flow)
+        {
+            if (object.ReferenceEquals(flow, this)) return true;
+
+            foreach (var subFlow in flow.Children.OfType<ChildDataflowMeta>().Select(_ => _.Flow))
+            {
+                if (this.HasCircularDependency(subFlow))
+                {
+                    return true;
+                }
             }
 
-            RegisterChild(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback), allowDuplicate);
+            return false;
         }
 
         internal void RegisterChild(IDataflowChildMeta childMeta, bool allowDuplicate)
@@ -101,12 +145,12 @@ namespace Gridsum.DataflowEx
             {
                 if (allowDuplicate)
                 {
-                    LogHelper.Logger.DebugFormat("Duplicate child registration ignored in {0}: {1}", this.Name, childMeta.DisplayName);
+                    LogHelper.Logger.DebugFormat("Duplicate child registration ignored in {0}: {1}", this.FullName, childMeta.DisplayName);
                     return;
                 }
                 else
                 {
-                    throw new ArgumentException("Duplicate child to register in " + this.Name);
+                    throw new ArgumentException("Duplicate child to register in " + this.FullName);
                 }
             }
 
@@ -156,7 +200,7 @@ namespace Gridsum.DataflowEx
 
                         if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                         {
-                            LogHelper.PerfMon.Debug(h => h("[{0}] has {1} todo items (in:{2}, out:{3}) at this moment.", this.Name, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                            LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment.", this.FullName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                         }
                     }
 
@@ -181,15 +225,16 @@ namespace Gridsum.DataflowEx
             }
             catch (Exception e)
             {
-                LogHelper.Logger.ErrorFormat("{0} Error occurred in my performance monitor loop. Monitoring stopped.", e, this.Name);
+                LogHelper.Logger.ErrorFormat("{0} Error occurred in my performance monitor loop. Monitoring stopped.", e, this.FullName);
             }
         }
 
         protected virtual async Task GetCompletionTask()
         {
-            if (m_children.Count == 0)
+            //waiting until some children is registered
+            while (m_children.Count == 0)
             {
-                throw new NoChildRegisteredException(this);
+                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
             }
 
             try
@@ -198,7 +243,7 @@ namespace Gridsum.DataflowEx
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
                 this.CleanUp();
-                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.Name));
+                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.FullName));
             }
             catch (Exception)
             {
@@ -237,7 +282,7 @@ namespace Gridsum.DataflowEx
 
         public virtual void Fault(Exception exception)
         {
-            LogHelper.Logger.ErrorFormat("<{0}> Exception occur. Shutting down my children...", exception, this.Name);
+            LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);
 
             foreach (var child in m_children)
             {
@@ -321,8 +366,8 @@ namespace Gridsum.DataflowEx
                         catch (Exception)
                         {
                             LogHelper.Logger.WarnFormat(
-                                "<{0}> Pulled and posted {1} {2}s to {3} before an exception",
-                                this.Name,
+                                "{0} Pulled and posted {1} {2}s to {3} before an exception",
+                                this.FullName,
                                 count,
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
@@ -331,8 +376,8 @@ namespace Gridsum.DataflowEx
                         }
 
                         LogHelper.Logger.InfoFormat(
-                            "<{0}> Successfully pulled and posted {1} {2}s to {3}.",
-                            this.Name,
+                            "{0} Successfully pulled and posted {1} {2}s to {3}.",
+                            this.FullName,
                             count,
                             typeof(TIn).GetFriendlyName(),
                             ReceiverDisplayName);
@@ -355,10 +400,10 @@ namespace Gridsum.DataflowEx
                 {
                     if (dataflowMeta.Blocks.Contains(this.InputBlock))
                     {
-                        return dataflowMeta.Flow.Name;
+                        return dataflowMeta.Flow.FullName;
                     }
                 }
-                return "the input block " + this.InputBlock.GetType().GetFriendlyName();
+                return "my input block " + this.InputBlock.GetType().GetFriendlyName();
             }
         }
     }
@@ -420,12 +465,12 @@ namespace Gridsum.DataflowEx
 
                     if (otherTask.IsFaulted)
                     {
-                        LogHelper.Logger.InfoFormat("<{0}>Downstream dataflow faulted before I am done. Fault myself.", this.Name);
+                        LogHelper.Logger.InfoFormat("{0} Downstream dataflow faulted before I am done. Fault myself.", this.FullName);
                         this.Fault(new LinkedDataflowFailedException());
                     }
                     else if (otherTask.IsCanceled)
                     {
-                        LogHelper.Logger.InfoFormat("<{0}>Downstream dataflow canceled before I am done. Cancel myself.", this.Name);
+                        LogHelper.Logger.InfoFormat("{0} Downstream dataflow canceled before I am done. Cancel myself.", this.FullName);
                         this.Fault(new LinkedDataflowCanceledException());
                     }
                 });
@@ -521,10 +566,10 @@ namespace Gridsum.DataflowEx
                 (survivor) =>
                     {
                         LogHelper.Logger.ErrorFormat(
-                            "[{0}] This is my error destination. Data should not arrive here: {1}", 
-                            this.Name, 
+                            "{0} This is my error destination. Data should not arrive here: {1}", 
+                            this.FullName, 
                             survivor);
-                        throw new InvalidDataException(string.Format("An object came to error region of {0}: {1}", this.Name, survivor));
+                        throw new InvalidDataException(string.Format("An object came to error region of {0}: {1}", this.FullName, survivor));
                     });
 
             this.OutputBlock.LinkTo(actionBlock, m_defaultLinkOption, left);

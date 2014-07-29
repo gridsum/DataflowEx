@@ -158,7 +158,7 @@ namespace Gridsum.DataflowEx
 
         public virtual string DumpStatistics()
         {
-            string recorderName = GetFriendlyName(GetType());
+            string recorderName = this.GetType().GetFriendlyName();
 
             StringBuilder sb = new StringBuilder();
 
@@ -168,7 +168,7 @@ namespace Gridsum.DataflowEx
                 if (!typeof(Exception).IsAssignableFrom(keyValuePair.Key))
                 {
                     sb.Append(' ');
-                    sb.Append(GetFriendlyName(keyValuePair.Key));
+                    sb.Append(keyValuePair.Key.GetFriendlyName());
                     sb.Append('(');
                     sb.Append(keyValuePair.Value.Count);
                     sb.Append(')');
@@ -189,15 +189,7 @@ namespace Gridsum.DataflowEx
 
             return sb.ToString();
         }
-
-        private static string GetFriendlyName(Type type)
-        {
-            if (type.IsGenericType)
-                return string.Format("{0}<{1}>", type.Name.Split('`')[0], string.Join(", ", type.GetGenericArguments().Select(GetFriendlyName)));
-            else
-                return type.Name;
-        }
-
+        
         public virtual void Clear()
         {
             this.m_typeCounter.Clear();

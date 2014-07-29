@@ -101,10 +101,17 @@ namespace Gridsum.DataflowEx.Test
             var container3 = new FaultyBlocks();
             var container4 = new FaultyBlocks();
 
-            Assert.AreEqual("PropagatorDataflow<String, String>1", container1.Name);
-            Assert.AreEqual("PropagatorDataflow<String, String>2", container2.Name);
+            Assert.AreEqual("[PropagatorDataflow<String, String>1]", container1.FullName);
+            Assert.AreEqual("[PropagatorDataflow<String, String>2]", container2.FullName);
             Assert.IsTrue(container3.Name.StartsWith("FaultyBlocks"));
             Assert.IsTrue(container4.Name.StartsWith("FaultyBlocks"));
+
+            container3.RegisterChild(container1);
+            container4.RegisterChild(container2);
+
+            Assert.IsTrue(container1.FullName.StartsWith("[FaultyBlocks"));
+            Assert.IsTrue(container2.FullName.StartsWith("[FaultyBlocks"));
+            
         }
         
         [TestMethod]
@@ -204,6 +211,21 @@ namespace Gridsum.DataflowEx.Test
             
             d1.RegisterChild(d2);
             d2.RegisterChild(d1);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void TestCircularDependency2()
+        {
+            var d1 = new Dataflow(DataflowOptions.Default);
+            var d2 = new Dataflow(DataflowOptions.Default);
+            var d3 = new Dataflow(DataflowOptions.Default);
+            var block = new ActionBlock<int>(i => { });
+            d2.RegisterChild(block);
+
+            d1.RegisterChild(d2);
+            d2.RegisterChild(d3);
+            d3.RegisterChild(d1);
         }
 
         [TestMethod]

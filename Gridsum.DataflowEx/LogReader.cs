@@ -73,17 +73,17 @@
             try
             {
                 count = await readAndPostTask;
-                LogHelper.Logger.InfoFormat("<{0}> Finished reading from text reader and posting to the dataflow.", this.Name);
+                LogHelper.Logger.InfoFormat("{0} Finished reading from text reader and posting to the dataflow.", this.FullName);
             }
             catch (OperationCanceledException oce)
             {
-                LogHelper.Logger.InfoFormat("<{0}> Reading from text reader canceled halfway. Possibly there is something wrong with dataflow processing.", this.Name);
+                LogHelper.Logger.InfoFormat("{0} Reading from text reader canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
                 throw;
             }
 
             if (completeLogReaderOnFinish)
             {
-                LogHelper.Logger.InfoFormat("<{0}> Telling my dataflow there is no more input.", this.Name);
+                LogHelper.Logger.InfoFormat("{0} Telling my dataflow there is no more input.", this.FullName);
                 this.InputBlock.Complete(); //no more input
                 await this.CompletionTask;
             }
