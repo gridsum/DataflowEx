@@ -50,12 +50,25 @@ namespace Gridsum.DataflowEx.Exceptions
         public static async Task AwaitableWhenAll<T>(Func<ImmutableList<T>> listGetter, Func<T, Task> itemCompletion)
         {
             ImmutableList<T> childrenSnapShot;
+            Exception cachedException = null;
             do
             {
                 childrenSnapShot = listGetter();
-                await TaskEx.AwaitableWhenAll(childrenSnapShot.Select(itemCompletion).ToArray());
+                try
+                {
+                    await AwaitableWhenAll(childrenSnapShot.Select(itemCompletion).ToArray());
+                }
+                catch (Exception e)
+                {
+                    cachedException = e;
+                }
             }
             while (!object.ReferenceEquals(listGetter(), childrenSnapShot));
+
+            if (cachedException != null)
+            {
+                throw cachedException;
+            }
         }
 
         public static Exception UnwrapWithPriority(AggregateException ae)

@@ -111,6 +111,13 @@ namespace Gridsum.DataflowEx
             }
 
             m_children = m_children.Add(childMeta);
+
+            if (! m_completionTask.IsValueCreated)
+            {
+                //eagerly initialize completion task
+                //would look better if Lazy<T> provides an EagerEvaluate() method
+                var t = m_completionTask.Value; 
+            }
         }
 
         /// <summary>
@@ -131,9 +138,13 @@ namespace Gridsum.DataflowEx
         public void RegisterCancellationTokenSource(CancellationTokenSource cts)
         {
             m_ctsList = m_ctsList.Add(cts);
+
+            if (m_children.Count != 0)
+            {
+            }
         }
 
-        private async Task StartPerformanceMonitorAsync()
+        private async void StartPerformanceMonitorAsync()
         {
             try
             {
@@ -300,11 +311,8 @@ namespace Gridsum.DataflowEx
                         long count = 0;
                         foreach (var item in reader)
                         {
-                            if (ct.IsCancellationRequested)
-                            {
-                                ct.ThrowIfCancellationRequested();
-                            }
-
+                            ct.ThrowIfCancellationRequested();
+                            
                             InputBlock.SafePost(item);
                             count++;
                         }
