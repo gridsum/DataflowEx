@@ -26,7 +26,7 @@ namespace Gridsum.DataflowEx
         object Unwrap();
     }
 
-    internal abstract class DataflowChildMeta : IDataflowChildMeta
+    internal abstract class ChildMetaBase : IDataflowChildMeta
     {
         protected readonly Dataflow m_host;
         private readonly Action<Task> m_completionCallback;
@@ -38,7 +38,7 @@ namespace Gridsum.DataflowEx
         public abstract void Fault(Exception e);
         public abstract object Unwrap();
 
-        protected DataflowChildMeta(Dataflow host, Action<Task> completionCallback)
+        protected ChildMetaBase(Dataflow host, Action<Task> completionCallback)
         {
             m_host = host;
             m_completionCallback = completionCallback;
@@ -98,7 +98,7 @@ namespace Gridsum.DataflowEx
     /// <summary>
     /// A block as child
     /// </summary>
-    internal class BlockMeta : DataflowChildMeta
+    internal class BlockMeta : ChildMetaBase
     {
         private readonly IDataflowBlock m_block;
         private readonly Task m_completion;
@@ -134,7 +134,7 @@ namespace Gridsum.DataflowEx
     /// <summary>
     /// A data flow as child
     /// </summary>
-    internal class ChildDataflowMeta : DataflowChildMeta
+    internal class ChildDataflowMeta : ChildMetaBase
     {
         private readonly Dataflow m_childFlow;
         private readonly Task m_completion;

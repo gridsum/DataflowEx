@@ -100,11 +100,13 @@
 
                         this.m_recorder.RecordEvent(s);
                     });
+            
+            var df1 = DataflowUtils.FromBlock(m_parsingBlock);
+            var df2 = DataflowUtils.FromBlock(m_recordBlock);
+            df1.LinkTo(df2);
 
-            m_parsingBlock.LinkTo(m_recordBlock, new DataflowLinkOptions() { PropagateCompletion = true});
-
-            RegisterChild(m_parsingBlock);
-            RegisterChild(m_recordBlock);
+            RegisterChild(df1);
+            RegisterChild(df2);
         }
 
         #endregion

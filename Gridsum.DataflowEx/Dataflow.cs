@@ -309,22 +309,33 @@ namespace Gridsum.DataflowEx
                 () =>
                     {
                         long count = 0;
-                        foreach (var item in reader)
+                        try
                         {
-                            ct.ThrowIfCancellationRequested();
-                            
-                            InputBlock.SafePost(item);
-                            count++;
+                            foreach (var item in reader)
+                            {
+                                ct.ThrowIfCancellationRequested();
+                                InputBlock.SafePost(item);
+                                count++;
+                            }
                         }
-
-                        LogHelper.Logger.Info(
-                            h =>
-                            h(
-                                "<{0}> Pulled and posted {1} {2}s to the input block {3}.",
+                        catch (Exception)
+                        {
+                            LogHelper.Logger.WarnFormat(
+                                "<{0}> Pulled and posted {1} {2}s to {3} before an exception",
                                 this.Name,
                                 count,
-                                Utils.GetFriendlyName(typeof(TIn)),
-                                Utils.GetFriendlyName(this.InputBlock.GetType())));
+                                typeof(TIn).GetFriendlyName(),
+                                ReceiverDisplayName);
+
+                            throw;
+                        }
+
+                        LogHelper.Logger.InfoFormat(
+                            "<{0}> Successfully pulled and posted {1} {2}s to {3}.",
+                            this.Name,
+                            count,
+                            typeof(TIn).GetFriendlyName(),
+                            ReceiverDisplayName);
 
                         return count;
                     },
@@ -334,6 +345,21 @@ namespace Gridsum.DataflowEx
         public void LinkFrom(ISourceBlock<TIn> block)
         {
             block.LinkTo(this.InputBlock, m_defaultLinkOption);
+        }
+
+        protected string ReceiverDisplayName
+        {
+            get
+            {
+                foreach (var dataflowMeta in m_children.OfType<ChildDataflowMeta>())
+                {
+                    if (dataflowMeta.Blocks.Contains(this.InputBlock))
+                    {
+                        return dataflowMeta.Flow.Name;
+                    }
+                }
+                return "the input block " + this.InputBlock.GetType().GetFriendlyName();
+            }
         }
     }
 
