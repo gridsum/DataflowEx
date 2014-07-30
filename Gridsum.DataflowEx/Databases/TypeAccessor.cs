@@ -23,8 +23,8 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         /// <summary>
-        ///     if the typeAccessor is exist, just return it; else create a new one with parameter: destLabel, connectionString,
-        ///     dataTableName
+        /// if the typeAccessor exists, just return it; else create a new one with parameter: destLabel, connectionString,
+        /// dataTableName
         /// </summary>
         /// <param name="destLabel"></param>
         /// <param name="connectionString"></param>
@@ -57,8 +57,7 @@ namespace Gridsum.DataflowEx.Databases
                 ? typeof (T).Name
                 : destinationTableName;
             m_schemaTable = null;
-
-
+            
             //create property accessor delegate for properties and coloumn mapping to database
 
             m_properties = new Dictionary<int, Func<T, object>>();
@@ -69,8 +68,6 @@ namespace Gridsum.DataflowEx.Databases
 
         private void CreateTypeVisitor()
         {
-            ParameterExpression paraExpression = Expression.Parameter(typeof (T), "t");
-
             Tuple<IDictionary<int, ReferenceTypeDepthExpression>, IList<ValueTypeMapping>> selected =
                 RecursiveGetAllSelectedProperties();
 
@@ -79,23 +76,30 @@ namespace Gridsum.DataflowEx.Databases
 
             #region 首先，根据深度对引用类型进行处理，生成相应的Expression
 
-            IOrderedEnumerable<ReferenceTypeDepthExpression> values = referenceTypes.Values.OrderBy(t => t.Depth);
-            foreach (ReferenceTypeDepthExpression value in values)
+            ParameterExpression rootExpression = Expression.Parameter(typeof(T), "t");
+
+            foreach (ReferenceTypeDepthExpression value in referenceTypes.Values.OrderBy(t => t.Depth))
             {
                 //父节点类型为根类型，即T
                 if (value.ParentKey==0)
                 {
-                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, paraExpression, null);
+                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, rootExpression, null);
                 }
                 else
                 {
                     ReferenceTypeDepthExpression parent = null;
-                    if (
-                        referenceTypes.TryGetValue(value.ParentKey, out parent) == false)
+                    if (referenceTypes.TryGetValue(value.ParentKey, out parent))
                     {
+                        value.Expression = this.CreatePropertyAccessorExpression(
+                            value.PropertyInfo,
+                            parent.Expression,
+                            null);
+                    }
+                    else
+                    {
+                        //todo: throw exception here 
                         LogHelper.Logger.Error("failed to get parent ReferenceTypeDepthException.");
                     }
-                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, parent.Expression, null);
                 }
             }
 
@@ -109,36 +113,36 @@ namespace Gridsum.DataflowEx.Databases
                 //父节点为根类型，即T：typeof(T)
                 if (valueType.ParentKey == 0)
                 {
-                    parentExpression = paraExpression;
+                    parentExpression = rootExpression;
                 }
                 else
                 {
                     ReferenceTypeDepthExpression parent = null;
-                    if (
-                        referenceTypes.TryGetValue(valueType.ParentKey,out parent) == false)
+                    if (referenceTypes.TryGetValue(valueType.ParentKey,out parent))
                     {
+                        parentExpression = parent.Expression;
+                    }
+                    else
+                    {
+                        //todo: throw exception here
                         LogHelper.Logger.Error("failed to get parent ReferenceTypeDepthException.");
                     }
-                    parentExpression = parent.Expression;
                 }
 
-                    BlockExpression curExpression = CreatePropertyAccessorExpression(valueType.CurrentPropertyInfo,
-                        parentExpression,
-                        valueType.DbColumnMapping.DefaultValue);
-                    m_dbColumnMappings.Add(valueType.DbColumnMapping);
-                    Expression<Func<T, object>> lambda =
-                        Expression.Lambda<Func<T, Object>>(Expression.Convert(curExpression, typeof (object)),
-                            paraExpression);
-                    Func<T, object> func = lambda.Compile();
+                BlockExpression curExpression = CreatePropertyAccessorExpression(valueType.CurrentPropertyInfo,
+                    parentExpression,
+                    valueType.DbColumnMapping.DefaultValue);
+                m_dbColumnMappings.Add(valueType.DbColumnMapping);
+                Expression<Func<T, object>> lambda =
+                    Expression.Lambda<Func<T, Object>>(Expression.Convert(curExpression, typeof (object)),
+                        rootExpression);
 
-                    m_properties.Add(valueType.DbColumnMapping.DestColumnOffset, func);
-                
+                m_properties.Add(valueType.DbColumnMapping.DestColumnOffset, lambda.Compile());
             }
 
             #endregion
         }
-
-
+        
         private BlockExpression CreatePropertyAccessorExpression(PropertyInfo prop, Expression parentExpr,
             object defaultValue)
         {
@@ -166,6 +170,8 @@ namespace Gridsum.DataflowEx.Databases
                         defaultValue = null;
                     }
                 }
+
+                //todo: different hehavior for value type and Nullable<value type>
                 if (defaultValue == null && prop.PropertyType.IsValueType)
                 {
                     defaultValue = Activator.CreateInstance(prop.PropertyType);
@@ -182,6 +188,7 @@ namespace Gridsum.DataflowEx.Databases
             }
             catch (Exception e)
             {
+                //todo: consider add type check in value type initialization
                 LogHelper.Logger.ErrorFormat(
                     "failed to create constant expression for property: {0}, with default value:{1}", e,
                     prop.PropertyType, defaultValue);
@@ -253,8 +260,7 @@ namespace Gridsum.DataflowEx.Databases
             }
             return m_schemaTable;
         }
-
-
+        
         /// <summary>
         ///     递归获得该类型的所有被选择的属性。
         ///     如果出现一个值类型或String添加了相应DestLabel的DbColumnMapping。则选取所有的带DbColumnMapping的属性。
@@ -267,7 +273,7 @@ namespace Gridsum.DataflowEx.Databases
             RecursiveGetAllSelectedProperties()
         {
             Type stringType = typeof (string);
-            Type type = typeof (T);
+            Type rootType = typeof (T);
 
 
             bool hasMapping = false;
@@ -276,7 +282,7 @@ namespace Gridsum.DataflowEx.Databases
 
             var pq = new Queue<Type>();
             var visitReferenceType = new List<Type>();
-            pq.Enqueue(type);
+            pq.Enqueue(rootType);
             while (pq.Count > 0)
             {
                 Type firstType = pq.Dequeue();
@@ -312,7 +318,7 @@ namespace Gridsum.DataflowEx.Databases
             int rootKey = 0;
             int parentKey = 0;
             var depthQueue = new Queue<Tuple<int, Type, int>>();
-            depthQueue.Enqueue(new Tuple<int,Type, int>(parentKey++,type, 0));
+            depthQueue.Enqueue(new Tuple<int,Type, int>(parentKey++,rootType, 0));
             
 
             while (depthQueue.Count > 0)
@@ -339,24 +345,28 @@ namespace Gridsum.DataflowEx.Databases
                     else
                     {
                         var propTypeDepthException = new ReferenceTypeDepthExpression(prop, currentKey, currentDepth + 1);
-                        if (prop.PropertyType == type || HasReferenceLoop(referenceDict, propTypeDepthException))
+                        if (prop.PropertyType == rootType || HasReferenceLoop(referenceDict, propTypeDepthException))
                         {
                             LogHelper.Logger.WarnFormat(
                                 "there is reference loop(like A.B.C.A) for property type:{0} in declare type:{1}",
                                 prop.PropertyType, prop.DeclaringType);
-                            continue;
                         }
-                        depthQueue.Enqueue(new Tuple<int,Type, int>(parentKey, prop.PropertyType, currentDepth + 1));
-                        referenceDict.Add(parentKey++, propTypeDepthException);
+                        else
+                        {
+                            depthQueue.Enqueue(new Tuple<int, Type, int>(parentKey, prop.PropertyType, currentDepth + 1));
+                            referenceDict.Add(parentKey++, propTypeDepthException);    
+                        }
                     }
                 }
             }
 
             #endregion
 
+            //nothing to do with DBColumnMapping above me
+
             //所有被选取的值类型
             IList<ValueTypeMapping> selectedValueList = SelectedValueProperties(valueList, hasMapping);
-            IList<ValueTypeMapping> filteredValueList = FilterValuePropertiesByDbColumn(selectedValueList);
+            IList<ValueTypeMapping> filteredValueList = this.DeduplicateValuePropertiesByDbColumn(selectedValueList);
             return
                 new Tuple<IDictionary<int, ReferenceTypeDepthExpression>, IList<ValueTypeMapping>>(referenceDict,filteredValueList);
         }
@@ -371,7 +381,7 @@ namespace Gridsum.DataflowEx.Databases
         private IList<ValueTypeMapping> SelectedValueProperties(IList<ValueTypeMapping> valueTypeMappings,
             bool hasMapping)
         {
-            var rightTypeMappings = new List<ValueTypeMapping>();
+            var validTypeMappings = new List<ValueTypeMapping>();
 
 
             if (hasMapping)
@@ -397,18 +407,24 @@ namespace Gridsum.DataflowEx.Databases
                         ? selectedAttrs
                         : destAttrs.Where(attr => attr.IsDefaultDestTableName()).ToArray();
 
-                    if (selectedAttrs.Length == 0) continue;
+                    if (selectedAttrs.Length == 0)
+                    {
+                        //todo: trace logging here on ignored property
+                        continue;
+                    }
 
                     for (int i = 0; i < selectedAttrs.Length; ++i)
                     {
                         LogHelper.Logger.TraceFormat("starting format DBColumnMapping: {0} for property: {1}",
                             selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
-                        FormatDbColumnMapping(valueTypeMapping.CurrentPropertyInfo, ref selectedAttrs[i]);
+                        this.PopulateDbColumnMapping(valueTypeMapping.CurrentPropertyInfo, ref selectedAttrs[i]);
                         LogHelper.Logger.TraceFormat("ending format DBColumnMapping:{0} for property:{1}",
                             selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
+                        
                         if (selectedAttrs[i].IsDestColumnOffsetOk() == false ||
                             selectedAttrs[i].IsDestColumnNameOk() == false)
                         {
+                            //todo: consider fail here
                             LogHelper.Logger.WarnFormat(
                                 "failed to format DBColumnMapping:{0} for prop:{1}. check whether its Attribute is mapping to database table correctly. and it's not added to mapping table.",
                                 selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
@@ -426,17 +442,19 @@ namespace Gridsum.DataflowEx.Databases
                         continue;
                     }
 
-
+                    //one property multiple mapping
+                    //todo: maybe need deduplication here
                     foreach (DBColumnMapping rightAttr in rightAttrs)
                     {
-                        rightTypeMappings.Add(new ValueTypeMapping(valueTypeMapping.CurrentPropertyInfo,
+                        //todo: add logging
+                        validTypeMappings.Add(new ValueTypeMapping(valueTypeMapping.CurrentPropertyInfo,
                             valueTypeMapping.ParentKey, valueTypeMapping.Depth, rightAttr));
                     }
                 }
 
                 #endregion
 
-                return rightTypeMappings;
+                return validTypeMappings;
             }
 
             //there isn't property with DestLabel attribute,so we can get it from database table.
@@ -465,13 +483,13 @@ namespace Gridsum.DataflowEx.Databases
                         DestColumnName = column.ColumnName
                     };
                     typeMapping.DbColumnMapping = dbMapping;
-                    rightTypeMappings.Add(typeMapping);
+                    validTypeMappings.Add(typeMapping);
                 }
             }
 
             #endregion
 
-            return rightTypeMappings;
+            return validTypeMappings;
         }
 
         /// <summary>
@@ -480,7 +498,7 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="propertyInfo"></param>
         /// <param name="mapping"></param>
-        private void FormatDbColumnMapping(PropertyInfo propertyInfo, ref DBColumnMapping mapping)
+        private void PopulateDbColumnMapping(PropertyInfo propertyInfo, ref DBColumnMapping mapping)
         {
             Type type = propertyInfo.PropertyType;
             bool tag = propertyInfo.PropertyType.IsValueType || propertyInfo.PropertyType == typeof (string);
@@ -498,6 +516,8 @@ namespace Gridsum.DataflowEx.Databases
                     LogHelper.Logger.WarnFormat(
                         "can not find column with column offset:{0} with property name:{1} in table: {2}, currnet db mapping:{3}",
                         mapping.DestColumnOffset, propertyInfo.Name, m_destinationTablename, mapping);
+                    
+                    //todo: consider throw exception here (fail early)
                     return;
                 }
                 mapping.DestColumnName = col.ColumnName;
@@ -537,21 +557,22 @@ namespace Gridsum.DataflowEx.Databases
         ///     判断当前的属性类型是否与已经存在的形成“闭环”。即
         ///     A.B.A。 当前的最后一个A，此时形成闭环
         /// </summary>
-        /// <param name="dicts"></param>
+        /// <param name="dict"></param>
         /// <param name="current"></param>
         /// <returns></returns>
-        private bool HasReferenceLoop(Dictionary<int, ReferenceTypeDepthExpression> dicts,
+        private bool HasReferenceLoop(Dictionary<int, ReferenceTypeDepthExpression> dict,
             ReferenceTypeDepthExpression current)
         {
 
             ReferenceTypeDepthExpression parent = null;
-            if (dicts.TryGetValue(current.ParentKey, out parent) == false)
+            if (dict.TryGetValue(current.ParentKey, out parent) == false)
                 return false;
 
             while (parent!=null)
             {
-                if (current.PropertyInfo.PropertyType == parent.PropertyInfo.PropertyType) return true;
-                if (dicts.TryGetValue(parent.ParentKey, out parent) == false)
+                if (current.PropertyInfo.PropertyType == parent.PropertyInfo.PropertyType) 
+                    return true; // my ancestor is myself
+                if (dict.TryGetValue(parent.ParentKey, out parent) == false)
                     return false;
             }
             return false;
@@ -566,7 +587,7 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="sourceMappings"></param>
         /// <returns></returns>
-        private IList<ValueTypeMapping> FilterValuePropertiesByDbColumn(IList<ValueTypeMapping> sourceMappings)
+        private IList<ValueTypeMapping> DeduplicateValuePropertiesByDbColumn(IList<ValueTypeMapping> sourceMappings)
         {
             var filtered = new List<ValueTypeMapping>();
             foreach (var group in sourceMappings.GroupBy(t => t.DbColumnMapping.DestColumnOffset))
@@ -581,14 +602,10 @@ namespace Gridsum.DataflowEx.Databases
                 {
                     //规则二、三
                     int minDepth = group.Min(t => t.Depth);
-                    var first = group.FirstOrDefault(t => t.Depth == minDepth);
-                    if (first == null)
-                    {
-                        LogHelper.Logger.ErrorFormat(
-                            "failed to find mapping property for column with columnOffset:{0}", group.Key);
-                        continue;
-                    }
+                    var first = group.First(t => t.Depth == minDepth);
                     filtered.Add(first);
+
+                    //todo: improve logging
                     LogHelper.Logger.WarnFormat(
                         "there are more than one property mapping to the same column with columnOffset:{0}, columnName:{1}",first.DbColumnMapping.DestColumnOffset, first.DbColumnMapping.DestColumnName);
                 }
@@ -656,6 +673,9 @@ namespace Gridsum.DataflowEx.Databases
     /// <summary>
     ///     用于存放一个Property在当前的类结构中的深度及表达式
     /// </summary>
+    /// <remarks>
+    /// Middle node in property tree
+    /// </remarks>
     public class ReferenceTypeDepthExpression
     {
         public ReferenceTypeDepthExpression(PropertyInfo propertyInfo, int parentKey, int depth,
@@ -681,6 +701,9 @@ namespace Gridsum.DataflowEx.Databases
     /// <summary>
     ///     用于存放一个值类型或String类型的DbColumnMapping
     /// </summary>
+    /// <remarks>
+    /// Leaf node in property tree
+    /// </remarks>
     public class ValueTypeMapping
     {
         public ValueTypeMapping(PropertyInfo currentPropertyInfo, int parentKey, int depth,
