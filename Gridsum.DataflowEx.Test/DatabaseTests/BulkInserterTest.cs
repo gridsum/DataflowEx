@@ -111,10 +111,10 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
         public int ProfileId { get; set; }
 
-        [DBColumnMapping(GSProduct.SEOD, "Price", -2.0f, null)]
+        [DBColumnMapping(GSProduct.SEOD, "Price", -2.0f)]
         public float Value { get; set; }
 
-        [DBColumnMapping(GSProduct.SEOD, "Name", "default", null)]
+        [DBColumnMapping(GSProduct.SEOD, "Name", "default")]
         public string Key { get; set; }
     }
     

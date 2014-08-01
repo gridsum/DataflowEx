@@ -201,12 +201,9 @@ namespace Gridsum.DataflowEx.Databases
 
                 foreach (LeafPropertyNode leaf in matchedLeafs)
                 {
-                    var dbMapping = new DBColumnMapping(this.m_destLabel, column.Ordinal, null, this.m_destinationTablename)
+                    var dbMapping = new DBColumnMapping(this.m_destLabel, column.Ordinal, null)
                                         {
-                                            DestColumnName
-                                                =
-                                                column
-                                                .ColumnName
+                                            DestColumnName = column.ColumnName
                                         };
 
                     dbMapping.Host = leaf;
@@ -225,13 +222,34 @@ namespace Gridsum.DataflowEx.Databases
         /// <param name="mapping"></param>
         private void PopulateDbColumnMapping(LeafPropertyNode leaf, DBColumnMapping mapping)
         {
+            DataTable schemaTable = GetSchemaTable();
+
             if (mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk())
             {
-                //todo: check and fail early
+                DataColumn col = schemaTable.Columns[mapping.DestColumnOffset];
+
+                if (col == null)
+                {
+                    var desc = string.Format(
+                            "can not find column with offset {0} in table {1} ",
+                            mapping.DestColumnOffset,
+                            m_destinationTablename);
+
+                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                }
+
+                if (col.ColumnName != mapping.DestColumnName)
+                {
+                    var desc = string.Format(
+                            "Column name from db {0} is inconsistent with that in db mapping {1} ",
+                            col.ColumnName,
+                            mapping);
+
+                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                }
+
                 return;
             }
-
-            DataTable schemaTable = GetSchemaTable();
 
             //说明当前的mapping的列名称出错（null），而位置参数正确。则读取数据库表获得要相应的列名称
             if (!mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk())
@@ -319,7 +337,7 @@ namespace Gridsum.DataflowEx.Databases
                     //规则二、三
                     int minDepth = group.Min(t => t.Host.Depth);
                     DBColumnMapping selected = group.First(t => t.Host.Depth == minDepth);
-                    filtered.Add(selected); //todo: leafs still has a lot of mappings...
+                    filtered.Add(selected);
 
                     foreach (var mapping in group)
                     {
@@ -436,74 +454,48 @@ namespace Gridsum.DataflowEx.Databases
 
         public abstract Expression Expression { get; }
 
-        internal BlockExpression CreatePropertyAccessorExpression(PropertyInfo prop, Expression parentExpr,
-            object defaultValue)
+        internal BlockExpression CreatePropertyAccessorExpression(object defaultValue)
         {
-            #region 对于值类型， Nullable<值类型>的默认值进行处理
+            PropertyInfo prop = this.PropertyInfo;
+            Type propType = prop.PropertyType;
 
-            Type underType = prop.PropertyType;
-            if (underType.IsGenericType && underType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            Type nullableInnerType = null;
+            if (propType.IsGenericType && propType.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
-                underType = Nullable.GetUnderlyingType(underType);
+                nullableInnerType = Nullable.GetUnderlyingType(propType);
             }
-            if (underType.IsValueType)
+
+            object nullValue = null;
+            if (propType.IsValueType && nullableInnerType == null)
             {
-                if (defaultValue != null)
+                nullValue = Activator.CreateInstance(propType);
+            }
+
+            //fix and test default value below
+            if (defaultValue != null)
+            {
+                defaultValue = Convert.ChangeType(defaultValue, nullableInnerType ?? propType);
+            }
+            else
+            {
+                if (propType.IsValueType)
                 {
-                    try
+                    if (nullableInnerType == null)
                     {
-                        //测试是否可以进行转换
-                        defaultValue = Convert.ChangeType(defaultValue, underType);
-                    }
-                    catch (Exception e)
-                    {
-                        LogHelper.Logger.WarnFormat(
-                            "failed to parse value from object for type: {0}, name:{1}, namespace:{2}", e,
-                            prop.PropertyType, prop.Name, prop.ToString());
-                        defaultValue = null;
+                        //todo: logging
+                        defaultValue = Activator.CreateInstance(propType);
                     }
                 }
-
-                //todo: different hehavior for value type and Nullable<value type>
-                if (defaultValue == null && prop.PropertyType.IsValueType)
-                {
-                    defaultValue = Activator.CreateInstance(prop.PropertyType);
-                }
             }
 
-            #endregion
-
-            ConstantExpression defaultExpr = null;
-            try
-            {
-                //默认返回Expression
-                defaultExpr = Expression.Constant(defaultValue, prop.PropertyType);
-            }
-            catch (Exception e)
-            {
-                //todo: consider add type check in value type initialization
-                LogHelper.Logger.ErrorFormat(
-                    "failed to create constant expression for property: {0}, with default value:{1}", e,
-                    prop.PropertyType, defaultValue);
-                throw;
-            }
-
-            //测试当前属性的“父属性”是否非空
-            BinaryExpression ifParentNotNull = Expression.NotEqual(parentExpr, Expression.Constant(null));
-
-            //“父属性”非空时的返回值
-            MemberExpression propExpr = Expression.Property(parentExpr, prop);
-
-            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-
-            //局部变量，用于存放最终的返回值
+            ConstantExpression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
+            BinaryExpression ifParentNotNull = Expression.NotEqual(this.Parent.Expression, Expression.Constant(null));
+            MemberExpression propExpr = Expression.Property(this.Parent.Expression, prop);
+            
+            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(nullValue));
             ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
-
-            var defaultOfT = underType.IsValueType ? Activator.CreateInstance(prop.PropertyType) : null;
-
-            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(defaultOfT));
-
-            //assign conditionally
+            
+            //safe:
             //if (p != null)
             //{
             //  if (p.P != null)
@@ -515,17 +507,26 @@ namespace Gridsum.DataflowEx.Databases
             //{
             //  tmp = default;
             //}
+
             ConditionalExpression assignConditionally = Expression.IfThenElse(
                 ifParentNotNull,
                 Expression.IfThenElse(
                     ifPropNotNull,
                     Expression.Assign(localVarExpr, propExpr),
-                    Expression.Assign(localVarExpr, defaultExpr)),
-                Expression.Assign(localVarExpr, defaultExpr));
+                    Expression.Assign(localVarExpr, defaultValExpr)),
+                Expression.Assign(localVarExpr, defaultValExpr));
 
+            //safe2:
+            //  if (p.P != null)
+            //      tmp = p.P;
+            //  else
+            //      tmp = default;
+            //unsafe:
+            //  p.P
+            
             //返回值
+            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
             GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-
             LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
 
             BlockExpression block = Expression.Block(
@@ -588,7 +589,7 @@ namespace Gridsum.DataflowEx.Databases
             this.m_exprIniter = new Lazy<Expression>(
                 () =>
                     {
-                        return this.CreatePropertyAccessorExpression(this.PropertyInfo, parent.Expression, null);
+                        return this.CreatePropertyAccessorExpression(null);
                     });
         }
 
@@ -617,10 +618,7 @@ namespace Gridsum.DataflowEx.Databases
             this.ResultType = propertyInfo.PropertyType;
 
             var attrs = (DBColumnMapping[]) propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true);
-            var validAttrs = attrs.Where(attr => attr.DestLabel == destLabel).ToList();
-            var tableAttrs = validAttrs.Where(va => va.MatchesTableName(destTable)).ToList();
-            var defaultAttrs = validAttrs.Where(va => va.IsDefaultDestTableName()).ToList();
-            this.DbColumnMappings = tableAttrs.Count > 0 ? tableAttrs : defaultAttrs;
+            this.DbColumnMappings = attrs.Where(attr => attr.DestLabel == destLabel).ToList();
 
             foreach (var dbColumnMapping in DbColumnMappings)
             {
@@ -642,7 +640,7 @@ namespace Gridsum.DataflowEx.Databases
 
         public Expression GetExpressionWithDefaultVal(object defaultVal)
         {
-            return this.CreatePropertyAccessorExpression(this.PropertyInfo, Parent.Expression, defaultVal);
+            return this.CreatePropertyAccessorExpression(defaultVal);
         }
     }
 }

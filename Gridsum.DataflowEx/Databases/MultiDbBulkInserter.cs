@@ -85,7 +85,7 @@ namespace Gridsum.DataflowEx.Databases
                 this.m_options, 
                 destLabel,
                 this.m_bulkSize, 
-                string.Format("childInserter_{0}", pid), 
+                string.Format("childDbBulkInserter_{0}", pid), 
                 postBulkInsert);
         }
 
