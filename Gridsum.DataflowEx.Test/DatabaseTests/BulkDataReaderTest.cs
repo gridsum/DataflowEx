@@ -16,15 +16,15 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     /// </summary>
     public class Entity
     {
-        [DBColumnMapping(GSProduct.WD, "wdId", 0)]
-        [DBColumnMapping(GSProduct.CD, "cdId", 0)]
+        [DBColumnMapping(GSProduct.WD, "wdId")]
+        [DBColumnMapping(GSProduct.CD, "cdId")]
         public int Id { get; set; }
 
-        [DBColumnMapping(GSProduct.WD, "Name", 1)]
-        [DBColumnMapping(GSProduct.CD, "Name", 1)]
+        [DBColumnMapping(GSProduct.WD, "Name", "1")]
+        [DBColumnMapping(GSProduct.CD, "Name", "1")]
         public string PersonName { get; set; }
 
-        [DBColumnMapping(GSProduct.CD, "PhoneNum", 2)]
+        [DBColumnMapping(GSProduct.CD, "PhoneNum", "2")]
         [DBColumnMapping(GSProduct.WD)]
         [DBColumnMapping(GSProduct.WD, "PhoneNumber2")]
         public string PhoneNumber { get; set; }
@@ -39,7 +39,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     public class Location
     {
         [DBColumnMapping(GSProduct.CD, "roadnum", -1)]
-        public int RoadNumber { get; set; }
+        public int? RoadNumber { get; set; }
 
         [DBColumnMapping(GSProduct.CD, "roadname")]
         public string RoadName { get; set; }
