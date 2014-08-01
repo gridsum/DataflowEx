@@ -81,7 +81,7 @@ namespace Gridsum.DataflowEx.Databases
         /// <summary>
         /// 默认的值
         /// </summary>
-        public object DefaultValue { get; private set; }
+        public object DefaultValue { get; internal set; }
 
         public LeafPropertyNode Host { get; set; }
 

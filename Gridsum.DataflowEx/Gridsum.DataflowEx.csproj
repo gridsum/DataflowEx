@@ -64,6 +64,7 @@
     <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="Databases\InvalidDBColumnMappingException.cs" />
+    <Compile Include="Databases\NoNullCheckAttribute.cs" />
     <Compile Include="Dataflow.cs" />
     <Compile Include="DataflowMerger.cs" />
     <Compile Include="DataflowOptions.cs" />

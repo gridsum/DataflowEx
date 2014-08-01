@@ -9,6 +9,8 @@ using System.Reflection;
 
 namespace Gridsum.DataflowEx.Databases
 {
+    using System.Diagnostics;
+
     using Common.Logging;
 
     public class TypeAccessorManager<T> where T : class
@@ -133,7 +135,7 @@ namespace Gridsum.DataflowEx.Databases
                     //值类型或引用类型
                     if (prop.PropertyType.IsValueType || prop.PropertyType == typeof(string))
                     {
-                        leafs.Add(new LeafPropertyNode(prop, nodeToExpand, m_destLabel, m_destinationTablename));
+                        leafs.Add(new LeafPropertyNode(prop, nodeToExpand, m_destLabel));
                     }
                     else
                     {
@@ -453,69 +455,101 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         public abstract Expression Expression { get; }
+        public abstract bool NoNullCheck { get; }
 
         internal BlockExpression CreatePropertyAccessorExpression(object defaultValue)
         {
             PropertyInfo prop = this.PropertyInfo;
             Type propType = prop.PropertyType;
 
-            Type nullableInnerType = null;
-            if (propType.IsGenericType && propType.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                nullableInnerType = Nullable.GetUnderlyingType(propType);
-            }
+            ConstantExpression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
+            ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
 
-            object nullValue = null;
-            if (propType.IsValueType && nullableInnerType == null)
-            {
-                nullValue = Activator.CreateInstance(propType);
-            }
+            BinaryExpression ifParentNotNull = Expression.NotEqual(localParentVarExpr, Expression.Constant(null));
+            MemberExpression propExpr = Expression.Property(localParentVarExpr, prop);
+            
+            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(null));
+            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
 
-            //fix and test default value below
-            if (defaultValue != null)
+            Expression assignConditionally;
+            if (propType.IsValueType && !propType.IsNullableType())
             {
-                defaultValue = Convert.ChangeType(defaultValue, nullableInnerType ?? propType);
+                if (this.Parent.NoNullCheck)
+                {
+                    //  tmp = p.P;
+                    assignConditionally = Expression.Assign(localVarExpr, propExpr);
+                }
+                else
+                {
+                    //if (p != null)
+                    //{
+                    //  tmp = p.P;  
+                    //}
+                    //else
+                    //  tmp = default(T);
+                    assignConditionally = Expression.IfThenElse(
+                        ifParentNotNull,
+                        Expression.Assign(localVarExpr, propExpr),
+                        Expression.Assign(localVarExpr, Expression.Constant(Activator.CreateInstance(propType))));
+                }
             }
             else
             {
-                if (propType.IsValueType)
+                if (this.Parent.NoNullCheck)
                 {
-                    if (nullableInnerType == null)
+                    if (defaultValue == null || this.NoNullCheck)
                     {
-                        //todo: logging
-                        defaultValue = Activator.CreateInstance(propType);
+                        //  tmp = p.P;
+                        assignConditionally = Expression.Assign(localVarExpr, propExpr);
+                    }
+                    else
+                    {
+                        // tmp = p.P;
+                        // if (tmp == null)
+                        //    tmp = default
+                        assignConditionally = Expression.Block(); //todo:
                     }
                 }
+                else
+                {
+                    //safe:
+                    //p = {parent expression};
+                    //if (p != null)
+                    //{
+                    //  if (p.P != null)
+                    //      tmp = p.P;
+                    //  else
+                    //      tmp = default;
+                    //}
+                    //else
+                    //{
+                    //  tmp = default;
+                    //}
+                    assignConditionally = Expression.IfThenElse(
+                        ifParentNotNull,
+                        Expression.IfThenElse(
+                            ifPropNotNull,
+                            Expression.Assign(localVarExpr, propExpr),
+                            Expression.Assign(localVarExpr, defaultValExpr)),
+                        Expression.Assign(localVarExpr, defaultValExpr));
+                }
             }
-
-            ConstantExpression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
-            BinaryExpression ifParentNotNull = Expression.NotEqual(this.Parent.Expression, Expression.Constant(null));
-            MemberExpression propExpr = Expression.Property(this.Parent.Expression, prop);
             
-            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(nullValue));
-            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
+            //返回值
+            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
+            GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
+            LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+
+            //todo: do we need return in NonLeafNode?
+            BlockExpression block = Expression.Block(
+                new[] { localVarExpr, localParentVarExpr },
+                Expression.Assign(localParentVarExpr, this.Parent.Expression),
+                assignConditionally,
+                retExpr,
+                labelExpr
+                );
+            return block;
             
-            //safe:
-            //if (p != null)
-            //{
-            //  if (p.P != null)
-            //      tmp = p.P;
-            //  else
-            //      tmp = default;
-            //}
-            //else
-            //{
-            //  tmp = default;
-            //}
-
-            ConditionalExpression assignConditionally = Expression.IfThenElse(
-                ifParentNotNull,
-                Expression.IfThenElse(
-                    ifPropNotNull,
-                    Expression.Assign(localVarExpr, propExpr),
-                    Expression.Assign(localVarExpr, defaultValExpr)),
-                Expression.Assign(localVarExpr, defaultValExpr));
-
             //safe2:
             //  if (p.P != null)
             //      tmp = p.P;
@@ -523,19 +557,6 @@ namespace Gridsum.DataflowEx.Databases
             //      tmp = default;
             //unsafe:
             //  p.P
-            
-            //返回值
-            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-            GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-            LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
-
-            BlockExpression block = Expression.Block(
-                new[] { localVarExpr },
-                assignConditionally,
-                retExpr,
-                labelExpr
-                );
-            return block;
         }
     }
 
@@ -560,6 +581,14 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
+        public override bool NoNullCheck
+        {
+            get
+            {
+                return true;
+            }
+        }
+
         public ParameterExpression RootParam
         {
             get
@@ -579,6 +608,8 @@ namespace Gridsum.DataflowEx.Databases
     {
         private readonly Lazy<Expression> m_exprIniter;
 
+        private bool m_noNullCheck;
+
         public NonLeafPropertyNode (PropertyInfo propertyInfo, PropertyTreeNode parent)
         {
             this.PropertyInfo = propertyInfo;
@@ -591,6 +622,8 @@ namespace Gridsum.DataflowEx.Databases
                     {
                         return this.CreatePropertyAccessorExpression(null);
                     });
+
+            m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any();
         }
 
         public override Expression Expression
@@ -598,6 +631,14 @@ namespace Gridsum.DataflowEx.Databases
             get
             {
                 return this.m_exprIniter.Value;
+            }
+        }
+
+        public override bool NoNullCheck
+        {
+            get
+            {
+                return m_noNullCheck;
             }
         }
     }
@@ -610,7 +651,9 @@ namespace Gridsum.DataflowEx.Databases
     /// </remarks>
     public class LeafPropertyNode : PropertyTreeNode
     {
-        public LeafPropertyNode(PropertyInfo propertyInfo, PropertyTreeNode parent, string destLabel, string destTable)
+        private bool m_noNullCheck;
+
+        public LeafPropertyNode(PropertyInfo propertyInfo, PropertyTreeNode parent, string destLabel)
         {
             this.PropertyInfo = propertyInfo;
             this.Parent = parent;
@@ -622,6 +665,45 @@ namespace Gridsum.DataflowEx.Databases
 
             foreach (var dbColumnMapping in DbColumnMappings)
             {
+                if (dbColumnMapping.DefaultValue != null)
+                {
+                    if (this.ResultType.IsValueType)
+                    {
+                        Type innerType;
+                        if (this.ResultType.IsNullableType(out innerType))
+                        {
+                            if (innerType.IsInstanceOfType(dbColumnMapping.DefaultValue))
+                            {
+                                //conversion here
+                                dbColumnMapping.DefaultValue = Convert.ChangeType(dbColumnMapping.DefaultValue,this.ResultType);
+                            }
+                            else
+                            {
+                                throw new InvalidDBColumnMappingException("The default value has wrong type",dbColumnMapping,this);
+                            }
+                        }
+                        else
+                        {
+                            throw new InvalidDBColumnMappingException(
+                                "A value type should not have non-null default value. If you want one consider declare the property type as Nullable<T>."
+                                , dbColumnMapping, this);
+                        }
+                    }
+                    else if (this.ResultType == typeof(string))
+                    {
+                        if (! (dbColumnMapping.DefaultValue is string))
+                        {
+                            throw new InvalidDBColumnMappingException("The default value has wrong type", dbColumnMapping, this);
+                        }
+                    }
+                    else
+                    {
+                        Debug.Fail("Should not reach here. A leaf node should not have ResultType as class type");
+                    }
+                }
+
+                m_noNullCheck = dbColumnMapping.DefaultValue == null;
+
                 dbColumnMapping.Host = this;
             }
         }
@@ -635,6 +717,14 @@ namespace Gridsum.DataflowEx.Databases
                 object defaultValue;
                 defaultValue = this.DbColumnMappings.Select(_ => _.DefaultValue).Distinct().Single();
                 return this.GetExpressionWithDefaultVal(defaultValue);
+            }
+        }
+
+        public override bool NoNullCheck
+        {
+            get
+            {
+                return m_noNullCheck;
             }
         }
 

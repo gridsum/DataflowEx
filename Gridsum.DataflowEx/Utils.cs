@@ -14,5 +14,22 @@ namespace Gridsum.DataflowEx
             else
                 return type.Name;
         }
+
+        public static bool IsNullableType(this Type type)
+        {
+            Type tmp;
+            return IsNullableType(type, out tmp);
+        }
+
+        public static bool IsNullableType(this Type type, out Type innerValueType)
+        {
+            innerValueType = null;
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                innerValueType = Nullable.GetUnderlyingType(type);
+                return true;
+            }
+            return false;
+        }
     }
 }
