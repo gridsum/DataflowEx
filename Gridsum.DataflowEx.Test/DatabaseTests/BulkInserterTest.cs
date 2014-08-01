@@ -49,7 +49,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestMultiDbBulkInserter()
         {
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
+            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
             var connectString =
                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestMultiDbBulkInserter_{0}.mdf;Initial Catalog=multidbinserter_{1};Integrated Security=True;Connect Timeout=30";

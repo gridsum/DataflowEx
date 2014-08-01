@@ -9,6 +9,8 @@ using System.Reflection;
 
 namespace Gridsum.DataflowEx.Databases
 {
+    using Common.Logging;
+
     public class TypeAccessorManager<T> where T : class
     {
         private static readonly ConcurrentDictionary<string, TypeAccessor<T>> m_accessors;
@@ -44,7 +46,7 @@ namespace Gridsum.DataflowEx.Databases
         private readonly string m_destinationTablename;
         private readonly string m_destLabel;
         private readonly Dictionary<int, Func<T, object>> m_properties;
-
+        private readonly ILog m_classLogger;
         private DataTable m_schemaTable;
 
         #region ctor and init
@@ -57,191 +59,28 @@ namespace Gridsum.DataflowEx.Databases
                 ? typeof (T).Name
                 : destinationTableName;
             m_schemaTable = null;
-            
-            //create property accessor delegate for properties and coloumn mapping to database
-
             m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();
-
+            m_classLogger = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name + "." + this.GetType().GetFriendlyName()); 
             CreateTypeVisitor();
         }
 
         private void CreateTypeVisitor()
         {
-            Tuple<IDictionary<int, ReferenceTypeDepthExpression>, IList<ValueTypeMapping>> selected =
-                RecursiveGetAllSelectedProperties();
-
-            IDictionary<int, ReferenceTypeDepthExpression> referenceTypes = selected.Item1;
-            IList<ValueTypeMapping> valueTypes = selected.Item2;
-
-            #region 首先，根据深度对引用类型进行处理，生成相应的Expression
-
-            ParameterExpression rootExpression = Expression.Parameter(typeof(T), "t");
-
-            foreach (ReferenceTypeDepthExpression value in referenceTypes.Values.OrderBy(t => t.Depth))
+            var rootNode = new RootNode<T>();
+            var mappings = this.RecursiveGetAllMappings(rootNode);
+            
+            foreach (DBColumnMapping mapping in mappings)
             {
-                //父节点类型为根类型，即T
-                if (value.ParentKey==0)
-                {
-                    value.Expression = CreatePropertyAccessorExpression(value.PropertyInfo, rootExpression, null);
-                }
-                else
-                {
-                    ReferenceTypeDepthExpression parent = null;
-                    if (referenceTypes.TryGetValue(value.ParentKey, out parent))
-                    {
-                        value.Expression = this.CreatePropertyAccessorExpression(
-                            value.PropertyInfo,
-                            parent.Expression,
-                            null);
-                    }
-                    else
-                    {
-                        //todo: throw exception here 
-                        LogHelper.Logger.Error("failed to get parent ReferenceTypeDepthException.");
-                    }
-                }
-            }
+                m_dbColumnMappings.Add(mapping);
 
-            #endregion
-
-            #region 其次，处理所有的值类型或字符串类型，生成相应的访问Func等。
-
-            foreach (ValueTypeMapping valueType in valueTypes)
-            {
-                Expression parentExpression = null;
-                //父节点为根类型，即T：typeof(T)
-                if (valueType.ParentKey == 0)
-                {
-                    parentExpression = rootExpression;
-                }
-                else
-                {
-                    ReferenceTypeDepthExpression parent = null;
-                    if (referenceTypes.TryGetValue(valueType.ParentKey,out parent))
-                    {
-                        parentExpression = parent.Expression;
-                    }
-                    else
-                    {
-                        //todo: throw exception here
-                        LogHelper.Logger.Error("failed to get parent ReferenceTypeDepthException.");
-                    }
-                }
-
-                BlockExpression curExpression = CreatePropertyAccessorExpression(valueType.CurrentPropertyInfo,
-                    parentExpression,
-                    valueType.DbColumnMapping.DefaultValue);
-                m_dbColumnMappings.Add(valueType.DbColumnMapping);
                 Expression<Func<T, object>> lambda =
-                    Expression.Lambda<Func<T, Object>>(Expression.Convert(curExpression, typeof (object)),
-                        rootExpression);
+                    Expression.Lambda<Func<T, object>>(
+                        Expression.Convert(mapping.Host.GetExpressionWithDefaultVal(mapping.DefaultValue),typeof(object)),
+                        rootNode.RootParam);
 
-                m_properties.Add(valueType.DbColumnMapping.DestColumnOffset, lambda.Compile());
+                m_properties.Add(mapping.DestColumnOffset, lambda.Compile());
             }
-
-            #endregion
-        }
-        
-        private BlockExpression CreatePropertyAccessorExpression(PropertyInfo prop, Expression parentExpr,
-            object defaultValue)
-        {
-            #region 对于值类型， Nullable<值类型>的默认值进行处理
-
-            Type underType = prop.PropertyType;
-            if (underType.IsGenericType && underType.GetGenericTypeDefinition() == typeof (Nullable<>))
-            {
-                underType = Nullable.GetUnderlyingType(underType);
-            }
-            if (underType.IsValueType)
-            {
-                if (defaultValue != null)
-                {
-                    try
-                    {
-                        //测试是否可以进行转换
-                        defaultValue = Convert.ChangeType(defaultValue, underType);
-                    }
-                    catch (Exception e)
-                    {
-                        LogHelper.Logger.WarnFormat(
-                            "failed to parse value from object for type: {0}, name:{1}, namespace:{2}", e,
-                            prop.PropertyType, prop.Name, prop.ToString());
-                        defaultValue = null;
-                    }
-                }
-
-                //todo: different hehavior for value type and Nullable<value type>
-                if (defaultValue == null && prop.PropertyType.IsValueType)
-                {
-                    defaultValue = Activator.CreateInstance(prop.PropertyType);
-                }
-            }
-
-            #endregion
-
-            ConstantExpression defaultExpr = null;
-            try
-            {
-                //默认返回Expression
-                defaultExpr = Expression.Constant(defaultValue, prop.PropertyType);
-            }
-            catch (Exception e)
-            {
-                //todo: consider add type check in value type initialization
-                LogHelper.Logger.ErrorFormat(
-                    "failed to create constant expression for property: {0}, with default value:{1}", e,
-                    prop.PropertyType, defaultValue);
-                throw;
-            }
-            
-            //测试当前属性的“父属性”是否非空
-            BinaryExpression ifParentNotNull = Expression.NotEqual(parentExpr, Expression.Constant(null));
-
-            //“父属性”非空时的返回值
-            MemberExpression propExpr = Expression.Property(parentExpr, prop);
-
-            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-
-            //局部变量，用于存放最终的返回值
-            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
-
-            var defaultOfT = underType.IsValueType ? Activator.CreateInstance(prop.PropertyType) : null;
-            
-            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(defaultOfT));
-            
-            //assign conditionally
-            //if (p != null)
-            //{
-            //  if (p.P != null)
-            //      tmp = p.P;
-            //  else
-            //      tmp = default;
-            //}
-            //else
-            //{
-            //  tmp = default;
-            //}
-            ConditionalExpression assignConditionally = Expression.IfThenElse(
-                ifParentNotNull, 
-                Expression.IfThenElse(
-                    ifPropNotNull, 
-                    Expression.Assign(localVarExpr, propExpr), 
-                    Expression.Assign(localVarExpr, defaultExpr)),
-                Expression.Assign(localVarExpr, defaultExpr));
-
-            //返回值
-            GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-
-            LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
-
-            BlockExpression block = Expression.Block(
-                new[] {localVarExpr},
-                assignConditionally,
-                retExpr,
-                labelExpr
-                );
-            return block;
         }
         
         private DataTable GetSchemaTable()
@@ -269,227 +108,113 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        private Tuple<IDictionary<int, ReferenceTypeDepthExpression>, IList<ValueTypeMapping>>
-            RecursiveGetAllSelectedProperties()
+        private IList<DBColumnMapping> RecursiveGetAllMappings(RootNode<T> root)
         {
-            Type stringType = typeof (string);
-            Type rootType = typeof (T);
-
-
-            bool hasMapping = false;
-
-            #region 递归判断是否有包含DbColumnMapping的值类型或String
-
-            var pq = new Queue<Type>();
-            var visitReferenceType = new List<Type>();
-            pq.Enqueue(rootType);
-            while (pq.Count > 0)
-            {
-                Type firstType = pq.Dequeue();
-
-                PropertyInfo[] props = firstType.GetProperties();
-                foreach (PropertyInfo prop in props)
-                {
-                    if (prop.PropertyType.IsValueType || prop.PropertyType == stringType)
-                    {
-                        var attrs = (DBColumnMapping[]) prop.GetCustomAttributes(typeof (DBColumnMapping), true);
-                        bool has = attrs.Any(attr => attr.DestLabel == m_destLabel);
-                        if (has == false) continue;
-                        hasMapping = true;
-                        break;
-                    }
-                    //reference type
-                    if (visitReferenceType.Contains(prop.PropertyType) == false)
-                        pq.Enqueue(prop.PropertyType);
-                }
-                visitReferenceType.Add(firstType);
-            }
-
-            #endregion
-
-            //所有的引用类型（不包括string）
-            //key: parentKey:一个利用自增来避免重复的int参数
-            var referenceDict = new Dictionary<int, ReferenceTypeDepthExpression>();
             //所有的值类型
-            var valueList = new List<ValueTypeMapping>();
+            var leafs = new List<LeafPropertyNode>();
 
             #region 读取所有的引用类型、值类型及String类型的属性
 
-            int rootKey = 0;
-            int parentKey = 0;
-            var depthQueue = new Queue<Tuple<int, Type, int>>();
-            depthQueue.Enqueue(new Tuple<int,Type, int>(parentKey++,rootType, 0));
+            var typeExpandQueue = new Queue<PropertyTreeNode>();
+            typeExpandQueue.Enqueue(root);
             
-
-            while (depthQueue.Count > 0)
+            while (typeExpandQueue.Count > 0)
             {
-                var firstNode = depthQueue.Dequeue();
-                int currentKey = firstNode.Item1;
-                Type currentType = firstNode.Item2;
-                int currentDepth = firstNode.Item3;
-
+                var nodeToExpand = typeExpandQueue.Dequeue();
+                Type currentType = nodeToExpand.ResultType;
+                
                 if (currentType.IsAbstract || currentType.IsInterface)
                 {
-                    LogHelper.Logger.WarnFormat("getting properties for interface or abstract class type: {0}",
-                        currentType);
+                    LogHelper.Logger.WarnFormat("Expanding properties for interface or abstract class type: {0}", currentType.GetFriendlyName());
                 }
 
-                PropertyInfo[] props = currentType.GetProperties();
-                foreach (PropertyInfo prop in props)
+                foreach (PropertyInfo prop in currentType.GetProperties())
                 {
                     //值类型或引用类型
-                    if (prop.PropertyType.IsValueType || prop.PropertyType == stringType)
+                    if (prop.PropertyType.IsValueType || prop.PropertyType == typeof(string))
                     {
-                        valueList.Add(new ValueTypeMapping(prop, currentKey, currentDepth + 1));
+                        leafs.Add(new LeafPropertyNode(prop, nodeToExpand, m_destLabel, m_destinationTablename));
                     }
                     else
                     {
-                        var propTypeDepthException = new ReferenceTypeDepthExpression(prop, currentKey, currentDepth + 1);
-                        if (prop.PropertyType == rootType || HasReferenceLoop(referenceDict, propTypeDepthException))
+                        var nonLeaf = new NonLeafPropertyNode(prop, nodeToExpand);
+
+                        if (nonLeaf.HasReferenceLoop)
                         {
-                            LogHelper.Logger.WarnFormat(
-                                "there is reference loop(like A.B.C.A) for property type:{0} in declare type:{1}",
-                                prop.PropertyType, prop.DeclaringType);
+                            m_classLogger.WarnFormat("Type reference loop found on {0}. Ignore this property path.", nonLeaf);
                         }
                         else
                         {
-                            depthQueue.Enqueue(new Tuple<int, Type, int>(parentKey, prop.PropertyType, currentDepth + 1));
-                            referenceDict.Add(parentKey++, propTypeDepthException);    
+                            typeExpandQueue.Enqueue(nonLeaf);
                         }
                     }
                 }
             }
 
             #endregion
-
-            //nothing to do with DBColumnMapping above me
-
-            //所有被选取的值类型
-            IList<ValueTypeMapping> selectedValueList = SelectedValueProperties(valueList, hasMapping);
-            IList<ValueTypeMapping> filteredValueList = this.DeduplicateValuePropertiesByDbColumn(selectedValueList);
-            return
-                new Tuple<IDictionary<int, ReferenceTypeDepthExpression>, IList<ValueTypeMapping>>(referenceDict,filteredValueList);
-        }
-
-        /// <summary>
-        ///     对所有的值类型与stirng类型进行“格式化”，并生成相应的属性到Column的映射关系。
-        ///     在此：只是简单的将属性映射到Column，不考虑两者多对多的关系的判断。
-        /// </summary>
-        /// <param name="valueTypeMappings"></param>
-        /// <param name="hasMapping"></param>
-        /// <returns></returns>
-        private IList<ValueTypeMapping> SelectedValueProperties(IList<ValueTypeMapping> valueTypeMappings,
-            bool hasMapping)
-        {
-            var validTypeMappings = new List<ValueTypeMapping>();
-
-
-            if (hasMapping)
+            //Check and complete DBColumnMapping 
+            foreach (LeafPropertyNode leafNode in leafs)
             {
-                #region 有属性存在DbColumnMapping
-
-                foreach (ValueTypeMapping valueTypeMapping in valueTypeMappings)
+                foreach (DBColumnMapping mapping in leafNode.DbColumnMappings)
                 {
-                    #region format DBColumnMappings
-
-                    var attrs =
-                        (DBColumnMapping[])
-                            valueTypeMapping.CurrentPropertyInfo.GetCustomAttributes(typeof (DBColumnMapping), true);
-
-                    DBColumnMapping[] destAttrs = attrs.Where(attr => attr.DestLabel == m_destLabel).ToArray();
-
-                    DBColumnMapping[] selectedAttrs =
-                        destAttrs.Where(attr => attr.IsTableNameMatch(m_destinationTablename)).ToArray();
-
-                    //说明：如果已经有满足数据库表匹配的Attribute存在，则选择这些Attribute；
-                    //否则，选择数据库表名称为默认值（即null）的Attribute。
-                    selectedAttrs = selectedAttrs.Length != 0
-                        ? selectedAttrs
-                        : destAttrs.Where(attr => attr.IsDefaultDestTableName()).ToArray();
-
-                    if (selectedAttrs.Length == 0)
-                    {
-                        //todo: trace logging here on ignored property
-                        continue;
-                    }
-
-                    for (int i = 0; i < selectedAttrs.Length; ++i)
-                    {
-                        LogHelper.Logger.TraceFormat("starting format DBColumnMapping: {0} for property: {1}",
-                            selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
-                        this.PopulateDbColumnMapping(valueTypeMapping.CurrentPropertyInfo, ref selectedAttrs[i]);
-                        LogHelper.Logger.TraceFormat("ending format DBColumnMapping:{0} for property:{1}",
-                            selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
-                        
-                        if (selectedAttrs[i].IsDestColumnOffsetOk() == false ||
-                            selectedAttrs[i].IsDestColumnNameOk() == false)
-                        {
-                            //todo: consider fail here
-                            LogHelper.Logger.WarnFormat(
-                                "failed to format DBColumnMapping:{0} for prop:{1}. check whether its Attribute is mapping to database table correctly. and it's not added to mapping table.",
-                                selectedAttrs[i], valueTypeMapping.CurrentPropertyInfo);
-                        }
-                    }
-
-                    #endregion
-
-                    DBColumnMapping[] rightAttrs =
-                        selectedAttrs.Where(attr => attr.IsDestColumnOffsetOk() && attr.IsDestColumnNameOk()).ToArray();
-                    if (rightAttrs.Length == 0)
-                    {
-                        LogHelper.Logger.WarnFormat("mapping to column failed for property:{0}",
-                            valueTypeMapping.CurrentPropertyInfo);
-                        continue;
-                    }
-
-                    //one property multiple mapping
-                    //todo: maybe need deduplication here
-                    foreach (DBColumnMapping rightAttr in rightAttrs)
-                    {
-                        //todo: add logging
-                        validTypeMappings.Add(new ValueTypeMapping(valueTypeMapping.CurrentPropertyInfo,
-                            valueTypeMapping.ParentKey, valueTypeMapping.Depth, rightAttr));
-                    }
+                    this.PopulateDbColumnMapping(leafNode, mapping);
                 }
-
-                #endregion
-
-                return validTypeMappings;
             }
 
+            List<LeafPropertyNode> mappedLeafs = leafs.Where(_ => _.DbColumnMappings.Count > 0).ToList();
+
+            if (mappedLeafs.Count == 0)
+            {
+                //create mapping from property name, our last try
+                this.AutoCreateDBColumnMapping(leafs);
+                mappedLeafs = leafs.Where(_ => _.DbColumnMappings.Count > 0).ToList();
+                if (mappedLeafs.Count == 0)
+                {
+                    throw new InvalidOperationException("No valid db column mapping found for type " + typeof(T).GetFriendlyName());
+                }
+            }
+
+            return this.DeduplicateDbColumnMappingByOffset(mappedLeafs);
+        }
+
+        private void AutoCreateDBColumnMapping(IList<LeafPropertyNode> leafNodes)
+        {
             //there isn't property with DestLabel attribute,so we can get it from database table.
             LogHelper.Logger.WarnFormat(
-                "mapping property by schema table for current type: {0}, which do not have attribute on all properties.",
-                typeof (T));
+                "Mapping property by schema table for current type: {0}, which has no attribute on each of its properties.",
+                typeof(T));
 
             #region 没有属性存在DbColumnMapping。因此，采用属性名称匹配数据库
 
-            DataTable dataTable = GetSchemaTable();
+            DataTable dataTable = this.GetSchemaTable();
 
             foreach (DataColumn column in dataTable.Columns)
             {
-                if (column == null || column.ReadOnly) continue;
-
-                IEnumerable<ValueTypeMapping> tempMappings =
-                    valueTypeMappings.Where(
-                        t =>
-                            string.Equals(t.CurrentPropertyInfo.Name, column.ColumnName,
-                                StringComparison.OrdinalIgnoreCase));
-                ValueTypeMapping[] typeMappings = tempMappings as ValueTypeMapping[] ?? tempMappings.ToArray();
-                foreach (ValueTypeMapping typeMapping in typeMappings)
+                if (column == null || column.ReadOnly)
                 {
-                    var dbMapping = new DBColumnMapping(m_destLabel, column.Ordinal, null, m_destinationTablename)
-                    {
-                        DestColumnName = column.ColumnName
-                    };
-                    typeMapping.DbColumnMapping = dbMapping;
-                    validTypeMappings.Add(typeMapping);
+                    continue;
+                }
+
+                IEnumerable<LeafPropertyNode> matchedLeafs =
+                    leafNodes.Where(
+                        t => string.Equals(t.PropertyInfo.Name, column.ColumnName, StringComparison.OrdinalIgnoreCase));
+
+                foreach (LeafPropertyNode leaf in matchedLeafs)
+                {
+                    var dbMapping = new DBColumnMapping(this.m_destLabel, column.Ordinal, null, this.m_destinationTablename)
+                                        {
+                                            DestColumnName
+                                                =
+                                                column
+                                                .ColumnName
+                                        };
+
+                    dbMapping.Host = leaf;
+                    leaf.DbColumnMappings.Add(dbMapping);
                 }
             }
 
             #endregion
-
-            return validTypeMappings;
         }
 
         /// <summary>
@@ -498,84 +223,75 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="propertyInfo"></param>
         /// <param name="mapping"></param>
-        private void PopulateDbColumnMapping(PropertyInfo propertyInfo, ref DBColumnMapping mapping)
+        private void PopulateDbColumnMapping(LeafPropertyNode leaf, DBColumnMapping mapping)
         {
-            Type type = propertyInfo.PropertyType;
-            bool tag = propertyInfo.PropertyType.IsValueType || propertyInfo.PropertyType == typeof (string);
-            if (tag == false) return;
-
-            if (mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk()) return;
+            if (mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk())
+            {
+                //todo: check and fail early
+                return;
+            }
 
             DataTable schemaTable = GetSchemaTable();
+
             //说明当前的mapping的列名称出错（null），而位置参数正确。则读取数据库表获得要相应的列名称
-            if (mapping.IsDestColumnNameOk() == false && mapping.IsDestColumnOffsetOk())
+            if (!mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk())
             {
                 DataColumn col = schemaTable.Columns[mapping.DestColumnOffset];
                 if (col == null)
                 {
-                    LogHelper.Logger.WarnFormat(
-                        "can not find column with column offset:{0} with property name:{1} in table: {2}, currnet db mapping:{3}",
-                        mapping.DestColumnOffset, propertyInfo.Name, m_destinationTablename, mapping);
-                    
-                    //todo: consider throw exception here (fail early)
-                    return;
+                    var desc = string.Format(
+                            "can not find column with offset {0} in table {1} ",
+                            mapping.DestColumnOffset,
+                            m_destinationTablename);
+
+                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
                 }
+                
                 mapping.DestColumnName = col.ColumnName;
+                this.m_classLogger.DebugFormat("Populated column name for DBColumnMapping: {0} on property node: {1}",
+                        mapping,
+                        leaf);
                 return;
             }
 
             //说明当前的mapping的列名称存在，而位置参数出错（-1）。则读取数据库表获得相应的列位置参数
-            if (mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk() == false)
+            if (mapping.IsDestColumnNameOk() && !mapping.IsDestColumnOffsetOk())
             {
                 DataColumn col = schemaTable.Columns[mapping.DestColumnName];
                 if (col == null)
                 {
-                    LogHelper.Logger.WarnFormat(
-                        "can not find column with column name:{0} with property name:{1} in table:{2}, current db mapping:{3}",
-                        mapping.DestColumnName, propertyInfo.Name, m_destinationTablename, mapping);
-                    return;
+                    var desc = string.Format(
+                            "can not find column with name {0} in table {1} ",
+                            mapping.DestColumnName,
+                            m_destinationTablename);
+
+                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
                 }
 
                 mapping.DestColumnOffset = col.Ordinal;
+                this.m_classLogger.DebugFormat("Populated column offset for DBColumnMapping: {0} on property node: {1}",
+                        mapping,
+                        leaf);
                 return;
             }
 
             //说明当前的mapping列名称不存在，位置参数也不存在，因此，根据PropertyInfo.Name读取数据库
-            DataColumn col2 = schemaTable.Columns[propertyInfo.Name];
-            if (col2 == null)
+            DataColumn guessColumn = schemaTable.Columns[leaf.PropertyInfo.Name];
+            if (guessColumn == null)
             {
-                LogHelper.Logger.WarnFormat(
-                    "can not find column with property name:{0} in table:{1}, current db mapping:{2}", propertyInfo.Name,
-                    m_destinationTablename, mapping);
-                return;
+                var desc = string.Format(
+                            "can not find column with property name {0} in table {1} ",
+                            leaf.PropertyInfo.Name,
+                            m_destinationTablename);
+
+                throw new InvalidDBColumnMappingException(desc, mapping, leaf);
             }
-            mapping.DestColumnOffset = col2.Ordinal;
-            mapping.DestColumnName = col2.ColumnName;
-        }
+            mapping.DestColumnOffset = guessColumn.Ordinal;
+            mapping.DestColumnName = guessColumn.ColumnName;
 
-        /// <summary>
-        ///     判断当前的属性类型是否与已经存在的形成“闭环”。即
-        ///     A.B.A。 当前的最后一个A，此时形成闭环
-        /// </summary>
-        /// <param name="dict"></param>
-        /// <param name="current"></param>
-        /// <returns></returns>
-        private bool HasReferenceLoop(Dictionary<int, ReferenceTypeDepthExpression> dict,
-            ReferenceTypeDepthExpression current)
-        {
-
-            ReferenceTypeDepthExpression parent = null;
-            if (dict.TryGetValue(current.ParentKey, out parent) == false)
-                return false;
-
-            while (parent!=null)
-            {
-                if (current.PropertyInfo.PropertyType == parent.PropertyInfo.PropertyType) 
-                    return true; // my ancestor is myself
-                if (dict.TryGetValue(parent.ParentKey, out parent) == false)
-                    return false;
-            }
-            return false;
+            this.m_classLogger.DebugFormat("Populated column name and offset for DBColumnMapping: {0} on property node: {1} by database metadata and propety name",
+                        mapping,
+                        leaf);
         }
 
         /// <summary>
@@ -585,29 +301,33 @@ namespace Gridsum.DataflowEx.Databases
         ///     如A.B.C.D, A.B.D。则选择后者
         ///     3、如果有多个属性匹配，且最小深度有多个，则默认选择第一个。
         /// </summary>
-        /// <param name="sourceMappings"></param>
         /// <returns></returns>
-        private IList<ValueTypeMapping> DeduplicateValuePropertiesByDbColumn(IList<ValueTypeMapping> sourceMappings)
+        private IList<DBColumnMapping> DeduplicateDbColumnMappingByOffset(IList<LeafPropertyNode> leafs)
         {
-            var filtered = new List<ValueTypeMapping>();
-            foreach (var group in sourceMappings.GroupBy(t => t.DbColumnMapping.DestColumnOffset))
+            var filtered = new List<DBColumnMapping>();
+            foreach (var group in leafs
+                .SelectMany(l => l.DbColumnMappings)
+                .GroupBy(m => m.DestColumnOffset))
             {
                 //规则一
                 if (group.Count() == 1)
                 {
-                    ValueTypeMapping first = group.FirstOrDefault();
-                    filtered.Add(first);
+                    filtered.Add(group.First());
                 }
                 else
                 {
                     //规则二、三
-                    int minDepth = group.Min(t => t.Depth);
-                    var first = group.First(t => t.Depth == minDepth);
-                    filtered.Add(first);
+                    int minDepth = group.Min(t => t.Host.Depth);
+                    DBColumnMapping selected = group.First(t => t.Host.Depth == minDepth);
+                    filtered.Add(selected); //todo: leafs still has a lot of mappings...
 
-                    //todo: improve logging
-                    LogHelper.Logger.WarnFormat(
-                        "there are more than one property mapping to the same column with columnOffset:{0}, columnName:{1}",first.DbColumnMapping.DestColumnOffset, first.DbColumnMapping.DestColumnName);
+                    foreach (var mapping in group)
+                    {
+                        if (!object.ReferenceEquals(mapping, selected))
+                        {
+                            m_classLogger.WarnFormat("Column mapping {0} on {1} abandoned as its offset {2} is already used", mapping, mapping.Host, mapping.DestColumnOffset);
+                        }
+                    }
                 }
             }
             return filtered;
@@ -669,6 +389,184 @@ namespace Gridsum.DataflowEx.Databases
         #endregion
     }
 
+    public abstract class PropertyTreeNode
+    {
+        public Type ResultType { get; set; }
+        public PropertyInfo PropertyInfo { get; set; }
+        public PropertyTreeNode Parent { get; set; }
+        public int Depth { get; set; }
+
+        public bool IsLeafNode
+        {
+            get
+            {
+                return ResultType.IsValueType || ResultType == typeof(string);
+            }
+        }
+
+        public bool HasReferenceLoop
+        {
+            get
+            {
+                var node = this.Parent;
+                while (node != null)
+                {
+                    if (this.ResultType == node.ResultType)
+                    {
+                        return true;
+                    }
+
+                    node = node.Parent;
+                }
+                return false;
+            }
+        }
+        
+        public override string ToString()
+        {
+            if (Parent == null)
+            {
+                return this.ResultType.GetFriendlyName();
+            }
+            else
+            {
+                return string.Format("{0}->{1}", Parent, PropertyInfo.Name);
+            }
+        }
+
+        public abstract Expression Expression { get; }
+
+        internal BlockExpression CreatePropertyAccessorExpression(PropertyInfo prop, Expression parentExpr,
+            object defaultValue)
+        {
+            #region 对于值类型， Nullable<值类型>的默认值进行处理
+
+            Type underType = prop.PropertyType;
+            if (underType.IsGenericType && underType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                underType = Nullable.GetUnderlyingType(underType);
+            }
+            if (underType.IsValueType)
+            {
+                if (defaultValue != null)
+                {
+                    try
+                    {
+                        //测试是否可以进行转换
+                        defaultValue = Convert.ChangeType(defaultValue, underType);
+                    }
+                    catch (Exception e)
+                    {
+                        LogHelper.Logger.WarnFormat(
+                            "failed to parse value from object for type: {0}, name:{1}, namespace:{2}", e,
+                            prop.PropertyType, prop.Name, prop.ToString());
+                        defaultValue = null;
+                    }
+                }
+
+                //todo: different hehavior for value type and Nullable<value type>
+                if (defaultValue == null && prop.PropertyType.IsValueType)
+                {
+                    defaultValue = Activator.CreateInstance(prop.PropertyType);
+                }
+            }
+
+            #endregion
+
+            ConstantExpression defaultExpr = null;
+            try
+            {
+                //默认返回Expression
+                defaultExpr = Expression.Constant(defaultValue, prop.PropertyType);
+            }
+            catch (Exception e)
+            {
+                //todo: consider add type check in value type initialization
+                LogHelper.Logger.ErrorFormat(
+                    "failed to create constant expression for property: {0}, with default value:{1}", e,
+                    prop.PropertyType, defaultValue);
+                throw;
+            }
+
+            //测试当前属性的“父属性”是否非空
+            BinaryExpression ifParentNotNull = Expression.NotEqual(parentExpr, Expression.Constant(null));
+
+            //“父属性”非空时的返回值
+            MemberExpression propExpr = Expression.Property(parentExpr, prop);
+
+            LabelTarget labelTarget = Expression.Label(prop.PropertyType);
+
+            //局部变量，用于存放最终的返回值
+            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
+
+            var defaultOfT = underType.IsValueType ? Activator.CreateInstance(prop.PropertyType) : null;
+
+            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(defaultOfT));
+
+            //assign conditionally
+            //if (p != null)
+            //{
+            //  if (p.P != null)
+            //      tmp = p.P;
+            //  else
+            //      tmp = default;
+            //}
+            //else
+            //{
+            //  tmp = default;
+            //}
+            ConditionalExpression assignConditionally = Expression.IfThenElse(
+                ifParentNotNull,
+                Expression.IfThenElse(
+                    ifPropNotNull,
+                    Expression.Assign(localVarExpr, propExpr),
+                    Expression.Assign(localVarExpr, defaultExpr)),
+                Expression.Assign(localVarExpr, defaultExpr));
+
+            //返回值
+            GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
+
+            LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+
+            BlockExpression block = Expression.Block(
+                new[] { localVarExpr },
+                assignConditionally,
+                retExpr,
+                labelExpr
+                );
+            return block;
+        }
+    }
+
+    public class RootNode<T> : PropertyTreeNode
+    {
+        private ParameterExpression m_param;
+
+        public RootNode()
+        {
+            this.ResultType = typeof(T);
+            PropertyInfo = null;
+            Parent = null;
+            Depth = 0;
+            m_param = Expression.Parameter(typeof(T), "t");
+        }
+
+        public override Expression Expression
+        {
+            get
+            {
+                return m_param;
+            }
+        }
+
+        public ParameterExpression RootParam
+        {
+            get
+            {
+                return m_param;
+            }
+        }
+    }
 
     /// <summary>
     ///     用于存放一个Property在当前的类结构中的深度及表达式
@@ -676,26 +574,31 @@ namespace Gridsum.DataflowEx.Databases
     /// <remarks>
     /// Middle node in property tree
     /// </remarks>
-    public class ReferenceTypeDepthExpression
+    public class NonLeafPropertyNode : PropertyTreeNode
     {
-        public ReferenceTypeDepthExpression(PropertyInfo propertyInfo, int parentKey, int depth,
-            Expression expression = null)
+        private readonly Lazy<Expression> m_exprIniter;
+
+        public NonLeafPropertyNode (PropertyInfo propertyInfo, PropertyTreeNode parent)
         {
-            PropertyInfo = propertyInfo;
-            ParentKey = parentKey;
-            Depth = depth;
-            Expression = expression;
+            this.PropertyInfo = propertyInfo;
+            this.Parent = parent;
+            Depth = parent == null ? 0 : parent.Depth + 1;
+            this.ResultType = propertyInfo.PropertyType;
+
+            this.m_exprIniter = new Lazy<Expression>(
+                () =>
+                    {
+                        return this.CreatePropertyAccessorExpression(this.PropertyInfo, parent.Expression, null);
+                    });
         }
 
-        public PropertyInfo PropertyInfo { get; set; }
-
-        /// <summary>
-        /// 父类型对应的节点Key
-        /// </summary>
-        public int ParentKey { get; set; }
-
-        public int Depth { get; set; }
-        public Expression Expression { get; set; }
+        public override Expression Expression
+        {
+            get
+            {
+                return this.m_exprIniter.Value;
+            }
+        }
     }
 
     /// <summary>
@@ -704,24 +607,42 @@ namespace Gridsum.DataflowEx.Databases
     /// <remarks>
     /// Leaf node in property tree
     /// </remarks>
-    public class ValueTypeMapping
+    public class LeafPropertyNode : PropertyTreeNode
     {
-        public ValueTypeMapping(PropertyInfo currentPropertyInfo, int parentKey, int depth,
-            DBColumnMapping dbColumnMapping = null)
+        public LeafPropertyNode(PropertyInfo propertyInfo, PropertyTreeNode parent, string destLabel, string destTable)
         {
-            CurrentPropertyInfo = currentPropertyInfo;
-            ParentKey = parentKey;
-            Depth = depth;
-            DbColumnMapping = dbColumnMapping;
+            this.PropertyInfo = propertyInfo;
+            this.Parent = parent;
+            Depth = parent == null ? 0 : parent.Depth + 1;
+            this.ResultType = propertyInfo.PropertyType;
+
+            var attrs = (DBColumnMapping[]) propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true);
+            var validAttrs = attrs.Where(attr => attr.DestLabel == destLabel).ToList();
+            var tableAttrs = validAttrs.Where(va => va.MatchesTableName(destTable)).ToList();
+            var defaultAttrs = validAttrs.Where(va => va.IsDefaultDestTableName()).ToList();
+            this.DbColumnMappings = tableAttrs.Count > 0 ? tableAttrs : defaultAttrs;
+
+            foreach (var dbColumnMapping in DbColumnMappings)
+            {
+                dbColumnMapping.Host = this;
+            }
         }
 
-        public PropertyInfo CurrentPropertyInfo { get; set; }
+        public List<DBColumnMapping> DbColumnMappings { get; set; }
 
-        /// <summary>
-        /// 父类型对应的节点Key
-        /// </summary>
-        public int ParentKey { get; set; }
-        public int Depth { get; set; }
-        public DBColumnMapping DbColumnMapping { get; set; }
+        public override Expression Expression
+        {
+            get
+            {
+                object defaultValue;
+                defaultValue = this.DbColumnMappings.Select(_ => _.DefaultValue).Distinct().Single();
+                return this.GetExpressionWithDefaultVal(defaultValue);
+            }
+        }
+
+        public Expression GetExpressionWithDefaultVal(object defaultVal)
+        {
+            return this.CreatePropertyAccessorExpression(this.PropertyInfo, Parent.Expression, defaultVal);
+        }
     }
 }

@@ -53,8 +53,7 @@ namespace Gridsum.DataflowEx.Databases
             : this(destLabel, -1, destColumnName, destTableName, defaultValue)
         {
         }
-
-
+        
         protected DBColumnMapping(string destLabel, int destColumnOffset, string destColumnName, string destTableName, object defaultValue = null)
             : base()
         {
@@ -89,6 +88,7 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         public object DefaultValue { get; set; }
 
+        public LeafPropertyNode Host { get; set; }
 
         public bool IsDestColumnOffsetOk()
         {
@@ -105,16 +105,19 @@ namespace Gridsum.DataflowEx.Databases
             return string.IsNullOrWhiteSpace(DestTableName);
         }
 
-        public bool IsTableNameMatch(string targetTableName)
+        public bool MatchesTableName(string targetTableName)
         {
             return string.Equals(targetTableName, DestTableName, StringComparison.OrdinalIgnoreCase);
         }
 
         public override string ToString()
         {
-            return "DestColumnOffset: " + this.DestColumnOffset + ", DestColumnName:" + this.DestColumnName +
-                   ", DestTableName:" + this.DestTableName + ", defaultValue:" +
-                   this.DefaultValue;
+            return string.Format(
+                "[ColName:{0}, ColOffset:{1}, TableName:{2}, DefaultValue:{3}]",
+                this.DestColumnName,
+                this.DestColumnOffset,
+                this.DestTableName,
+                this.DefaultValue);
         }
     }
 }
