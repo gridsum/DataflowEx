@@ -13,11 +13,11 @@ namespace Gridsum.DataflowEx.Databases
 
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly ConcurrentDictionary<string, TypeAccessor<T>> m_accessors;
+        private static readonly ConcurrentDictionary<string, Lazy<TypeAccessor<T>>> m_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new ConcurrentDictionary<string, TypeAccessor<T>>();
+            m_accessors = new ConcurrentDictionary<string, Lazy<TypeAccessor<T>>>();
         }
 
         private TypeAccessorManager()
@@ -35,7 +35,7 @@ namespace Gridsum.DataflowEx.Databases
         public static TypeAccessor<T> GetAccessorByDestLabel(string destLabel, string connectionString,
             string dataTableName)
         {
-            return m_accessors.GetOrAdd(destLabel, s => new TypeAccessor<T>(s, connectionString, dataTableName));
+            return m_accessors.GetOrAdd(destLabel, s => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(s, connectionString, dataTableName))).Value;
         }
     }
 
