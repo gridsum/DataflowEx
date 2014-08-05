@@ -83,7 +83,7 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         public object DefaultValue { get; internal set; }
 
-        public LeafPropertyNode Host { get; set; }
+        public PropertyTreeNode Host { get; set; }
 
         public bool IsDestColumnOffsetOk()
         {

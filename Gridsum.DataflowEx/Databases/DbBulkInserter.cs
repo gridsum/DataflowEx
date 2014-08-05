@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx.Databases
                             }
 
                             bulkCopy.DestinationTableName = destTable;
-                            bulkCopy.BulkCopyTimeout = (int) TimeSpan.FromMinutes(30).TotalMilliseconds;
+                            bulkCopy.BulkCopyTimeout = (int)TimeSpan.FromMinutes(30).TotalMilliseconds;
                             bulkCopy.BatchSize = m_bulkSize;
 
                             // Write from the source to the destination.
@@ -69,6 +69,12 @@ namespace Gridsum.DataflowEx.Databases
                     }
                     catch (Exception e)
                     {
+                        if (e is NullReferenceException)
+                        {
+                            LogHelper.Logger.ErrorFormat(
+                                "{0} NullReferenceException occurred in bulk insertion. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.", this.FullName);
+                        }
+
                         LogHelper.Logger.ErrorFormat("{0} Bulk insertion failed. Rolling back all changes...", this.FullName, e);
                         transaction.Rollback();
                         LogHelper.Logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);

@@ -10,7 +10,6 @@ using System.Reflection;
 namespace Gridsum.DataflowEx.Databases
 {
     using System.Diagnostics;
-
     using Common.Logging;
 
     public class TypeAccessorManager<T> where T : class
@@ -78,7 +77,7 @@ namespace Gridsum.DataflowEx.Databases
 
                 Expression<Func<T, object>> lambda =
                     Expression.Lambda<Func<T, object>>(
-                        Expression.Convert(mapping.Host.CreatePropertyAccessorExpression(mapping),typeof(object)),
+                        Expression.Convert(mapping.Host.CreatePropertyAccessorExpression(mapping.DefaultValue),typeof(object)),
                         rootNode.RootParam);
 
                 m_properties.Add(mapping.DestColumnOffset, lambda.Compile());
@@ -117,7 +116,7 @@ namespace Gridsum.DataflowEx.Databases
 
             #region 读取所有的引用类型、值类型及String类型的属性
 
-            var typeExpandQueue = new Queue<PropertyTreeNode>();
+            var typeExpandQueue = new Queue<IExpandableNode>();
             typeExpandQueue.Enqueue(root);
             
             while (typeExpandQueue.Count > 0)
@@ -268,9 +267,10 @@ namespace Gridsum.DataflowEx.Databases
                 }
                 
                 mapping.DestColumnName = col.ColumnName;
-                this.m_classLogger.DebugFormat("Populated column name for DBColumnMapping: {0} on property node: {1}",
+                this.m_classLogger.DebugFormat("Populated column name for DBColumnMapping: {0} on property node: {1} by table {2}",
                         mapping,
-                        leaf);
+                        leaf,
+                        m_destinationTablename);
                 return;
             }
 
@@ -289,9 +289,10 @@ namespace Gridsum.DataflowEx.Databases
                 }
 
                 mapping.DestColumnOffset = col.Ordinal;
-                this.m_classLogger.DebugFormat("Populated column offset for DBColumnMapping: {0} on property node: {1}",
+                this.m_classLogger.DebugFormat("Populated column offset for DBColumnMapping: {0} on property node: {1} by table {2}",
                         mapping,
-                        leaf);
+                        leaf,
+                        m_destinationTablename);
                 return;
             }
 
@@ -309,9 +310,10 @@ namespace Gridsum.DataflowEx.Databases
             mapping.DestColumnOffset = guessColumn.Ordinal;
             mapping.DestColumnName = guessColumn.ColumnName;
 
-            this.m_classLogger.DebugFormat("Populated column name and offset for DBColumnMapping: {0} on property node: {1} by database metadata and propety name",
+            this.m_classLogger.DebugFormat("Populated column name and offset for DBColumnMapping: {0} on property node: {1} by table {2}",
                         mapping,
-                        leaf);
+                        leaf,
+                        m_destinationTablename);
         }
 
         /// <summary>
@@ -409,12 +411,36 @@ namespace Gridsum.DataflowEx.Databases
         #endregion
     }
 
+    public interface IExpandableNode
+    {
+        Type ResultType { get; }
+        int Depth { get; }
+        Expression Expression { get; }
+        bool NoNullCheck { get; }
+        IExpandableNode Parent { get; }
+    }
+
     public abstract class PropertyTreeNode
     {
         public Type ResultType { get; set; }
         public PropertyInfo PropertyInfo { get; set; }
-        public PropertyTreeNode Parent { get; set; }
+        public IExpandableNode Parent { get; set; }
         public int Depth { get; set; }
+
+        public PropertyTreeNode(PropertyInfo propertyInfo, IExpandableNode parent)
+        {
+            this.Parent = parent;
+            Depth = parent.Depth + 1;
+            this.PropertyInfo = propertyInfo;
+            this.ResultType = propertyInfo.PropertyType;
+
+            this.DbColumnMappings = new List<DBColumnMapping>((DBColumnMapping[])propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true));
+
+            foreach (var dbColumnMapping in DbColumnMappings)
+            {
+                dbColumnMapping.Host = this;
+            }
+        }
 
         public bool IsLeafNode
         {
@@ -454,73 +480,152 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
+        public List<DBColumnMapping> DbColumnMappings { get; set; }
+
         public abstract Expression Expression { get; }
-        public abstract bool NoNullCheck { get; }        
-    }
 
-    public class RootNode<T> : PropertyTreeNode
-    {
-        private ParameterExpression m_param;
-
-        public RootNode()
+        //todo: check all the Expression.Label()
+        internal Expression CreatePropertyAccessorExpression(object defaultValue)
         {
-            this.ResultType = typeof(T);
-            PropertyInfo = null;
-            Parent = null;
-            Depth = 0;
-            m_param = Expression.Parameter(typeof(T), "t");
-        }
+            PropertyInfo prop = this.PropertyInfo;
+            Type propType = prop.PropertyType;
 
-        public override Expression Expression
-        {
-            get
+            if (defaultValue == null)
             {
-                return m_param;
+                return this.CreatePropertyAccessorExpression();
+            }
+            if (propType.IsValueType && !propType.IsNullableType()) //Normal value type cannot have a default value
+            {
+                return this.CreatePropertyAccessorExpression();
+            }
+
+            Expression nullExpr = Expression.Constant(null);
+            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType, "tmp");
+            Expression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
+
+            //now: only class type (string) or nullable with a non-null default value
+            if (this.Parent.NoNullCheck)
+            {
+                // tmp = parent-expression.P;
+                // if (tmp == null)
+                //    tmp = default
+                // return tmp;
+                var code1 = Expression.Assign(localVarExpr, Expression.Property(this.Parent.Expression, prop));
+                var code2 = Expression.IfThen(
+                    Expression.Equal(localVarExpr, nullExpr),
+                    Expression.Assign(localVarExpr, defaultValExpr));
+
+                //返回值
+                LabelTarget labelTarget = Expression.Label(prop.PropertyType);
+                GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
+                LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+                BlockExpression block = Expression.Block(new[] { localVarExpr }, code1, code2, retExpr, labelExpr);
+                return block;
+            }
+            else
+            {
+                //p = {parent expression};
+                ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
+                var code1 = Expression.Assign(localParentVarExpr, this.Parent.Expression);
+                //if (p != null)
+                //{
+                //   tmp = p.P;
+                //   if (tmp != null)
+                //      return tmp;
+                //   else
+                //      return defaultValue;
+                //}
+                //else
+                //{
+                //   return defaultValue;
+                //}
+                LabelTarget labelTarget = Expression.Label(prop.PropertyType);
+                LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+                var code2 = Expression.IfThenElse(
+                    Expression.NotEqual(localParentVarExpr, nullExpr),
+                    Expression.Block(
+                        new[] { localVarExpr },
+                        Expression.Assign(localVarExpr, Expression.Property(localParentVarExpr, prop)),
+                        Expression.IfThenElse(
+                            Expression.NotEqual(localVarExpr, nullExpr),
+                            Expression.Return(labelTarget, localVarExpr),
+                            Expression.Return(labelTarget, defaultValExpr))),
+                    Expression.Return(labelTarget, defaultValExpr));
+
+                return Expression.Block(new[] { localVarExpr, localParentVarExpr }, code1, code2, labelExpr);
             }
         }
 
-        public override bool NoNullCheck
-        {
-            get
-            {
-                return true;
-            }
-        }
 
-        public ParameterExpression RootParam
+        protected virtual Expression CreatePropertyAccessorExpression()
         {
-            get
+            PropertyInfo prop = this.PropertyInfo;
+            ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
+
+            BinaryExpression ifParentNotNull = Expression.NotEqual(localParentVarExpr, Expression.Constant(null));
+            MemberExpression propExpr = Expression.Property(localParentVarExpr, prop);
+            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
+
+            if (this.Parent.NoNullCheck)
             {
-                return m_param;
+                return Expression.Property(this.Parent.Expression, prop);
+            }
+            else
+            {
+                Expression defaultExpression;
+                if (prop.PropertyType.IsValueType && !prop.PropertyType.IsNullableType()) //value type
+                {
+                    defaultExpression = Expression.Constant(Activator.CreateInstance(prop.PropertyType));
+                }
+                else
+                {
+                    defaultExpression = Expression.Constant(null, prop.PropertyType);
+                }
+
+                //p = {parent expression};
+                //if (p != null)
+                //{
+                //  return p.P;
+                //}
+                //else
+                //{
+                //  return default(T);
+                //}
+                LabelTarget labelTarget = Expression.Label(prop.PropertyType);
+                LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+
+                Expression assignConditionally = Expression.IfThenElse(
+                    ifParentNotNull,
+                    Expression.Return(labelTarget, propExpr),
+                    Expression.Return(labelTarget, defaultExpression));
+
+                BlockExpression block = Expression.Block(
+                    new[] { localVarExpr, localParentVarExpr },
+                    Expression.Assign(localParentVarExpr, this.Parent.Expression),
+                    assignConditionally,
+                    labelExpr
+                    );
+                return block;
             }
         }
     }
 
     /// <summary>
-    ///     用于存放一个Property在当前的类结构中的深度及表达式
+    /// 用于存放一个Property在当前的类结构中的深度及表达式
     /// </summary>
     /// <remarks>
     /// Middle node in property tree
     /// </remarks>
-    public class NonLeafPropertyNode : PropertyTreeNode
+    public class NonLeafPropertyNode : PropertyTreeNode, IExpandableNode
     {
         private readonly Lazy<Expression> m_exprIniter;
 
         private bool m_noNullCheck;
 
-        public NonLeafPropertyNode (PropertyInfo propertyInfo, PropertyTreeNode parent)
+        public NonLeafPropertyNode(PropertyInfo propertyInfo, IExpandableNode parent)
+            : base(propertyInfo, parent)
         {
-            this.PropertyInfo = propertyInfo;
-            this.Parent = parent;
-            Depth = parent == null ? 0 : parent.Depth + 1;
-            this.ResultType = propertyInfo.PropertyType;
-
-            this.m_exprIniter = new Lazy<Expression>(
-                () =>
-                    {
-                        return this.CreatePropertyAccessorExpression();
-                    });
-
+            this.m_exprIniter = new Lazy<Expression>(this.CreatePropertyAccessorExpression);
             m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any();
         }
 
@@ -532,83 +637,89 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public override bool NoNullCheck
+        public bool NoNullCheck
         {
             get
             {
                 return m_noNullCheck;
             }
         }
+    }
 
-        protected Expression CreatePropertyAccessorExpression()
+    public class RootNode<T> : IExpandableNode
+    {
+        private ParameterExpression m_param;
+
+        public RootNode()
         {
-            PropertyInfo prop = this.PropertyInfo;
-            Type propType = prop.PropertyType;
+            m_param = Expression.Parameter(typeof(T), "t");
+        }
 
-            ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
-
-            BinaryExpression ifParentNotNull = Expression.NotEqual(localParentVarExpr, Expression.Constant(null));
-            MemberExpression propExpr = Expression.Property(localParentVarExpr, prop);
-
-            BinaryExpression ifPropNotNull = Expression.NotEqual(propExpr, Expression.Constant(null));
-            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType);
-
-            if (this.Parent.NoNullCheck)
+        public Type ResultType {
+            get
             {
-                return Expression.Property(this.Parent.Expression, prop);
+                return typeof(T);
             }
-            else
+        }
+
+        public int Depth
+        {
+            get
             {
-                //todo: do we need return in NonLeafNode?
+                return 0;
+            }
+        }
 
-                //p = {parent expression};
-                //if (p != null)
-                //{
-                //  tmp = p.P;
-                //}
-                //else
-                //{
-                //  tmp = null;
-                //}
-                Expression assignConditionally = Expression.IfThenElse(
-                    ifParentNotNull,
-                    Expression.Assign(localVarExpr, propExpr),
-                    Expression.Assign(localVarExpr, Expression.Constant(null)));
+        public Expression Expression
+        {
+            get
+            {
+                return m_param;
+            }
+        }
 
-                LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-                GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-                LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
+        public bool NoNullCheck
+        {
+            get
+            {
+                return true;
+            }
+        }
 
-                BlockExpression block = Expression.Block(
-                    new[] { localVarExpr, localParentVarExpr },
-                    Expression.Assign(localParentVarExpr, this.Parent.Expression),
-                    assignConditionally,
-                    retExpr,
-                    labelExpr
-                    );
-                return block;
-            }          
+        public IExpandableNode Parent
+        {
+            get
+            {
+                return null;
+            }
+        }
 
+        public ParameterExpression RootParam
+        {
+            get
+            {
+                return m_param;
+            }
+        }
+
+        public override string ToString()
+        {
+            return this.ResultType.GetFriendlyName();
         }
     }
 
     /// <summary>
-    ///     用于存放一个值类型或String类型的DbColumnMapping
+    /// 用于存放一个值类型或String类型的DbColumnMapping
     /// </summary>
     /// <remarks>
     /// Leaf node in property tree
     /// </remarks>
     public class LeafPropertyNode : PropertyTreeNode
     {
-        public LeafPropertyNode(PropertyInfo propertyInfo, PropertyTreeNode parent, string destLabel)
+        public LeafPropertyNode(PropertyInfo propertyInfo, IExpandableNode parent, string destLabel)
+            : base(propertyInfo, parent)
         {
-            this.PropertyInfo = propertyInfo;
-            this.Parent = parent;
-            Depth = parent == null ? 0 : parent.Depth + 1;
-            this.ResultType = propertyInfo.PropertyType;
-
-            var attrs = (DBColumnMapping[]) propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true);
-            this.DbColumnMappings = attrs.Where(attr => attr.DestLabel == destLabel).ToList();
+            this.DbColumnMappings = this.DbColumnMappings.Where(m => m.DestLabel == destLabel).ToList();
 
             foreach (var dbColumnMapping in DbColumnMappings)
             {
@@ -648,12 +759,8 @@ namespace Gridsum.DataflowEx.Databases
                         Debug.Fail("Should not reach here. A leaf node should not have ResultType as class type");
                     }
                 }
-
-                dbColumnMapping.Host = this;
             }
         }
-
-        public List<DBColumnMapping> DbColumnMappings { get; set; }
 
         public override Expression Expression
         {
@@ -665,166 +772,7 @@ namespace Gridsum.DataflowEx.Databases
                 //return this.GetExpressionWithDefaultVal(defaultValue);
             }
         }
-
-        public override bool NoNullCheck
-        {
-            get
-            {
-                throw new NotSupportedException();
-            }
-        }
         
-        //todo: check all the Expression.Label()
-        internal Expression CreatePropertyAccessorExpression(DBColumnMapping mapping)
-        {
-            PropertyInfo prop = this.PropertyInfo;
-            Type propType = prop.PropertyType;
-
-            object defaultValue = mapping.DefaultValue;
-            Expression nullExpr = Expression.Constant(null);
-            ParameterExpression localVarExpr = Expression.Variable(prop.PropertyType, "tmp");
-                        
-            if (propType.IsValueType && !propType.IsNullableType()) //value type
-            {
-                if (this.Parent.NoNullCheck)
-                {
-                    // tmp = parent-expression.P;
-                    return Expression.Property(this.Parent.Expression, prop);
-                }
-                else
-                {
-                    // p = parent expression
-                    //if (p != null)
-                    //{
-                    //  tmp = p.P;  
-                    //}
-                    //else
-                    //  tmp = default(T);
-                    ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
-                    var code1 = Expression.Assign(localParentVarExpr, this.Parent.Expression);
-                    var code2 = Expression.IfThenElse(
-                        Expression.NotEqual(localParentVarExpr, nullExpr),
-                        Expression.Assign(localVarExpr, Expression.Property(localParentVarExpr, prop)),
-                        Expression.Assign(localVarExpr, Expression.Constant(Activator.CreateInstance(propType))));
-
-                    //返回值
-                    LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-                    GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-                    LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
-                    BlockExpression block = Expression.Block(
-                        new[] { localVarExpr, localParentVarExpr },
-                        code1,
-                        code2,
-                        retExpr,
-                        labelExpr
-                        );
-                    return block;
-                }
-            }
-            else //class type (string) or nullable
-            {
-                if (this.Parent.NoNullCheck)
-                {
-                    if (defaultValue == null)
-                    {
-                        // return parent-expression.P;
-                        return Expression.Property(this.Parent.Expression, prop);
-                    }
-                    else
-                    {
-                        Expression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
-
-                        // tmp = parent-expression.P;
-                        // if (tmp == null)
-                        //    tmp = default
-                        var code1 = Expression.Assign(localVarExpr, Expression.Property(this.Parent.Expression, prop));
-                        var code2 = Expression.IfThen(
-                            Expression.Equal(localVarExpr, nullExpr), 
-                            Expression.Assign(localVarExpr, defaultValExpr));
-
-                        //返回值
-                        LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-                        GotoExpression retExpr = Expression.Return(labelTarget, localVarExpr);
-                        LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
-                        BlockExpression block = Expression.Block(
-                            new[] { localVarExpr },
-                            code1,
-                            code2,
-                            retExpr,
-                            labelExpr
-                            );
-                        return block;
-                    }
-                }
-                else
-                {
-                    if (defaultValue == null)
-                    {
-                        //p = {parent expression};
-                        ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType, "p");
-                        var code1 = Expression.Assign(localParentVarExpr, this.Parent.Expression);
-                        //if (p != null)
-                        //{
-                        //    return p.P;
-                        //}
-                        //return null;
-                        LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-                        LabelExpression labelExpr = Expression.Label(labelTarget, Expression.Constant(null, prop.PropertyType));
-
-                        var code2 = Expression.IfThenElse(
-                        Expression.NotEqual(localParentVarExpr, nullExpr),
-                        Expression.Return(labelTarget, Expression.Property(localParentVarExpr, prop)),
-                        Expression.Return(labelTarget, Expression.Constant(null, prop.PropertyType)));
-
-                        BlockExpression block = Expression.Block(
-                            new[] { localParentVarExpr },
-                            code1,
-                            code2,
-                            labelExpr
-                            );
-                        return block;
-                    }
-                    else
-                    {
-                        Expression defaultValExpr = Expression.Constant(defaultValue, prop.PropertyType);
-
-                        //p = {parent expression};
-                        ParameterExpression localParentVarExpr = Expression.Variable(this.Parent.ResultType);
-                        var code1 = Expression.Assign(localParentVarExpr, this.Parent.Expression);
-                        //if (p != null)
-                        //{
-                        //   tmp = p.P;
-                        //   if (tmp != null)
-                        //      return tmp;
-                        //   else
-                        //      return defaultValue;
-                        //}
-                        //else
-                        //{
-                        //   return defaultValue;
-                        //}
-                        LabelTarget labelTarget = Expression.Label(prop.PropertyType);
-                        LabelExpression labelExpr = Expression.Label(labelTarget, localVarExpr);
-                        var code2 = Expression.IfThenElse(
-                            Expression.NotEqual(localParentVarExpr, nullExpr),
-                            Expression.Block(new[] { localVarExpr },
-                                Expression.Assign(localVarExpr, Expression.Property(localParentVarExpr, prop)),
-                                Expression.IfThenElse(
-                                    Expression.NotEqual(localVarExpr, nullExpr),
-                                    Expression.Return(labelTarget, localVarExpr),
-                                    Expression.Return(labelTarget, defaultValExpr))
-                                ),
-                            Expression.Return(labelTarget, defaultValExpr));
-
-                        return Expression.Block(
-                                new[] { localVarExpr, localParentVarExpr },
-                                code1,
-                                code2,
-                                labelExpr
-                            );
-                    }                    
-                }
-            }
-        }
+        
     }
 }
