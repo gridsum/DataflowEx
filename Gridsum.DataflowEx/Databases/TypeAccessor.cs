@@ -484,7 +484,10 @@ namespace Gridsum.DataflowEx.Databases
 
         public abstract Expression Expression { get; }
 
-        //todo: check all the Expression.Label()
+        /// <summary>
+        /// Create property access expression with a default value
+        /// </summary>
+        /// <returns>An expression representing the value of the property node</returns>
         internal Expression CreatePropertyAccessorExpression(object defaultValue)
         {
             PropertyInfo prop = this.PropertyInfo;
@@ -556,7 +559,10 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-
+        /// <summary>
+        /// Create property access expression without a default value
+        /// </summary>
+        /// <returns>An expression representing the value of the property node</returns>
         protected virtual Expression CreatePropertyAccessorExpression()
         {
             PropertyInfo prop = this.PropertyInfo;
