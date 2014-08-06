@@ -26,6 +26,11 @@ namespace Gridsum.DataflowEx
             return new TargetDataflow<TIn>(block);
         }
 
+        public static Dataflow<TIn> ToDataflow<TIn>(this ITargetBlock<TIn> block)
+        {
+            return FromBlock(block);
+        }
+
         public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action, DataflowOptions options)
         {
             return FromBlock(new ActionBlock<TIn>(action), options);
@@ -34,6 +39,11 @@ namespace Gridsum.DataflowEx
         public static Dataflow<TIn> FromBlock<TIn>(ITargetBlock<TIn> block, DataflowOptions options)
         {
             return new TargetDataflow<TIn>(block, options);
+        }
+
+        public static Dataflow<TIn> ToDataflow<TIn>(this ITargetBlock<TIn> block, DataflowOptions options)
+        {
+            return FromBlock(block, options);
         }
 
         public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, TOut> transform)
@@ -51,6 +61,11 @@ namespace Gridsum.DataflowEx
             return new PropagatorDataflow<TIn, TOut>(block);
         }
 
+        public static Dataflow<TIn, TOut> ToDataflow<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block)
+        {
+            return FromBlock(block);
+        }
+
         public static Dataflow<TIn, TOut> FromDelegate<TIn, TOut>(Func<TIn, TOut> func, DataflowOptions options)
         {
             return FromBlock(new TransformBlock<TIn, TOut>(func), options);
@@ -66,6 +81,11 @@ namespace Gridsum.DataflowEx
             return new PropagatorDataflow<TIn, TOut>(block, options);
         }
 
+        public static Dataflow<TIn, TOut> ToDataflow<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block, DataflowOptions options)
+        {
+            return FromBlock(block, options);
+        }
+
         public static Dataflow<TIn, TOut> AutoComplete<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, TimeSpan timeout)
             where TIn : ITracableItem
             where TOut : ITracableItem 
@@ -78,7 +98,23 @@ namespace Gridsum.DataflowEx
             var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
             dataflow.LinkTo(brancher);
             brancher.LinkTo(out1);
-            brancher.LinkSecondlyTo(out2);
+            brancher.LinkTo(out2);
+        }
+
+        public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, Func<TOut, TOut> copyFunc, params IDataflow<TOut>[] outs)
+        {
+            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            dataflow.LinkTo(brancher);
+
+            foreach (var output in outs)
+            {
+                brancher.LinkTo(output);
+            }
+        }
+
+        public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, params Dataflow<TOut>[] outs)
+        {
+            LinkToMultiple(dataflow, null, outs);
         }
 
         //todo: from delegate, from existing dataflows

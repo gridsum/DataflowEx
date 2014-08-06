@@ -24,8 +24,8 @@ namespace Gridsum.DataflowEx.Test
             var action1 = new ActionBlock<int>(i => sum1 = sum1 + i);
             var action2 = new ActionBlock<int>(i => sum2 = sum2 + i);
 
-            dataCopier.OutputBlock.LinkTo(action1, new DataflowLinkOptions() {PropagateCompletion = true});
-            dataCopier.CopiedOutputBlock.LinkTo(action2, new DataflowLinkOptions() {PropagateCompletion = true});
+            dataCopier.LinkTo(DataflowUtils.FromBlock(action1));
+            dataCopier.LinkTo(DataflowUtils.FromBlock(action2));
 
             for (int j = 0; j < 1000; j++)
             {
@@ -45,18 +45,17 @@ namespace Gridsum.DataflowEx.Test
         {
             var random = new Random();
             var buffer = new BufferBlock<int>();
-            var dataCopier = new DataBrancher<int>();
-
+            
             int sum1 = 0;
             int sum2 = 0;
+            int sum3 = 0;
 
             var action1 = new ActionBlock<int>(i => sum1 = sum1 + i);
             var action2 = new ActionBlock<int>(i => sum2 = sum2 + i);
+            var action3 = new ActionBlock<int>(i => sum3 = sum3 + i);
 
-            buffer.LinkTo(dataCopier.InputBlock, new DataflowLinkOptions() { PropagateCompletion = true });
-            dataCopier.OutputBlock.LinkTo(action1, new DataflowLinkOptions() { PropagateCompletion = true });
-            dataCopier.CopiedOutputBlock.LinkTo(action2, new DataflowLinkOptions() { PropagateCompletion = true });
-
+            buffer.ToDataflow().LinkToMultiple(new []{action1, action2, action3}.Select(a => a.ToDataflow()).ToArray());
+            
             for (int j = 0; j < 1000; j++)
             {
                 buffer.Post((int)(random.NextDouble() * 10000));
@@ -64,10 +63,11 @@ namespace Gridsum.DataflowEx.Test
 
             buffer.Complete();
 
-            await TaskEx.AwaitableWhenAll(action1.Completion, action2.Completion);
+            await TaskEx.AwaitableWhenAll(action1.Completion, action2.Completion, action3.Completion);
 
             Console.WriteLine("sum1 = {0} , sum2 = {1}", sum1, sum2);
             Assert.AreEqual(sum1, sum2);
+            Assert.AreEqual(sum1, sum3);
         }
     }
 }

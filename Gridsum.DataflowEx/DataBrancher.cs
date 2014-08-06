@@ -7,6 +7,8 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx
 {
+    using System.Collections.Immutable;
+
     /// <summary>
     /// BroadcastBlock only pushes latest data (if destination is full) and causes data loss.
     /// That's why we need DataCopier which preserves a 100% same copy of the data stream through CopiedOutputBlock
@@ -14,7 +16,7 @@ namespace Gridsum.DataflowEx
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
     public class DataBrancher<T> : Dataflow<T, T>
     {
-        private readonly BufferBlock<T> m_copyBuffer;
+        private ImmutableList<BufferBlock<T>> m_copyBuffers;
         private readonly TransformBlock<T, T> m_transformBlock;
 
         public DataBrancher() : this(DataflowOptions.Default) {}
@@ -23,27 +25,31 @@ namespace Gridsum.DataflowEx
 
         public DataBrancher(Func<T,T> copyFunc, DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
-            m_copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
-            {
-                BoundedCapacity = dataflowOptions.RecommendedCapacity ?? int.MaxValue
-            });
+            m_copyBuffers = ImmutableList<BufferBlock<T>>.Empty;
 
-            m_transformBlock = new TransformBlock<T, T>(arg =>
-            {
-                m_copyBuffer.SafePost(copyFunc == null ? arg : copyFunc(arg));
-                return arg;
-            });
+            m_transformBlock = new TransformBlock<T, T>(
+                arg =>
+                    {
+                        T copy = copyFunc == null ? arg : copyFunc(arg);
+                        foreach (var bufferBlock in m_copyBuffers)
+                        {
+                            bufferBlock.SafePost(copy);
+                        }
+                        return arg;
+                    });
 
             m_transformBlock.Completion.ContinueWith(t =>
             {
                 //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
                 if (t.Status == TaskStatus.RanToCompletion) 
                 {
-                    m_copyBuffer.Complete();
+                    foreach (var bufferBlock in m_copyBuffers)
+                    {
+                        bufferBlock.Complete();
+                    }
                 }
             });
 
-            RegisterChild(m_copyBuffer);
             RegisterChild(m_transformBlock);
         }
 
@@ -60,17 +66,40 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// The copied data stream
         /// </summary>
-        public ISourceBlock<T> CopiedOutputBlock
+        public ImmutableList<BufferBlock<T>> CopiedOutputBlocks
         {
-            get { return m_copyBuffer; }
+            get { return m_copyBuffers; }
         }
 
         /// <summary>
         /// Link the copied data stream to another block
         /// </summary>
-        public void LinkSecondlyTo(IDataflow<T> other)
+        public void LinkCopyTo(IDataflow<T> other)
         {
-            LinkBlockToFlow(this.CopiedOutputBlock, other);
+            //first, create a new copy block
+            var copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
+            {
+                BoundedCapacity = m_dataflowOptions.RecommendedCapacity ?? int.MaxValue
+            });
+
+            RegisterChild(copyBuffer);
+            m_copyBuffers = m_copyBuffers.Add(copyBuffer);
+            LinkBlockToFlow(copyBuffer, other);
+        }
+
+        public override void LinkTo(IDataflow<T> other)
+        {
+            if (m_condBuilder.Count == 0)
+            {
+                //link first output as primary output
+                base.LinkTo(other);    
+            }
+            else
+            {
+                this.LinkCopyTo(other);
+            }
+
+            LogHelper.Logger.InfoFormat("{0} now links to its {1}th target ({2})", this.FullName, m_copyBuffers.Count + 1, other.Name);
         }
     }
 }

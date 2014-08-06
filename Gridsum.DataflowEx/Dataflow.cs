@@ -476,7 +476,7 @@ namespace Gridsum.DataflowEx
                 });
         }
 
-        public void LinkTo(IDataflow<TOut> other)
+        public virtual void LinkTo(IDataflow<TOut> other)
         {
             m_condBuilder.Add(new Predicate<TOut>(@out => true));
             LinkBlockToFlow(this.OutputBlock, other);
