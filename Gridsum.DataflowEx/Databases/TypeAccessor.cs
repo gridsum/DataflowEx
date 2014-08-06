@@ -9,6 +9,7 @@ using System.Reflection;
 
 namespace Gridsum.DataflowEx.Databases
 {
+    using System.Collections;
     using System.Diagnostics;
     using Common.Logging;
 
@@ -123,7 +124,13 @@ namespace Gridsum.DataflowEx.Databases
             {
                 var nodeToExpand = typeExpandQueue.Dequeue();
                 Type currentType = nodeToExpand.ResultType;
-                
+
+                if (!nodeToExpand.IsExpandable)
+                {
+                    LogHelper.Logger.DebugFormat("{0} ({1}) is not expandable. Ignore it.", nodeToExpand, currentType.GetFriendlyName());
+                    continue;
+                }
+
                 if (currentType.IsAbstract || currentType.IsInterface)
                 {
                     LogHelper.Logger.WarnFormat("Expanding properties for interface or abstract class type: {0}", currentType.GetFriendlyName());
@@ -413,6 +420,7 @@ namespace Gridsum.DataflowEx.Databases
 
     public interface IExpandableNode
     {
+        bool IsExpandable { get; }
         Type ResultType { get; }
         int Depth { get; }
         Expression Expression { get; }
@@ -635,6 +643,14 @@ namespace Gridsum.DataflowEx.Databases
             m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any();
         }
 
+        public bool IsExpandable
+        {
+            get
+            {
+                return !typeof(IEnumerable).IsAssignableFrom(this.ResultType);
+            }
+        }
+
         public override Expression Expression
         {
             get
@@ -659,6 +675,14 @@ namespace Gridsum.DataflowEx.Databases
         public RootNode()
         {
             m_param = Expression.Parameter(typeof(T), "t");
+        }
+
+        public bool IsExpandable
+        {
+            get
+            {
+                return !typeof(IEnumerable).IsAssignableFrom(this.ResultType);
+            }
         }
 
         public Type ResultType {
