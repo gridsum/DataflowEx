@@ -31,9 +31,8 @@ namespace Gridsum.DataflowEx.Test
             var dataflow1 = DataflowUtils.FromDelegate<Int, Int>(i => i);
             var dataflow2 = DataflowUtils.FromBlock(block).AutoComplete(TimeSpan.FromSeconds(1));
             
-            dataflow1.LinkTo(dataflow2);
-            dataflow2.LinkTo(dataflow1);
-
+            dataflow1.LinkTo(dataflow2).LinkTo(dataflow1);
+            
             dataflow1.InputBlock.Post(new Int() { Val = 1 });
             Assert.IsTrue(await dataflow2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(10)));
         }
@@ -49,9 +48,8 @@ namespace Gridsum.DataflowEx.Test
             var dataflow1 = DataflowUtils.FromDelegate<Int, Int>(i => new[] { i }); //preserve the guid
             var dataflow2 = DataflowUtils.FromBlock(block2).AutoComplete(TimeSpan.FromSeconds(1));
 
-            dataflow1.LinkTo(dataflow2);
-            dataflow2.LinkTo(dataflow1);
-
+            dataflow1.LinkTo(dataflow2).LinkTo(dataflow1);
+            
             dataflow1.InputBlock.Post(new Int() { Val = 1 });
             Assert.IsTrue(await dataflow2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(2)));
             Assert.IsTrue(dataflow2.Name.EndsWith("AutoComplete"));

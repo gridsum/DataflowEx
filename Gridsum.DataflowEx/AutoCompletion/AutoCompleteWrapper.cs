@@ -57,9 +57,8 @@ namespace Gridsum.DataflowEx.AutoCompletion
 
             m_after = DataflowUtils.FromBlock(after);
 
-            m_before.LinkTo(dataflow);
-            dataflow.LinkTo(m_after);
-
+            m_before.LinkTo(dataflow).LinkTo(m_after);
+            
             RegisterChild(m_before);
             RegisterChild(dataflow);
             RegisterChild(m_after);

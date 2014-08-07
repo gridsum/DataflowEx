@@ -476,10 +476,16 @@ namespace Gridsum.DataflowEx
                 });
         }
 
-        public virtual void LinkTo(IDataflow<TOut> other)
+        public virtual IDataflow<TOut> LinkTo(IDataflow<TOut> other)
         {
             m_condBuilder.Add(new Predicate<TOut>(@out => true));
             LinkBlockToFlow(this.OutputBlock, other);
+            return other;
+        }
+
+        public Dataflow<TOut, TNext> LinkTo<TNext>(Dataflow<TOut, TNext> other)
+        {
+            return LinkTo(other as IDataflow<TOut>) as Dataflow<TOut, TNext>;
         }
 
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)

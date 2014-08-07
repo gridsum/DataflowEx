@@ -87,7 +87,7 @@ namespace Gridsum.DataflowEx
             LinkBlockToFlow(copyBuffer, other);
         }
 
-        public override void LinkTo(IDataflow<T> other)
+        public override IDataflow<T> LinkTo(IDataflow<T> other)
         {
             if (m_condBuilder.Count == 0)
             {
@@ -100,6 +100,7 @@ namespace Gridsum.DataflowEx
             }
 
             LogHelper.Logger.InfoFormat("{0} now links to its {1}th target ({2})", this.FullName, m_copyBuffers.Count + 1, other.Name);
+            return other;
         }
     }
 }
