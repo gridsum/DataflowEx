@@ -47,6 +47,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             //test result
             Assert.AreEqual(3, context.Seods.Count());
             Assert.AreEqual("b", context.Seods.Find(2).Name);
+            Assert.AreEqual("b", context.Seods.Find(2).Name2);
             Assert.AreEqual(5, context.Seods.Find(2).LegInt);
             Assert.AreEqual("bleg", context.Seods.Find(2).LegString);
             Assert.AreEqual(-2f, context.Seods.First(s => s.Id == 2).Price);
@@ -94,6 +95,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             //test result
             Assert.AreEqual(3, context.Seods.Count());
             Assert.AreEqual("b", context.Seods.Find(2).Name);
+            Assert.AreEqual("b", context.Seods.Find(2).Name2);
             Assert.AreEqual(5, context.Seods.Find(2).LegInt);
             Assert.AreEqual("bleg", context.Seods.Find(2).LegString);
             Assert.AreEqual("LegString2", context.Seods.Find(2).LegString2);
@@ -179,6 +181,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public float? Value { get; set; }
 
         [DBColumnMapping(GSProduct.SEOD, "Name", "default")]
+        [DBColumnMapping(GSProduct.SEOD, "Name2", "default")]
         public string Key { get; set; }
 
         public Leg MyLeg { get; set; }
@@ -206,6 +209,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public float? Value { get; set; }
 
         [DBColumnMapping(GSProduct.SEOD, "Name", "default")]
+        [DBColumnMapping(GSProduct.SEOD, "Name2", "default")]
         public string Key { get; set; }
 
         [NoNullCheck]
@@ -236,6 +240,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public int Id { get; set; }
 
         public string Name { get; set; }
+        public string Name2 { get; set; }
 
         public float Price { get; set; }
         
