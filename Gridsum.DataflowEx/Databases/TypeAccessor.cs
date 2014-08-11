@@ -139,7 +139,7 @@ namespace Gridsum.DataflowEx.Databases
                 foreach (PropertyInfo prop in currentType.GetProperties())
                 {
                     //值类型或引用类型
-                    if (prop.PropertyType.IsValueType || prop.PropertyType == typeof(string))
+                    if (PropertyTreeNode.IsLeafNodeType(prop.PropertyType))
                     {
                         leafs.Add(new LeafPropertyNode(prop, nodeToExpand, m_destLabel));
                     }
@@ -450,12 +450,9 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public bool IsLeafNode
+        public static bool IsLeafNodeType(Type type)
         {
-            get
-            {
-                return ResultType.IsValueType || ResultType == typeof(string);
-            }
+            return type.IsValueType || type == typeof(string) || type == typeof(byte[]);
         }
 
         public bool HasReferenceLoop
@@ -751,6 +748,7 @@ namespace Gridsum.DataflowEx.Databases
         {
             this.DbColumnMappings = this.DbColumnMappings.Where(m => m.DestLabel == destLabel).ToList();
 
+            //safe check for db column mappings in order to fail early rather than insertion time
             foreach (var dbColumnMapping in DbColumnMappings)
             {
                 if (dbColumnMapping.DefaultValue != null)
@@ -784,6 +782,13 @@ namespace Gridsum.DataflowEx.Databases
                             throw new InvalidDBColumnMappingException("The default value has wrong type", dbColumnMapping, this);
                         }
                     }
+                    else if (this.ResultType == typeof(byte[]))
+                    {
+                        if (! (dbColumnMapping.DefaultValue is byte[]))
+                        {
+                            throw new InvalidDBColumnMappingException("The default value has wrong type", dbColumnMapping, this);
+                        }
+                    }
                     else
                     {
                         Debug.Fail("Should not reach here. A leaf node should not have ResultType as class type");
@@ -802,7 +807,5 @@ namespace Gridsum.DataflowEx.Databases
                 //return this.GetExpressionWithDefaultVal(defaultValue);
             }
         }
-        
-        
     }
 }

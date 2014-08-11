@@ -7,6 +7,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
+    using System.Text;
+
     [TestClass]
     public class BulkInserterTest
     {
@@ -62,7 +64,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter_NoNullCheck()
         {
             //init db
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
+            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
             var connectString =
                 @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDbBulkInserter2.mdf;Initial Catalog=dbinserter2;Integrated Security=True;Connect Timeout=30";
@@ -78,11 +80,12 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 DataflowOptions.Default,
                 GSProduct.SEOD);
 
+            var guid = Guid.NewGuid();
             var entities = new Entity3[]
                                {
                                    new Entity3(1) { Key = "a", Value = 0.5f, MyLeg = new Leg() {}},
                                    new Entity3(2) { Key = "b", MyLeg = new Leg() { LegInt = 5, LegString = "bleg" } },
-                                   new Entity3(3) { Value = 0.7f, MyLeg = new Leg()},
+                                   new Entity3(3) { Value = 0.7f, MyLeg = new Leg(), UID = guid, RawData = Encoding.ASCII.GetBytes("abc")},
                                };
 
             foreach (var entity in entities)
@@ -105,6 +108,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             Assert.AreEqual(2, context.Seods.Find(3).LegInt);
             Assert.AreEqual("LegString", context.Seods.Find(3).LegString);
             Assert.AreEqual("LegString2", context.Seods.Find(3).LegString2);
+            Assert.AreEqual(guid, context.Seods.Find(3).Uid);
+            Assert.AreEqual("abc", Encoding.ASCII.GetString(context.Seods.Find(3).RawData));
         }
 
         [TestMethod]
@@ -185,6 +190,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public string Key { get; set; }
 
         public Leg MyLeg { get; set; }
+
+        [DBColumnMapping(GSProduct.SEOD, "Uid")]
+        public Guid UID { get; set; }
     }
 
     public class Entity3
@@ -214,6 +222,12 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
         [NoNullCheck]
         public Leg MyLeg { get; set; }
+
+        [DBColumnMapping(GSProduct.SEOD, "Uid")]
+        public Guid UID { get; set; }
+
+        [DBColumnMapping(GSProduct.SEOD, "RawData")]
+        public byte[] RawData { get; set; }
     }
 
     public class Leg
@@ -247,6 +261,10 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public string LegString { get; set; }
         public string LegString2 { get; set; }
         public int LegInt { get; set; }
+
+        public Guid Uid { get; set; }
+
+        public byte[] RawData { get; set; }
     }
 
     public class InsertContext : DbContext
