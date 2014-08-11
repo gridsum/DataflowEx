@@ -225,7 +225,10 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [DBColumnMapping(GSProduct.SEOD, "Uid")]
         public Guid UID { get; set; }
 
-        [DBColumnMapping(GSProduct.SEOD, "RawData")]
+        [DBColumnMapping(GSProduct.SEOD, "Uid")]
+        public Guid UID2 { get; set; }
+
+        [DBColumnMapping(GSProduct.SEOD)]
         public byte[] RawData { get; set; }
     }
 

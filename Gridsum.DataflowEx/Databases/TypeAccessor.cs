@@ -748,7 +748,7 @@ namespace Gridsum.DataflowEx.Databases
         {
             this.DbColumnMappings = this.DbColumnMappings.Where(m => m.DestLabel == destLabel).ToList();
 
-            //safe check for db column mappings in order to fail early rather than insertion time
+            //type safety check for db column mappings in order to fail early rather than insertion time
             foreach (var dbColumnMapping in DbColumnMappings)
             {
                 if (dbColumnMapping.DefaultValue != null)
