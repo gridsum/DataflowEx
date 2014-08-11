@@ -24,8 +24,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
             context.SaveChanges();
-
-
+            
             var inserter = new DbBulkInserter<Entity2>(
                 connectString,
                 "dbo.Seods",
@@ -39,12 +38,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                                    new Entity2(3) { Value = 0.7f },
                                };
 
-            foreach (var entity in entities)
-            {
-                inserter.InputBlock.SafePost(entity);
-            }
-            inserter.InputBlock.Complete();
-            inserter.CompletionTask.Wait();
+            inserter.ProcessAsync(entities, true).Wait();
 
             //test result
             Assert.AreEqual(3, context.Seods.Count());
@@ -84,16 +78,21 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             var entities = new Entity3[]
                                {
                                    new Entity3(1) { Key = "a", Value = 0.5f, MyLeg = new Leg() {}},
-                                   new Entity3(2) { Key = "b", MyLeg = new Leg() { LegInt = 5, LegString = "bleg" } },
-                                   new Entity3(3) { Value = 0.7f, MyLeg = new Leg(), UID = guid, RawData = Encoding.ASCII.GetBytes("abc")},
+                                   new Entity3(2) { Key = "b", MyLeg = new Leg() { LegInt = 5, LegString = "bleg" } }
                                };
 
-            foreach (var entity in entities)
-            {
-                inserter.InputBlock.SafePost(entity);
-            }
-            inserter.InputBlock.Complete();
-            inserter.CompletionTask.Wait();
+            var entities2 = new[]
+                                {
+                                    new Entity3(3)
+                                        {
+                                            Value = 0.7f,
+                                            MyLeg = new Leg(),
+                                            UID = guid,
+                                            RawData = Encoding.ASCII.GetBytes("abc")
+                                        }
+                                };
+
+            inserter.ProcessMultipleAsync(true, entities, entities2).Wait();
 
             //test result
             Assert.AreEqual(3, context.Seods.Count());

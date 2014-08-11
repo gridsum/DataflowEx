@@ -406,6 +406,90 @@ namespace Gridsum.DataflowEx
                 return "my input block " + this.InputBlock.GetType().GetFriendlyName();
             }
         }
+
+        /// <summary>
+        /// Asynchronously read from the enumerable and process items in the underlying dataflow.
+        /// </summary>
+        /// <param name="enumerable">The enumerable to read from</param>
+        /// <param name="completeFlowOnFinish">
+        /// Whether a complete signal should be sent to the dataflow. 
+        /// If yes, it also ensures that the whole processing dataflow is completed before the ProcessAsync() task ends.
+        /// Default to yes. Set the param to false if the dataflow will read other enumerables/streams after this operation.
+        /// </param>
+        /// <returns>A task representing state of the async operation which returns the total count of items processed in this method</returns>
+        public virtual async Task<long> ProcessAsync(IEnumerable<TIn> enumerable, bool completeFlowOnFinish = true)
+        {
+            var cts = new CancellationTokenSource();
+            Task<long> readAndPostTask = this.PullFromAsync(enumerable, cts.Token);
+            this.RegisterCancellationTokenSource(cts);
+
+            long count;
+            try
+            {
+                count = await readAndPostTask;
+                LogHelper.Logger.InfoFormat("{0} Finished reading from enumerable and posting to the dataflow.", this.FullName);
+            }
+            catch (OperationCanceledException oce)
+            {
+                LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
+                throw;
+            }
+
+            if (completeFlowOnFinish)
+            {
+                await this.SignalAndWaitForCompletionAsync();
+            }
+
+            return count;
+        }
+
+        protected async Task SignalAndWaitForCompletionAsync()
+        {
+            LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
+            this.InputBlock.Complete(); //no more input
+            await this.CompletionTask;
+        }
+
+        /// <summary>
+        /// Asynchronously read from the enumerables sequentially and process items in the underlying dataflow.
+        /// </summary>
+        /// <param name="enumerables">The enumerables to read from</param>
+        /// <param name="completeLogReaderOnFinish">
+        /// Whether a complete signal should be sent to the dataflow. 
+        /// If yes, it also ensures that the whole processing dataflow is completed before the ProcessAsync() task ends.
+        /// Default to yes. Set the param to false if the log reader will read other enumerables after this operation.
+        /// </param>
+        /// <returns>A task representing the state of the async operation which returns the total count of items processed in this method</returns>
+        public virtual async Task<long> ProcessMultipleAsync(IEnumerable<IEnumerable<TIn>> enumerables, bool completeLogReaderOnFinish = true)
+        {
+            long count = 0;
+            foreach (var enumerable in enumerables)
+            {
+                count += await ProcessAsync(enumerable, false);
+            }
+
+            if (completeLogReaderOnFinish)
+            {
+                await this.SignalAndWaitForCompletionAsync();
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Asynchronously read from the enumerables sequentially and process items in the underlying dataflow.
+        /// </summary>
+        /// <param name="completeLogReaderOnFinish">
+        /// Whether a complete signal should be sent to the dataflow. 
+        /// If yes, it also ensures that the whole processing dataflow is completed before the ProcessAsync() task ends.
+        /// Default to yes. Set the param to false if the log reader will read other enumerables after this operation.
+        /// </param>
+        /// <param name="enumerables">The enumerables to read from</param>
+        /// <returns>A task representing the state of the async operation which returns the total count of items processed in this method</returns>
+        public virtual Task<long> ProcessMultipleAsync(bool completeLogReaderOnFinish, params IEnumerable<TIn>[] enumerables)
+        {
+            return ProcessMultipleAsync(enumerables, completeLogReaderOnFinish);
+        }
     }
 
     public abstract class Dataflow<TIn, TOut> : Dataflow<TIn>, IDataflow<TIn, TOut>
