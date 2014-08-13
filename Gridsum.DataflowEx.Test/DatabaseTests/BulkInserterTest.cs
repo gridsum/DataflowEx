@@ -156,7 +156,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 Assert.IsTrue(curContext.Seods.FirstOrDefault().Name.Length == 1);
                 Assert.IsTrue(curContext.Seods.FirstOrDefault().Name2.Length == 1);
             }
-
         }
     }
     

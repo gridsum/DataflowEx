@@ -10,6 +10,7 @@ using System.Reflection;
 namespace Gridsum.DataflowEx.Databases
 {
     using System.Collections;
+    using System.Collections.Immutable;
     using System.Diagnostics;
     using Common.Logging;
 
@@ -415,6 +416,13 @@ namespace Gridsum.DataflowEx.Databases
             return m_dbColumnMappings.FirstOrDefault(b => b.DestColumnOffset == colId);
         }
 
+        public ImmutableList<DBColumnMapping> DbColumnMappings
+        {
+            get
+            {
+                return m_dbColumnMappings.ToImmutableList();
+            }
+        }
         #endregion
     }
 
