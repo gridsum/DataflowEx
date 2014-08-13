@@ -144,12 +144,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 new Entity2(3, 3f, "f")
             };
 
-            foreach (var x in entities)
-            {
-                multiDbBulkInserter.InputBlock.Post(x);
-            }
-            multiDbBulkInserter.InputBlock.Complete();
-            multiDbBulkInserter.CompletionTask.Wait();
+            multiDbBulkInserter.ProcessAsync(entities).Wait();
 
             //assert result
             for (int i = 1; i <= profileIdCount; ++i)
@@ -158,6 +153,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 var curContext = new InsertContext(connString);
                 Assert.AreEqual(i, curContext.Seods.Count());
                 Assert.AreEqual(i, curContext.Seods.FirstOrDefault().Price);
+                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name.Length == 1);
+                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name2.Length == 1);
             }
 
         }
