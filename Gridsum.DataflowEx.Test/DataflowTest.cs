@@ -81,7 +81,7 @@ namespace Gridsum.DataflowEx.Test
             var container1 = DataflowUtils.FromBlock(block1);
             var container2 = DataflowUtils.FromBlock(block2);
 
-            container1.LinkTo(container2).LinkTo(container1); //circular
+            container1.GoTo(container2).GoTo(container1); //circular
             
             container1.InputBlock.Post(1);
             await Task.Delay(1000); //IMPORTANT: wait for block work done (nothing left in their input/output queue)

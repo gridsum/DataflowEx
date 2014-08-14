@@ -38,17 +38,8 @@ namespace Gridsum.DataflowEx
                         return arg;
                     });
 
-            m_transformBlock.Completion.ContinueWith(t =>
-            {
-                //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
-                if (t.Status == TaskStatus.RanToCompletion) 
-                {
-                    foreach (var bufferBlock in m_copyBuffers)
-                    {
-                        bufferBlock.Complete();
-                    }
-                }
-            });
+            //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
+            m_transformBlock.LinkNormalCompletionTo(() => m_copyBuffers);
 
             RegisterChild(m_transformBlock);
         }
@@ -87,7 +78,7 @@ namespace Gridsum.DataflowEx
             LinkBlockToFlow(copyBuffer, other);
         }
 
-        public override IDataflow<T> LinkTo(IDataflow<T> other)
+        public override IDataflow<T> GoTo(IDataflow<T> other)
         {
             if (m_condBuilder.Count == 0)
             {

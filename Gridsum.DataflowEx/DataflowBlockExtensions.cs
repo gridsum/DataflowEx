@@ -10,6 +10,8 @@ using Gridsum.DataflowEx.Exceptions;
 
 namespace Gridsum.DataflowEx
 {
+    using System.Collections.Immutable;
+
     public static class DataflowBlockExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,6 +72,34 @@ namespace Gridsum.DataflowEx
 //            }
 
             throw new ArgumentException("Fail to auto-detect buffer count of block: " + Utils.GetFriendlyName(block.GetType()), "block");
+        }
+
+        /// <summary>
+        /// Link the block's success completion to other blocks. If the block failed or is canceled, nothing will be done.
+        /// </summary>
+        public static void LinkNormalCompletionTo(this IDataflowBlock block, Func<IEnumerable<IDataflowBlock>> blocksGetter)
+        {
+            LinkNormalCompletionTo(block, blocksGetter());    
+        }
+
+        public static void LinkNormalCompletionTo(this IDataflowBlock block, IDataflowBlock downStreamBlock)
+        {
+            LinkNormalCompletionTo(block, new [] {downStreamBlock});
+        }
+
+        private static void LinkNormalCompletionTo(this IDataflowBlock block, IEnumerable<IDataflowBlock> blocks)
+        {
+            block.Completion.ContinueWith(t =>
+            {
+                //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
+                if (t.Status == TaskStatus.RanToCompletion)
+                {
+                    foreach (var bufferBlock in blocks)
+                    {
+                        bufferBlock.Complete();
+                    }
+                }
+            });
         }
     }
 }

@@ -21,6 +21,7 @@ namespace Gridsum.DataflowEx
     public interface IOutputDataflow<out TOut> : IDataflow
     {
         ISourceBlock<TOut> OutputBlock { get; }
+        void LinkTo(IDataflow<TOut> other);
     }
 
     public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>, IOutputDataflow<TOut>

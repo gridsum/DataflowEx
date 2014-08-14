@@ -7,8 +7,10 @@
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
+    using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
 
+    using Gridsum.DataflowEx.AutoCompletion;
     using Gridsum.DataflowEx.Databases;
 
     public struct JoinBatch<TIn> where TIn : class
@@ -32,20 +34,25 @@
 
     public class DbDataJoiner<TIn, TKey, TUpdate> : Dataflow<TIn, TIn> where TIn : class 
     {
-        class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>
+        class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>
         {
             private Func<TIn, TKey> m_keyGetter;
+            private BufferBlock<JoinBatch<TIn>> m_outputBlock;
 
             public DimTableInserter(TargetTable targetTable, Expression<Func<TIn, TKey>> joinBy)
                 : base(targetTable, DataflowOptions.Default)
             {
                 m_keyGetter = joinBy.Compile();
+                m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
+
+                RegisterChild(m_outputBlock);
+
+                m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
             }
-            
-            protected override IEnumerable<TIn> PreprocessBatch(TIn[] array)
+
+            protected override ICollection<TIn> PreprocessBatch(TIn[] array)
             {
-                //todo: deduplicate by Expression<Func<TIn, TKey>> joinBy
-                return array.Distinct(this);
+                return array.Distinct(this).ToArray();
             }
 
             public bool Equals(TIn x, TIn y)
@@ -57,24 +64,42 @@
             {
                 return m_keyGetter(obj).GetHashCode();
             }
+
+            protected override async Task OnPostBulkInsert(SqlConnection sqlConnection, TargetTable target, ICollection<TIn> insertedData)
+            {
+                var redoBatch = new JoinBatch<TIn>((TIn[])insertedData, CacheRefreshStrategy.Always);
+                m_outputBlock.SafePost(redoBatch);
+                await base.OnPostBulkInsert(sqlConnection, target, insertedData);
+            }
+
+            public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
+            {
+                return m_outputBlock;
+            } }
+
+            public void LinkTo(IDataflow<JoinBatch<TIn>> other)
+            {
+                this.LinkBlockToFlow(m_outputBlock, other);
+            }
         }
         
         private readonly TargetTable m_dimTableTarget;
         private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private TransformManyBlock<JoinBatch<TIn>, TIn> m_lookupBlock;
+        private Dataflow<JoinBatch<TIn>, TIn> m_lookupNode;
         private DBColumnMapping m_joinByMapping;
         private DBColumnMapping m_updateOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
-        
+        private DimTableInserter m_dimInserter;
+
         public DbDataJoiner(Expression<Func<TIn, TKey>> joinBy, Expression<Func<TIn, TUpdate>> updateOn,
             TargetTable dimTableTarget, int batchSize)
             : base(DataflowOptions.Default)
         {
-            this.m_dimTableTarget = dimTableTarget;
+            m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupBlock = new TransformManyBlock<JoinBatch<TIn>, TIn>(new Func<JoinBatch<TIn>, IEnumerable<TIn>>(this.JoinBatch));
+            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, TIn>(new Func<JoinBatch<TIn>, IEnumerable<TIn>>(this.JoinBatch)).ToDataflow("LookupNode");
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
             m_joinByMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinBy));
@@ -85,10 +110,17 @@
                     array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never));
 
             m_batchBlock.LinkTo(transformer);
-            transformer.LinkTo(m_lookupBlock);
+            m_lookupNode.LinkFrom(transformer);
 
-            RegisterChild(this.m_batchBlock);
-            RegisterChild(this.m_lookupBlock, displayName: "LookupBlock");
+            RegisterChild(m_batchBlock);
+            RegisterChild(m_lookupNode);
+
+            m_dimInserter = new DimTableInserter(dimTableTarget, joinBy);
+            var hb = new HeartbeatNode<JoinBatch<TIn>>();
+
+            m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
+            m_dimInserter.LinkTo(hb);
+            hb.LinkTo(m_lookupNode);
         }
 
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
@@ -134,6 +166,7 @@
                 else
                 {
                     //todo: not found in the cache table, as secondly output
+                    m_dimInserter.InputBlock.SafePost(input);
                 }
             }
         }
@@ -150,7 +183,7 @@
         {
             get
             {
-                return this.m_lookupBlock;
+                return m_lookupNode.OutputBlock;
             }
         }
     }

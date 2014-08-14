@@ -23,7 +23,7 @@ namespace Gridsum.DataflowEx
             m_b1 = b1;
             m_b2 = b2;
 
-            m_b1.LinkTo(m_b2);
+            m_b1.GoTo(m_b2);
 
             RegisterChild(m_b1);
             RegisterChild(m_b2);
@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx
             m_b2 = b2;
             m_b3 = b3;
 
-            m_b1.LinkTo(m_b2).LinkTo(m_b3);
+            m_b1.GoTo(m_b2).GoTo(m_b3);
             
             RegisterChild(m_b1);
             RegisterChild(m_b2);

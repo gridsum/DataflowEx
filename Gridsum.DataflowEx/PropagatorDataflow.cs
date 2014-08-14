@@ -31,5 +31,12 @@ namespace Gridsum.DataflowEx
             get { return m_block; }
         }
 
+        public override string Name
+        {
+            get
+            {
+                return base.Name;
+            }
+        }
     }
 }

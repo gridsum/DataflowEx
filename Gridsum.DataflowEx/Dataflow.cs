@@ -55,6 +55,13 @@ namespace Gridsum.DataflowEx
         public virtual string Name
         {
             get { return m_defaultName; }
+            set
+            {
+                if (value != null)
+                {
+                    m_defaultName = value;
+                }
+            }
         }
 
         public string FullName
@@ -262,6 +269,8 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentException("The child ring contains a non-child: " + nonChild.FullName);
             }
 
+            //todo: check if it is a real ring
+
             string ringName = this.GetRingDisplayName(ringNodes);
 
             LogHelper.Logger.InfoFormat("{0} A ring is set up: {1}", this.FullName, ringName);
@@ -397,6 +406,52 @@ namespace Gridsum.DataflowEx
             {
                 return BufferStatus.Total();                
             }
+        }
+
+        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
+        {
+            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
+
+            //manullay handle inter-dataflow problem
+            //we use WhenAll here to make sure this dataflow fails before propogating to other dataflow
+            Task.WhenAll(block.Completion, this.CompletionTask).ContinueWith(whenAllTask =>
+            {
+                if (!otherDataflow.CompletionTask.IsCompleted)
+                {
+                    if (whenAllTask.IsFaulted)
+                    {
+                        otherDataflow.Fault(new LinkedDataflowFailedException());
+                    }
+                    else if (whenAllTask.IsCanceled)
+                    {
+                        otherDataflow.Fault(new LinkedDataflowCanceledException());
+                    }
+                    else
+                    {
+                        otherDataflow.InputBlock.Complete();
+                    }
+                }
+            });
+
+            //Make sure other dataflow also fails me
+            otherDataflow.CompletionTask.ContinueWith(otherTask =>
+            {
+                if (this.CompletionTask.IsCompleted)
+                {
+                    return;
+                }
+
+                if (otherTask.IsFaulted)
+                {
+                    LogHelper.Logger.InfoFormat("{0} Downstream dataflow faulted before I am done. Fault myself.", this.FullName);
+                    this.Fault(new LinkedDataflowFailedException());
+                }
+                else if (otherTask.IsCanceled)
+                {
+                    LogHelper.Logger.InfoFormat("{0} Downstream dataflow canceled before I am done. Cancel myself.", this.FullName);
+                    this.Fault(new LinkedDataflowCanceledException());
+                }
+            });
         }
     }
 
@@ -577,62 +632,21 @@ namespace Gridsum.DataflowEx
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
         
-        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
+        public void LinkTo(IDataflow<TOut> other)
         {
-            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
-
-            //manullay handle inter-dataflow problem
-            //we use WhenAll here to make sure this dataflow fails before propogating to other dataflow
-            Task.WhenAll(block.Completion, this.CompletionTask).ContinueWith(whenAllTask => 
-                {
-                    if (!otherDataflow.CompletionTask.IsCompleted)
-                    {
-                        if (whenAllTask.IsFaulted)
-                        {
-                            otherDataflow.Fault(new LinkedDataflowFailedException());
-                        }
-                        else if (whenAllTask.IsCanceled)
-                        {
-                            otherDataflow.Fault(new LinkedDataflowCanceledException());
-                        }
-                        else
-                        {
-                            otherDataflow.InputBlock.Complete();
-                        }
-                    }
-                });
-
-            //Make sure other dataflow also fails me
-            otherDataflow.CompletionTask.ContinueWith(otherTask =>
-                {
-                    if (this.CompletionTask.IsCompleted)
-                    {
-                        return;
-                    }
-
-                    if (otherTask.IsFaulted)
-                    {
-                        LogHelper.Logger.InfoFormat("{0} Downstream dataflow faulted before I am done. Fault myself.", this.FullName);
-                        this.Fault(new LinkedDataflowFailedException());
-                    }
-                    else if (otherTask.IsCanceled)
-                    {
-                        LogHelper.Logger.InfoFormat("{0} Downstream dataflow canceled before I am done. Cancel myself.", this.FullName);
-                        this.Fault(new LinkedDataflowCanceledException());
-                    }
-                });
+            this.GoTo(other);
         }
 
-        public virtual IDataflow<TOut> LinkTo(IDataflow<TOut> other)
+        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other)
         {
             m_condBuilder.Add(new Predicate<TOut>(@out => true));
             LinkBlockToFlow(this.OutputBlock, other);
             return other;
         }
 
-        public Dataflow<TOut, TNext> LinkTo<TNext>(Dataflow<TOut, TNext> other)
+        public Dataflow<TOut, TNext> GoTo<TNext>(Dataflow<TOut, TNext> other)
         {
-            return LinkTo(other as IDataflow<TOut>) as Dataflow<TOut, TNext>;
+            return GoTo(other as IDataflow<TOut>) as Dataflow<TOut, TNext>;
         }
 
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)

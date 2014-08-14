@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace Gridsum.DataflowEx
 {
     using System.Collections.Concurrent;
+    using System.Collections.Immutable;
     using System.Threading.Tasks.Dataflow;
 
     /// <summary>
@@ -47,20 +48,11 @@ namespace Gridsum.DataflowEx
                         childFlow.InputBlock.SafePost(input);
                     });
 
-            RegisterChild(m_dispatcherBlock, t =>
-            {
-                //propagate completion to children as we don't have 'link'
-                if (t.Status == TaskStatus.RanToCompletion)
-                {
-                    foreach (var kvPair in m_destinations)
-                    {
-                        var childFlow = kvPair.Value.Value;
-                        childFlow.InputBlock.Complete();
-                    }
-                }
+            RegisterChild(m_dispatcherBlock);
 
-                //no need to propagate errors as register handles that (given that dyamic blocks are registered)
-            });
+            //propagate completion to children as we don't have 'link'
+            //no need to propagate errors as register handles that (given that dyamic blocks are registered)
+            m_dispatcherBlock.LinkNormalCompletionTo(() => m_destinations.Values.Select(_=>_.Value.InputBlock).ToList());
         }
 
         /// <summary>
