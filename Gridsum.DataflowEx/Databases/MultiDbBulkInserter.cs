@@ -17,7 +17,7 @@ namespace Gridsum.DataflowEx.Databases
         private DataflowOptions m_options;
         private int m_bulkSize;
         private readonly string m_displayName;
-        private readonly PostBulkInsertDelegate m_postBulkInsert;
+        private readonly PostBulkInsertDelegate<T> m_postBulkInsert;
 
         public MultiDbBulkInserter(DataflowOptions options, 
             Func<T, int> dispatchFunc, 
@@ -26,7 +26,7 @@ namespace Gridsum.DataflowEx.Databases
             string destLabel, 
             int bulkSize = 4096 * 2, 
             string displayName = null,
-            PostBulkInsertDelegate postBulkInsert = null)
+            PostBulkInsertDelegate<T> postBulkInsert = null)
             : base(dispatchFunc)
         {
             m_options = options;

@@ -61,9 +61,11 @@
     <Compile Include="AutoCompletion\AutoCompleteWrapper.cs" />
     <Compile Include="AutoCompletion\ControlItem.cs" />
     <Compile Include="AutoCompletion\ControlType.cs" />
+    <Compile Include="AutoCompletion\HeartbeatNode.cs" />
     <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
-    <Compile Include="Databases\DbDataJoiner.cs" />
+    <Compile Include="Databases\TargetTable.cs" />
+    <Compile Include="ETL\DbDataJoiner.cs" />
     <Compile Include="Databases\InvalidDBColumnMappingException.cs" />
     <Compile Include="Databases\NoNullCheckAttribute.cs" />
     <Compile Include="DataDispatcher.cs" />

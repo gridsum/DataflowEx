@@ -54,7 +54,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             using (var connection = new SqlConnection(connectString))
             {
                 connection.Open();
-                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorByDestLabel("NestClassTest", connectString, "dbo.AEFs");
+                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorForTable(new TargetTable("NestClassTest", connectString, "dbo.AEFs"));
                 var aReader = new BulkDataReader<ABulk>(aTypeAccessor, new[] { a1, a2, a3, a4 });
                 using (var aCopy = new SqlBulkCopy(connection))
                 {

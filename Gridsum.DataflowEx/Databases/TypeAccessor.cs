@@ -16,11 +16,11 @@ namespace Gridsum.DataflowEx.Databases
 
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly ConcurrentDictionary<string, Lazy<TypeAccessor<T>>> m_accessors;
+        private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> m_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new ConcurrentDictionary<string, Lazy<TypeAccessor<T>>>();
+            m_accessors = new ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>>();
         }
 
         private TypeAccessorManager()
@@ -35,10 +35,9 @@ namespace Gridsum.DataflowEx.Databases
         /// <param name="connectionString"></param>
         /// <param name="dataTableName"></param>
         /// <returns></returns>
-        public static TypeAccessor<T> GetAccessorByDestLabel(string destLabel, string connectionString,
-            string dataTableName)
+        public static TypeAccessor<T> GetAccessorForTable(TargetTable target)
         {
-            return m_accessors.GetOrAdd(destLabel, s => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(s, connectionString, dataTableName))).Value;
+            return m_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
         }
     }
 
@@ -54,13 +53,13 @@ namespace Gridsum.DataflowEx.Databases
 
         #region ctor and init
 
-        public TypeAccessor(string destLabel, string connectionString, string destinationTableName)
+        public TypeAccessor(TargetTable target)
         {
-            m_destLabel = destLabel;
-            m_connectionString = connectionString;
-            m_destinationTablename = string.IsNullOrWhiteSpace(destinationTableName)
+            m_destLabel = target.DestLabel;
+            m_connectionString = target.ConnectionString;
+            m_destinationTablename = string.IsNullOrWhiteSpace(target.TableName)
                 ? typeof (T).Name
-                : destinationTableName;
+                : target.TableName;
             m_schemaTable = null;
             m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();

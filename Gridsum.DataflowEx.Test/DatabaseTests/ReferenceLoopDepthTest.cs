@@ -68,7 +68,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 connection.Open();
 
                 var tableName = "dbo.LoopEntities";
-                var accessor = TypeAccessorManager<LoopA>.GetAccessorByDestLabel(GSProduct.AD, connectString, tableName);
+                var accessor = TypeAccessorManager<LoopA>.GetAccessorForTable(new TargetTable(GSProduct.AD, connectString, tableName));
                 var reader = new BulkDataReader<LoopA>(accessor, new[] { loopA });
                 using (var bulkCopy = new SqlBulkCopy(connection))
                 {

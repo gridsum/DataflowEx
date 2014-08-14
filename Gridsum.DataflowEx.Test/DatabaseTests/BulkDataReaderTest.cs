@@ -118,7 +118,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 connection.Open();
 
                 // Wd:
-                var wdAccessor = TypeAccessorManager<Entity>.GetAccessorByDestLabel(GSProduct.WD, connectString, "dbo.Wds");
+                var wdAccessor = TypeAccessorManager<Entity>.GetAccessorForTable(new TargetTable(GSProduct.WD, connectString, "dbo.Wds"));
                 var wdReader2 = new BulkDataReader<Entity>(wdAccessor, entities);
                 using (var bulkCopy = new SqlBulkCopy(connection))
                 {
@@ -132,8 +132,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 }
 
                 //Cd:
-                var cdAccessor = TypeAccessorManager<Entity>.GetAccessorByDestLabel(GSProduct.CD, connectString,
-                    "dbo.Cds");
+                var cdAccessor = TypeAccessorManager<Entity>.GetAccessorForTable(new TargetTable(GSProduct.CD, connectString,"dbo.Cds"));
                 var cdReader2 = new BulkDataReader<Entity>(cdAccessor, entities);
                 using (var bulkCopy = new SqlBulkCopy(connection))
                 {
@@ -148,7 +147,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
                 //Wd 2: use debug model to test whether this new WdAccessor is new build or not
                 //right: this WdAccessor should just get from TypeAccessorManager, it can not be rebuild.
-                var wdAccessor2 = TypeAccessorManager<Entity>.GetAccessorByDestLabel(GSProduct.WD, connectString, "dbo.Wds");
+                var wdAccessor2 =
+                    TypeAccessorManager<Entity>.GetAccessorForTable(
+                        new TargetTable(GSProduct.WD, connectString, "dbo.Wds"));
                 var wdReader22 = new BulkDataReader<Entity>(wdAccessor2, entities2);
                 using (var bulkCopy = new SqlBulkCopy(connection))
                 {
