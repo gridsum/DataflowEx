@@ -101,11 +101,13 @@ namespace Gridsum.DataflowEx
     internal class BlockMeta : ChildMetaBase
     {
         private readonly IDataflowBlock m_block;
+        private readonly string m_displayName;
         private readonly Task m_completion;
 
-        public BlockMeta(IDataflowBlock block, Dataflow host, Action<Task> completionCallback = null) : base(host, completionCallback)
+        public BlockMeta(IDataflowBlock block, Dataflow host, Action<Task> completionCallback = null, string displayName = null) : base(host, completionCallback)
         {
             m_block = block;
+            this.m_displayName = displayName;
             m_completion = GetWrappedCompletion(m_block.Completion);
         }
 
@@ -117,7 +119,7 @@ namespace Gridsum.DataflowEx
 
         public override string DisplayName
         {
-            get { return string.Format("{0}->({1})", m_host.FullName, this.m_block.GetType().GetFriendlyName()); }
+            get { return string.Format("{0}->({1})", m_host.FullName, m_displayName ?? m_block.GetType().GetFriendlyName()); }
         }
 
         public override void Fault(Exception e)

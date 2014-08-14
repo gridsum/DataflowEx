@@ -18,8 +18,12 @@ namespace Gridsum.DataflowEx
         ITargetBlock<TIn> InputBlock { get; }
     }
 
-    public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>
+    public interface IOutputDataflow<out TOut> : IDataflow
     {
         ISourceBlock<TOut> OutputBlock { get; }
+    }
+
+    public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>, IOutputDataflow<TOut>
+    {
     }
 }

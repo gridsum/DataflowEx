@@ -14,6 +14,8 @@ namespace Gridsum.DataflowEx
 {
     using System.IO;
 
+    using Gridsum.DataflowEx.AutoCompletion;
+
     /// <summary>
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
     /// may contain one or multiple children. A child could be either a block or a dataflow
@@ -94,14 +96,14 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Register this block to block meta. Also make sure the dataflow will fail if the registered block fails.
         /// </summary>
-        public void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null, bool allowDuplicate = false)
+        public void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null, bool allowDuplicate = false, string displayName = null)
         {
             if (block == null)
             {
                 throw new ArgumentNullException("block");
             }
 
-            RegisterChild(new BlockMeta(block, this, blockCompletionCallback), allowDuplicate);
+            RegisterChild(new BlockMeta(block, this, blockCompletionCallback, displayName), allowDuplicate);
         }
 
         public void RegisterChild(Dataflow childFlow, Action<Task> dataflowCompletionCallback = null, bool allowDuplicate = false)
@@ -135,6 +137,11 @@ namespace Gridsum.DataflowEx
             }
 
             return false;
+        }
+
+        private bool IsMyChild(IDataflow flow)
+        {
+            return m_children.Any(child => object.ReferenceEquals(child.Unwrap(), flow));
         }
 
         internal void RegisterChild(IDataflowChildMeta childMeta, bool allowDuplicate)
@@ -227,6 +234,62 @@ namespace Gridsum.DataflowEx
             {
                 LogHelper.Logger.ErrorFormat("{0} Error occurred in my performance monitor loop. Monitoring stopped.", e, this.FullName);
             }
+        }
+
+        /// <summary>
+        /// Register a continuous ring completion check after the preTask ends.
+        /// When the checker thinks the ring is O.K. to shut down, it will pull the trigger 
+        /// of heartbeat node in the ring. Then nodes in the ring will shut down one by one
+        /// </summary>
+        /// <param name="preTask">The task after which ring check begins</param>
+        /// <param name="ringNodes">Child dataflows that forms a ring</param>
+        protected async void RegisterChildRing(Task preTask, params Dataflow[] ringNodes)
+        {
+            if (ringNodes.Length == 0)
+            {
+                throw new ArgumentException("The child ring contains nothing");
+            }
+
+            var hb = ringNodes.OfType<IHeartbeatNode>().FirstOrDefault();
+            if (hb == null)
+            {
+                throw new ArgumentException("A ring must contain at least one IHeartbeatNode");
+            }
+
+            var nonChild = ringNodes.FirstOrDefault(r => { return !this.IsMyChild(r); });
+            if (nonChild != null)
+            {
+                throw new ArgumentException("The child ring contains a non-child: " + nonChild.FullName);
+            }
+
+            string ringName = this.GetRingDisplayName(ringNodes);
+
+            LogHelper.Logger.InfoFormat("{0} A ring is set up: {1}", this.FullName, ringName);
+            await preTask;
+            LogHelper.Logger.InfoFormat("{0} Ring pretask done. Starting check loop for {1}", this.FullName, ringName);
+
+            while (true)
+            {
+                long before = hb.ProcessedItemCount;
+                int buffered = ringNodes.Sum(r => r.BufferedCount) + ringNodes[0].BufferedCount;
+                long after = hb.ProcessedItemCount;
+
+                if (buffered == 0 && before == after)
+                {
+                    hb.Complete(); //start the completion domino :)
+                    break;
+                }
+
+                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10) /* todo: use static value */);
+            }
+
+            LogHelper.Logger.InfoFormat("{0} Ring check loop done. Completion in heartbeat node triggered: {1}", this.FullName, ringName);
+        }
+
+        private string GetRingDisplayName(Dataflow[] ringNodes)
+        {
+            string ringString = string.Join("=>", ringNodes.Select(n => n.Name));
+            return string.Format("{0}->({1})", this.FullName, ringString);
         }
 
         protected virtual async Task GetCompletionTask()
