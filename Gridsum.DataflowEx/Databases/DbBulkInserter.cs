@@ -46,9 +46,8 @@ namespace Gridsum.DataflowEx.Databases
             m_batchBlock = new BatchBlock<T>(bulkSize);
             m_actionBlock = new ActionBlock<T[]>(async array =>
             {
-                var preprocessedArray = this.PreprocessBatch(array);
                 LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
-                await DumpToDB(preprocessedArray, targetTable);
+                await DumpToDB(array, targetTable);
                 LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
             });
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
@@ -57,7 +56,7 @@ namespace Gridsum.DataflowEx.Databases
             RegisterChild(m_actionBlock);
         }
 
-        protected async virtual Task DumpToDB(ICollection<T> data, TargetTable targetTable)
+        protected async virtual Task DumpToDB(T[] data, TargetTable targetTable)
         {
             using (var bulkReader = new BulkDataReader<T>(TypeAccessorManager<T>.GetAccessorForTable(targetTable), data))
             {
@@ -123,17 +122,12 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        protected virtual async Task OnPostBulkInsert(SqlConnection sqlConnection, TargetTable target, ICollection<T> insertedData)
+        protected virtual async Task OnPostBulkInsert(SqlConnection sqlConnection, TargetTable target, T[] insertedData)
         {
             if (m_postBulkInsert != null)
             {
                 await m_postBulkInsert(sqlConnection, m_targetTable, insertedData);
             }
-        }
-
-        protected virtual ICollection<T> PreprocessBatch(T[] array)
-        {
-            return array;
         }
     }
 

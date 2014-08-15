@@ -34,6 +34,12 @@
 
     public class DbDataJoiner<TIn, TKey, TUpdate> : Dataflow<TIn, KeyValuePair<TIn, TUpdate>> where TIn : class 
     {
+        /// <summary>
+        /// Used by the joiner to insert unmatched rows to the dim table.
+        /// 2 differences between this and standard db bulkinserter:
+        /// (1) It has a preprocess step to select distinct rows
+        /// (2) It will output original data out tagged with CacheRefreshStrategy.Always
+        /// </summary>
         class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>
         {
             private Func<TIn, TKey> m_keyGetter;
@@ -47,14 +53,18 @@
                 RegisterChild(m_outputBlock);
                 m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
             }
-
-            protected override ICollection<TIn> PreprocessBatch(TIn[] array)
+            
+            protected override async Task DumpToDB(TIn[] data, TargetTable targetTable)
             {
-                int oldCount = array.Length;
-                var newArray = array.Distinct(this).ToArray();
+                int oldCount = data.Length;
+                var newArray = data.Distinct(this).ToArray();
                 int newCount = newArray.Length;
                 LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
-                return newArray;
+
+                await base.DumpToDB(newArray, targetTable);
+
+                var redoBatch = new JoinBatch<TIn>(data, CacheRefreshStrategy.Always);
+                m_outputBlock.SafePost(redoBatch);
             }
 
             public bool Equals(TIn x, TIn y)
@@ -66,14 +76,7 @@
             {
                 return m_keyGetter(obj).GetHashCode();
             }
-
-            protected override async Task OnPostBulkInsert(SqlConnection sqlConnection, TargetTable target, ICollection<TIn> insertedData)
-            {
-                var redoBatch = new JoinBatch<TIn>((TIn[])insertedData, CacheRefreshStrategy.Always);
-                m_outputBlock.SafePost(redoBatch);
-                await base.OnPostBulkInsert(sqlConnection, target, insertedData);
-            }
-
+            
             public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
             {
                 return m_outputBlock;
@@ -134,6 +137,7 @@
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
         {
             var me = expression.Body as MemberExpression;
+            
             return me.Member as PropertyInfo;
         }
 
