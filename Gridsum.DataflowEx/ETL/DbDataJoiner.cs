@@ -32,7 +32,7 @@
         Always,
     }
 
-    public class DbDataJoiner<TIn, TKey, TUpdate> : Dataflow<TIn, TIn> where TIn : class 
+    public class DbDataJoiner<TIn, TKey, TUpdate> : Dataflow<TIn, KeyValuePair<TIn, TUpdate>> where TIn : class 
     {
         class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>
         {
@@ -44,15 +44,17 @@
             {
                 m_keyGetter = joinBy.Compile();
                 m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
-
                 RegisterChild(m_outputBlock);
-
                 m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
             }
 
             protected override ICollection<TIn> PreprocessBatch(TIn[] array)
             {
-                return array.Distinct(this).ToArray();
+                int oldCount = array.Length;
+                var newArray = array.Distinct(this).ToArray();
+                int newCount = newArray.Length;
+                LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
+                return newArray;
             }
 
             public bool Equals(TIn x, TIn y)
@@ -86,23 +88,24 @@
         private readonly TargetTable m_dimTableTarget;
         private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private Dataflow<JoinBatch<TIn>, TIn> m_lookupNode;
-        private DBColumnMapping m_joinByMapping;
+        private Dataflow<JoinBatch<TIn>, KeyValuePair<TIn, TUpdate>> m_lookupNode;
+        private DBColumnMapping m_joinOnMapping;
         private DBColumnMapping m_updateOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
+        private DataView m_indexedTable;
 
-        public DbDataJoiner(Expression<Func<TIn, TKey>> joinBy, Expression<Func<TIn, TUpdate>> updateOn,
+        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, Expression<Func<TIn, TUpdate>> updateOn,
             TargetTable dimTableTarget, int batchSize)
             : base(DataflowOptions.Default)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, TIn>(new Func<JoinBatch<TIn>, IEnumerable<TIn>>(this.JoinBatch)).ToDataflow("LookupNode");
+            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, KeyValuePair<TIn, TUpdate>>(new Func<JoinBatch<TIn>, IEnumerable<KeyValuePair<TIn, TUpdate>>>(this.JoinBatch)).ToDataflow("LookupNode");
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
-            m_joinByMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinBy));
+            m_joinOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             m_updateOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(updateOn));
 
             var transformer =
@@ -113,14 +116,19 @@
             m_lookupNode.LinkFrom(transformer);
 
             RegisterChild(m_batchBlock);
+            RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(dimTableTarget, joinBy);
+            m_dimInserter = new DimTableInserter(dimTableTarget, joinOn);
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
             m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
             m_dimInserter.LinkTo(hb);
             hb.LinkTo(m_lookupNode);
+
+            RegisterChild(m_dimInserter);
+            RegisterChild(hb);
+            RegisterChildRing(transformer.Completion, m_lookupNode, m_dimInserter, hb);
         }
 
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
@@ -129,46 +137,72 @@
             return me.Member as PropertyInfo;
         }
 
-        private IEnumerable<TIn> JoinBatch(JoinBatch<TIn> batch)
+        private IEnumerable<KeyValuePair<TIn, TUpdate>> JoinBatch(JoinBatch<TIn> batch)
         {
-            //select a part of the underlying table by given column filtering
+            if (m_indexedTable == null || batch.Strategy == CacheRefreshStrategy.Always)
+            {
+                m_indexedTable = this.RegenerateJoinTable();
+            }
 
+            foreach (var input in batch.Data)
+            {
+                int idx = this.m_indexedTable.Find(m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset)(input));
+
+                if (idx != -1)
+                {
+                    DataRowView row = this.m_indexedTable[idx];
+                    TUpdate updateValue = (TUpdate) row[m_updateOnMapping.DestColumnName];
+
+                    yield return new KeyValuePair<TIn, TUpdate>(input, updateValue);
+                }
+                else
+                {
+                    m_dimInserter.InputBlock.SafePost(input);
+                }
+            }
+        }
+
+        protected virtual DataView RegenerateJoinTable()
+        {
+            LogHelper.Logger.DebugFormat("{0} pulling join table to memory... Table name: {1} Label: {2}",
+                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
+
+            //select a part of the underlying table by given column filtering
             string select = string.Format(
                 "select {0}, {1} from {2}",
-                m_joinByMapping.DestColumnName,
+                m_joinOnMapping.DestColumnName,
                 m_updateOnMapping.DestColumnName,
                 m_dimTableTarget.TableName);
 
             DataTable cacheTable;
-            using (var conn = new SqlConnection(m_dimTableTarget.ConnectionString))
+            using (var conn = new SqlConnection(this.m_dimTableTarget.ConnectionString))
             {
                 cacheTable = new DataTable();
-                using (var adapter = new SqlDataAdapter(select, conn))
+                using (var adapter = new SqlDataAdapter(@select, conn))
                 {
                     adapter.Fill(cacheTable);
-                }               
+                }
             }
 
-            DataView indexedTable = new DataView(cacheTable, null, this.m_joinByMapping.DestColumnName, DataViewRowState.CurrentRows);
-
-            foreach (var input in batch.Data)
+            if (!typeof(TUpdate).IsAssignableFrom(cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType))
             {
-                var idx = indexedTable.Find(this.m_typeAccessor.GetPropertyAccessor(this.m_joinByMapping.DestColumnOffset)(input));
-
-                if (idx != -1)
-                {
-                    var row = indexedTable[idx];
-                    var updateValue = row[this.m_updateOnMapping.DestColumnName];
-
-                    //todo: set the value to input
-                    yield return input;
-                }
-                else
-                {
-                    //todo: not found in the cache table, as secondly output
-                    m_dimInserter.InputBlock.SafePost(input);
-                }
+                throw new InvalidDBColumnMappingException(
+                    "Generic type is not assignable from db column type: "
+                    + cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType,
+                    this.m_updateOnMapping,
+                    null);
             }
+
+            DataView indexedTable = new DataView(
+                cacheTable,
+                null,
+                this.m_joinOnMapping.DestColumnName,
+                DataViewRowState.CurrentRows);
+
+            LogHelper.Logger.DebugFormat("{0} Join table pulled. Table name: {1} Label: {2}",
+                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
+
+            return indexedTable;
         }
 
         public override ITargetBlock<TIn> InputBlock
@@ -179,7 +213,7 @@
             }
         }
 
-        public override ISourceBlock<TIn> OutputBlock
+        public override ISourceBlock<KeyValuePair<TIn, TUpdate>> OutputBlock
         {
             get
             {
