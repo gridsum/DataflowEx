@@ -79,27 +79,22 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public static void LinkNormalCompletionTo(this IDataflowBlock block, Func<IEnumerable<IDataflowBlock>> blocksGetter)
         {
-            LinkNormalCompletionTo(block, blocksGetter());    
-        }
-
-        public static void LinkNormalCompletionTo(this IDataflowBlock block, IDataflowBlock downStreamBlock)
-        {
-            LinkNormalCompletionTo(block, new [] {downStreamBlock});
-        }
-
-        private static void LinkNormalCompletionTo(this IDataflowBlock block, IEnumerable<IDataflowBlock> blocks)
-        {
             block.Completion.ContinueWith(t =>
             {
                 //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
                 if (t.Status == TaskStatus.RanToCompletion)
                 {
-                    foreach (var bufferBlock in blocks)
+                    foreach (var bufferBlock in blocksGetter())
                     {
                         bufferBlock.Complete();
                     }
                 }
             });
+        }
+
+        public static void LinkNormalCompletionTo(this IDataflowBlock block, IDataflowBlock downStreamBlock)
+        {
+            LinkNormalCompletionTo(block, () => new [] {downStreamBlock});
         }
     }
 }

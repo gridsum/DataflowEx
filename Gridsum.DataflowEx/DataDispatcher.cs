@@ -52,7 +52,7 @@ namespace Gridsum.DataflowEx
 
             //propagate completion to children as we don't have 'link'
             //no need to propagate errors as register handles that (given that dyamic blocks are registered)
-            m_dispatcherBlock.LinkNormalCompletionTo(() => m_destinations.Values.Select(_=>_.Value.InputBlock).ToList());
+            m_dispatcherBlock.LinkNormalCompletionTo(() => m_destinations.Values.Select(_=>_.Value.InputBlock));
         }
 
         /// <summary>
