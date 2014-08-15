@@ -67,7 +67,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             context.Inits.Add(new Init2());
             context.SaveChanges();
 
-
             var inserter = new DbBulkInserter<Entity3>(
                 connectString,
                 "dbo.Seods",

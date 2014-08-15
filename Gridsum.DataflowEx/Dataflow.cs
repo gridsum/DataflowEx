@@ -292,13 +292,13 @@ namespace Gridsum.DataflowEx
                 await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10) /* todo: use static value */);
             }
 
-            LogHelper.Logger.InfoFormat("{0} Ring check loop done. Completion in heartbeat node triggered: {1}", this.FullName, ringName);
+            LogHelper.Logger.InfoFormat("{0} Ring completion detected! Completion triggered on heartbeat node: {1}", this.FullName, ringName);
         }
 
         private string GetRingDisplayName(Dataflow[] ringNodes)
         {
             string ringString = string.Join("=>", ringNodes.Select(n => n.Name));
-            return string.Format("{0}->({1})", this.FullName, ringString);
+            return string.Format("({0})", ringString);
         }
 
         protected virtual async Task GetCompletionTask()

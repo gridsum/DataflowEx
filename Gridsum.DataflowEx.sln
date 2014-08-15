@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30501.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gridsum.DataflowEx", "Gridsum.DataflowEx\Gridsum.DataflowEx.csproj", "{A4FD6288-AE2E-4C28-B7D4-D317D1601E86}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{77014771-4A9D-4A59-AB9D-B587668F5233}"

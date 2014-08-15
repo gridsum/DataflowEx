@@ -32,7 +32,7 @@
         Always,
     }
 
-    public class DbDataJoiner<TIn, TKey, TUpdate> : Dataflow<TIn, KeyValuePair<TIn, TUpdate>> where TIn : class 
+    public class DbDataJoiner<TIn, TKey> : Dataflow<TIn, KeyValuePair<TIn, DataRowView>> where TIn : class 
     {
         /// <summary>
         /// Used by the joiner to insert unmatched rows to the dim table.
@@ -91,31 +91,29 @@
         private readonly TargetTable m_dimTableTarget;
         private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private Dataflow<JoinBatch<TIn>, KeyValuePair<TIn, TUpdate>> m_lookupNode;
+        private Dataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>> m_lookupNode;
         private DBColumnMapping m_joinOnMapping;
-        private DBColumnMapping m_updateOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
         private DataView m_indexedTable;
 
-        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, Expression<Func<TIn, TUpdate>> updateOn,
+        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, 
             TargetTable dimTableTarget, int batchSize)
             : base(DataflowOptions.Default)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, KeyValuePair<TIn, TUpdate>>(new Func<JoinBatch<TIn>, IEnumerable<KeyValuePair<TIn, TUpdate>>>(this.JoinBatch)).ToDataflow("LookupNode");
+            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>>(new Func<JoinBatch<TIn>, IEnumerable<KeyValuePair<TIn, DataRowView>>>(this.JoinBatch)).ToDataflow("LookupNode");
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
             m_joinOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
-            m_updateOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(updateOn));
-
+            
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
                     array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never));
 
-            m_batchBlock.LinkTo(transformer);
+            m_batchBlock.LinkTo(transformer, m_defaultLinkOption);
             m_lookupNode.LinkFrom(transformer);
 
             RegisterChild(m_batchBlock);
@@ -137,11 +135,10 @@
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
         {
             var me = expression.Body as MemberExpression;
-            
             return me.Member as PropertyInfo;
         }
 
-        private IEnumerable<KeyValuePair<TIn, TUpdate>> JoinBatch(JoinBatch<TIn> batch)
+        private IEnumerable<KeyValuePair<TIn, DataRowView>> JoinBatch(JoinBatch<TIn> batch)
         {
             if (m_indexedTable == null || batch.Strategy == CacheRefreshStrategy.Always)
             {
@@ -155,9 +152,8 @@
                 if (idx != -1)
                 {
                     DataRowView row = this.m_indexedTable[idx];
-                    TUpdate updateValue = (TUpdate) row[m_updateOnMapping.DestColumnName];
 
-                    yield return new KeyValuePair<TIn, TUpdate>(input, updateValue);
+                    yield return new KeyValuePair<TIn, DataRowView>(input, row);
                 }
                 else
                 {
@@ -168,15 +164,17 @@
 
         protected virtual DataView RegenerateJoinTable()
         {
-            LogHelper.Logger.DebugFormat("{0} pulling join table to memory... Table name: {1} Label: {2}",
+            LogHelper.Logger.DebugFormat("{0} Pulling join table '{1}' to memory. Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
 
-            //select a part of the underlying table by given column filtering
-            string select = string.Format(
-                "select {0}, {1} from {2}",
-                m_joinOnMapping.DestColumnName,
-                m_updateOnMapping.DestColumnName,
-                m_dimTableTarget.TableName);
+//            string select = string.Format(
+//                "select {0}, {1} from {2}",
+//                m_joinOnMapping.DestColumnName,
+//                m_updateOnMapping.DestColumnName,
+//                m_dimTableTarget.TableName);
+
+            //todo: select partially here
+            string select = string.Format("select * from {0}", m_dimTableTarget.TableName);
 
             DataTable cacheTable;
             using (var conn = new SqlConnection(this.m_dimTableTarget.ConnectionString))
@@ -188,14 +186,14 @@
                 }
             }
 
-            if (!typeof(TUpdate).IsAssignableFrom(cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType))
-            {
-                throw new InvalidDBColumnMappingException(
-                    "Generic type is not assignable from db column type: "
-                    + cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType,
-                    this.m_updateOnMapping,
-                    null);
-            }
+//            if (!typeof(TUpdate).IsAssignableFrom(cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType))
+//            {
+//                throw new InvalidDBColumnMappingException(
+//                    "Generic type is not assignable from db column type: "
+//                    + cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType,
+//                    this.m_updateOnMapping,
+//                    null);
+//            }
 
             DataView indexedTable = new DataView(
                 cacheTable,
@@ -203,8 +201,8 @@
                 this.m_joinOnMapping.DestColumnName,
                 DataViewRowState.CurrentRows);
 
-            LogHelper.Logger.DebugFormat("{0} Join table pulled. Table name: {1} Label: {2}",
-                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
+            LogHelper.Logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
+                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
 
             return indexedTable;
         }
@@ -217,7 +215,7 @@
             }
         }
 
-        public override ISourceBlock<KeyValuePair<TIn, TUpdate>> OutputBlock
+        public override ISourceBlock<KeyValuePair<TIn, DataRowView>> OutputBlock
         {
             get
             {
