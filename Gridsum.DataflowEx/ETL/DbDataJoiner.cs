@@ -40,7 +40,7 @@
         /// (1) It has a preprocess step to select distinct rows
         /// (2) It will output original data out tagged with CacheRefreshStrategy.Always
         /// </summary>
-        class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>
+        class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
             private Func<TIn, TKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
@@ -56,6 +56,8 @@
             
             protected override async Task DumpToDB(TIn[] data, TargetTable targetTable)
             {
+                IsBusy = true;
+
                 int oldCount = data.Length;
                 var newArray = data.Distinct(this).ToArray();
                 int newCount = newArray.Length;
@@ -65,6 +67,8 @@
 
                 var redoBatch = new JoinBatch<TIn>(data, CacheRefreshStrategy.Always);
                 m_outputBlock.SafePost(redoBatch);
+
+                IsBusy = false;
             }
 
             public bool Equals(TIn x, TIn y)
@@ -86,12 +90,14 @@
             {
                 this.LinkBlockToFlow(m_outputBlock, other);
             }
+
+            public bool IsBusy { get; private set; }
         }
         
         private readonly TargetTable m_dimTableTarget;
         private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private Dataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>> m_lookupNode;
+        private TransformManyDataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>> m_lookupNode;
         private DBColumnMapping m_joinOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
@@ -99,23 +105,24 @@
 
         public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, 
             TargetTable dimTableTarget, int batchSize)
-            : base(DataflowOptions.Default)
+            : base(DataflowOptions.Verbose)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupNode = new TransformManyBlock<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>>(new Func<JoinBatch<TIn>, IEnumerable<KeyValuePair<TIn, DataRowView>>>(this.JoinBatch)).ToDataflow("LookupNode");
+            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>>(this.JoinBatch);
+            m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
             m_joinOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
-                    array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never));
+                    array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never)).ToDataflow();
 
-            m_batchBlock.LinkTo(transformer, m_defaultLinkOption);
-            m_lookupNode.LinkFrom(transformer);
-
+            transformer.LinkFromBlock(m_batchBlock);
+            transformer.LinkTo(m_lookupNode);
+            
             RegisterChild(m_batchBlock);
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
@@ -129,7 +136,7 @@
 
             RegisterChild(m_dimInserter);
             RegisterChild(hb);
-            RegisterChildRing(transformer.Completion, m_lookupNode, m_dimInserter, hb);
+            RegisterChildRing(transformer.CompletionTask, m_lookupNode, m_dimInserter, hb);
         }
 
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
@@ -138,28 +145,33 @@
             return me.Member as PropertyInfo;
         }
 
-        private IEnumerable<KeyValuePair<TIn, DataRowView>> JoinBatch(JoinBatch<TIn> batch)
+        protected virtual IEnumerable<KeyValuePair<TIn, DataRowView>> JoinBatch(JoinBatch<TIn> batch)
         {
             if (m_indexedTable == null || batch.Strategy == CacheRefreshStrategy.Always)
             {
                 m_indexedTable = this.RegenerateJoinTable();
             }
 
+            var outputList = new List<KeyValuePair<TIn, DataRowView>>(m_batchSize);
+
+            Func<TIn, object> accessor = m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset);
+
             foreach (var input in batch.Data)
             {
-                int idx = this.m_indexedTable.Find(m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset)(input));
+                int idx = this.m_indexedTable.Find(accessor(input));
 
                 if (idx != -1)
                 {
                     DataRowView row = this.m_indexedTable[idx];
-
-                    yield return new KeyValuePair<TIn, DataRowView>(input, row);
+                    outputList.Add(new KeyValuePair<TIn, DataRowView>(input, row));
                 }
                 else
                 {
                     m_dimInserter.InputBlock.SafePost(input);
                 }
             }
+
+            return outputList;
         }
 
         protected virtual DataView RegenerateJoinTable()

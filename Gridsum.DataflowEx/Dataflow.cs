@@ -24,7 +24,7 @@ namespace Gridsum.DataflowEx
     public class Dataflow : IDataflow
     {
         private static ConcurrentDictionary<string, IntHolder> s_nameDict = new ConcurrentDictionary<string, IntHolder>();
-        protected readonly DataflowOptions m_dataflowOptions;
+        protected internal readonly DataflowOptions m_dataflowOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
         protected ImmutableList<IDataflowChildMeta> m_children = ImmutableList.Create<IDataflowChildMeta>();
@@ -146,7 +146,7 @@ namespace Gridsum.DataflowEx
             return false;
         }
 
-        private bool IsMyChild(IDataflow flow)
+        public bool IsMyChild(IDataflow flow)
         {
             return m_children.Any(child => object.ReferenceEquals(child.Unwrap(), flow));
         }
@@ -250,55 +250,12 @@ namespace Gridsum.DataflowEx
         /// </summary>
         /// <param name="preTask">The task after which ring check begins</param>
         /// <param name="ringNodes">Child dataflows that forms a ring</param>
-        protected async void RegisterChildRing(Task preTask, params Dataflow[] ringNodes)
+        protected async void RegisterChildRing(Task preTask, params IRingNode[] ringNodes)
         {
-            if (ringNodes.Length == 0)
-            {
-                throw new ArgumentException("The child ring contains nothing");
-            }
-
-            var hb = ringNodes.OfType<IHeartbeatNode>().FirstOrDefault();
-            if (hb == null)
-            {
-                throw new ArgumentException("A ring must contain at least one IHeartbeatNode");
-            }
-
-            var nonChild = ringNodes.FirstOrDefault(r => { return !this.IsMyChild(r); });
-            if (nonChild != null)
-            {
-                throw new ArgumentException("The child ring contains a non-child: " + nonChild.FullName);
-            }
-
+            var ring = new RingMonitor(this, ringNodes);
             //todo: check if it is a real ring
 
-            string ringName = this.GetRingDisplayName(ringNodes);
-
-            LogHelper.Logger.InfoFormat("{0} A ring is set up: {1}", this.FullName, ringName);
-            await preTask;
-            LogHelper.Logger.InfoFormat("{0} Ring pretask done. Starting check loop for {1}", this.FullName, ringName);
-
-            while (true)
-            {
-                long before = hb.ProcessedItemCount;
-                int buffered = ringNodes.Sum(r => r.BufferedCount) + ringNodes[0].BufferedCount;
-                long after = hb.ProcessedItemCount;
-
-                if (buffered == 0 && before == after)
-                {
-                    hb.Complete(); //start the completion domino :)
-                    break;
-                }
-
-                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10) /* todo: use static value */);
-            }
-
-            LogHelper.Logger.InfoFormat("{0} Ring completion detected! Completion triggered on heartbeat node: {1}", this.FullName, ringName);
-        }
-
-        private string GetRingDisplayName(Dataflow[] ringNodes)
-        {
-            string ringString = string.Join("=>", ringNodes.Select(n => n.Name));
-            return string.Format("({0})", ringString);
+            ring.StartMonitoring(preTask);
         }
 
         protected virtual async Task GetCompletionTask()
@@ -408,30 +365,15 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        //Linkd MY block to OHTER dataflow
         protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
         {
+            //todo: add check logic , also consider removing this.CompletionTask constraint
+
             block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
 
-            //manullay handle inter-dataflow problem
-            //we use WhenAll here to make sure this dataflow fails before propogating to other dataflow
-            Task.WhenAll(block.Completion, this.CompletionTask).ContinueWith(whenAllTask =>
-            {
-                if (!otherDataflow.CompletionTask.IsCompleted)
-                {
-                    if (whenAllTask.IsFaulted)
-                    {
-                        otherDataflow.Fault(new LinkedDataflowFailedException());
-                    }
-                    else if (whenAllTask.IsCanceled)
-                    {
-                        otherDataflow.Fault(new LinkedDataflowCanceledException());
-                    }
-                    else
-                    {
-                        otherDataflow.InputBlock.Complete();
-                    }
-                }
-            });
+            //todo: change API and get rid of the cast in v 1.1
+            (otherDataflow as Dataflow<T>).RegisterDependency(block);
 
             //Make sure other dataflow also fails me
             otherDataflow.CompletionTask.ContinueWith(otherTask =>
@@ -457,6 +399,8 @@ namespace Gridsum.DataflowEx
 
     public abstract class Dataflow<TIn> : Dataflow, IDataflow<TIn>
     {
+        protected ImmutableList<IDataflowBlock> m_dependencies = ImmutableList.Create<IDataflowBlock>();
+
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
         }
@@ -505,7 +449,7 @@ namespace Gridsum.DataflowEx
                 ct);
         }
 
-        public void LinkFrom(ISourceBlock<TIn> block)
+        public void LinkFromBlock(ISourceBlock<TIn> block)
         {
             block.LinkTo(this.InputBlock, m_defaultLinkOption);
         }
@@ -607,6 +551,44 @@ namespace Gridsum.DataflowEx
         public virtual Task<long> ProcessMultipleAsync(bool completeLogReaderOnFinish, params IEnumerable<TIn>[] enumerables)
         {
             return ProcessMultipleAsync(enumerables, completeLogReaderOnFinish);
+        }
+
+        public void RegisterDependency(IDataflowBlock upstreamBlock)
+        {
+            bool isFirstDependency = m_dependencies.IsEmpty;
+
+            m_dependencies = m_dependencies.Add(upstreamBlock);
+
+            if (isFirstDependency)
+            {
+                TaskEx.AwaitableWhenAll(() => m_dependencies, f => f.Completion).ContinueWith(
+                    upstreamTask =>
+                        {
+                            if (!this.CompletionTask.IsCompleted)
+                            {
+                                if (upstreamTask.IsFaulted)
+                                {
+                                    this.Fault(new LinkedDataflowFailedException());
+                                }
+                                else if (upstreamTask.IsCanceled)
+                                {
+                                    this.Fault(new LinkedDataflowCanceledException());
+                                }
+                                else
+                                {
+                                    if (m_dependencies.Count > 1)
+                                    {
+                                        LogHelper.Logger.InfoFormat("{0} All of my dependencies are done. Completing myself.", this.FullName);
+                                    }
+                                    this.InputBlock.Complete();
+                                }
+                            }
+                        });
+            }
+            else
+            {
+                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies.", this.FullName, m_dependencies.Count);
+            }
         }
     }
 

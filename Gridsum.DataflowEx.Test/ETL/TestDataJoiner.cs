@@ -8,6 +8,7 @@ namespace Gridsum.DataflowEx.Test.ETL
 {
     using System.Data;
     using System.Data.Entity;
+    using System.Diagnostics;
     using System.Threading.Tasks.Dataflow;
 
     using Gridsum.DataflowEx.Databases;
@@ -22,6 +23,9 @@ namespace Gridsum.DataflowEx.Test.ETL
         [TestMethod]
         public async Task TestDataJoinerJoining()
         {
+
+            Debug.WriteLine("hello1...");
+
             Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
             var connectString = 
@@ -48,9 +52,10 @@ namespace Gridsum.DataflowEx.Test.ETL
                             Assert.AreEqual(pair.Key.Pointer, pair.Value["Key"]);
                             Assert.AreEqual("Str" + pair.Key.Pointer, pair.Value["StrValue"]);
                         }).ToDataflow();
-
-
+            
             joiner.LinkTo(asserter);
+
+            Debug.WriteLine("hello2...");
 
             await joiner.ProcessAsync(
                 new[]
@@ -58,6 +63,9 @@ namespace Gridsum.DataflowEx.Test.ETL
                         new Trunk() { Pointer = "3" }, 
                         new Trunk() { Pointer = "5" }, 
                         new Trunk() { Pointer = "7" },
+                        new Trunk() { Pointer = "7" },
+                        new Trunk() { Pointer = "9" },
+                        new Trunk() { Pointer = "99", Leaf = new Leaf() {StrValue = "Str99"}},
                     });
 
             await asserter.CompletionTask;

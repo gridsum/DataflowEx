@@ -11,6 +11,8 @@ namespace Gridsum.DataflowEx
         Task CompletionTask { get; }
         void Fault(Exception exception);
         string Name { get; }
+        string FullName { get; }
+        int BufferedCount { get; }
     }
 
     public interface IDataflow<in TIn> : IDataflow
@@ -26,5 +28,10 @@ namespace Gridsum.DataflowEx
 
     public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>, IOutputDataflow<TOut>
     {
+    }
+
+    public interface IBatchedDataflow : IDataflow
+    {
+        void TriggerBatch();
     }
 }

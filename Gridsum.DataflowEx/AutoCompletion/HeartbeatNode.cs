@@ -8,11 +8,14 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx.AutoCompletion
 {
-    public interface IHeartbeatNode : IDataflow
+    public interface IHeartbeatNode : IRingNode
     {
         long ProcessedItemCount { get; }
 
         void Complete();
+
+        bool NoHeartbeatDuring(Action action);
+        Task<bool> NoHeartbeatDuring(Func<Task> action);
     }
 
     public class HeartbeatNode<T> : Dataflow<T, T>, IHeartbeatNode
@@ -26,7 +29,9 @@ namespace Gridsum.DataflowEx.AutoCompletion
 
             Func<T, T> f = arg =>
                 {
+                    IsBusy = true;
                     m_beats++;
+                    IsBusy = false;
                     return arg;
                 };
 
@@ -62,5 +67,23 @@ namespace Gridsum.DataflowEx.AutoCompletion
         {
             this.InputBlock.Complete();
         }
+
+        public bool NoHeartbeatDuring(Action action)
+        {
+            long before = m_beats;
+            action();
+            long after = m_beats;
+            return after == before;
+        }
+
+        public async Task<bool> NoHeartbeatDuring(Func<Task> action)
+        {
+            long before = m_beats;
+            await action();
+            long after = m_beats;
+            return after == before;
+        }
+
+        public bool IsBusy { get; private set; }
     }
 }

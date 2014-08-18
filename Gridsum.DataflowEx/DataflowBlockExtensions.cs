@@ -84,9 +84,9 @@ namespace Gridsum.DataflowEx
                 //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
                 if (t.Status == TaskStatus.RanToCompletion)
                 {
-                    foreach (var bufferBlock in blocksGetter())
+                    foreach (var linkedBlock in blocksGetter())
                     {
-                        bufferBlock.Complete();
+                        linkedBlock.Complete();
                     }
                 }
             });

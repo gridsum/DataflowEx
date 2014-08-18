@@ -100,5 +100,32 @@ namespace Gridsum.DataflowEx.Test
                 Assert.IsTrue(t.Exception == null);
             });
         }
+
+        [TestMethod]
+        public async Task TestMultipleLinks()
+        {
+            var b1 = new BufferBlock<int>();
+            var b2 = new BufferBlock<int>();
+            var a1 = new ActionBlock<int>((i) => Console.WriteLine(i));
+
+            b1.LinkTo(a1, new DataflowLinkOptions() { PropagateCompletion = true });
+            b2.LinkTo(a1, new DataflowLinkOptions() { PropagateCompletion = true });
+
+            b1.Post(1);
+            b2.Post(2);
+            b1.Complete();
+
+            await a1.Completion;
+        }
+
+        [TestMethod]
+        public async Task TestBatchBlockBuffer()
+        {
+            var b = new BatchBlock<int>(1000);
+            b.Post(1);
+            b.Post(2);
+
+            Assert.AreEqual(2, b.GetBufferCount().Total());
+        }
     }
 }

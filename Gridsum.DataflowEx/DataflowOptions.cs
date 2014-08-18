@@ -33,11 +33,28 @@ namespace Gridsum.DataflowEx
             RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
         };
 
+        private static DataflowOptions s_verboseOptions = new DataflowOptions()
+        {
+            BlockMonitorEnabled = true,
+            FlowMonitorEnabled = true,
+            PerformanceMonitorMode = PerformanceLogMode.Verbose,
+            MonitorInterval = TimeSpan.FromSeconds(5),
+            RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
+        };
+
         public static DataflowOptions Default
         {
             get
             {
                 return s_defaultOptions;
+            }
+        }
+
+        public static DataflowOptions Verbose
+        {
+            get
+            {
+                return s_verboseOptions;
             }
         }
 
