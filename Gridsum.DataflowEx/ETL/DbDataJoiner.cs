@@ -103,9 +103,8 @@
         private DimTableInserter m_dimInserter;
         private DataView m_indexedTable;
 
-        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, 
-            TargetTable dimTableTarget, int batchSize)
-            : base(DataflowOptions.Verbose)
+        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, TargetTable dimTableTarget, int batchSize)
+            : base(DataflowOptions.Default)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
@@ -114,12 +113,12 @@
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
-            m_joinOnMapping = this.m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
+            m_joinOnMapping = m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
                     array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never)).ToDataflow();
-            transformer.Name = "transformer";
+            transformer.Name = "ArrayToJoinBatchConverter";
 
             transformer.LinkFromBlock(m_batchBlock);
             transformer.LinkTo(m_lookupNode);
@@ -143,7 +142,20 @@
         public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
         {
             var me = expression.Body as MemberExpression;
-            return me.Member as PropertyInfo;
+
+            if (me == null)
+            {
+                throw new ArgumentException("Expression must be a simple property getter: " + expression);
+            }
+
+            var pi = me.Member as PropertyInfo;
+
+            if (pi == null)
+            {
+                throw new ArgumentException("Expression must be a simple property getter: " + expression);
+            }
+
+            return pi;
         }
 
         protected virtual IEnumerable<KeyValuePair<TIn, DataRowView>> JoinBatch(JoinBatch<TIn> batch)

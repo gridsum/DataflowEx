@@ -234,7 +234,7 @@ namespace Gridsum.DataflowEx
 
                     CustomPerfMonBehavior();
 
-                    await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
+                    await Task.Delay(m_dataflowOptions.MonitorInterval);
                 }
             }
             catch (Exception e)
@@ -261,9 +261,15 @@ namespace Gridsum.DataflowEx
         protected virtual async Task GetCompletionTask()
         {
             //waiting until some children is registered
-            while (m_children.Count == 0)
+            if (m_children.Count == 0)
             {
-                await Task.Delay(m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
+                LogHelper.Logger.WarnFormat("{0} still has no children. Will check again soon.", this.FullName);
+                await Task.Delay(m_dataflowOptions.MonitorInterval);
+
+                if (m_children.Count == 0)
+                {
+                    throw new NoChildRegisteredException(this);
+                }
             }
 
             try
@@ -553,6 +559,26 @@ namespace Gridsum.DataflowEx
             return ProcessMultipleAsync(enumerables, completeLogReaderOnFinish);
         }
 
+        /// <summary>
+        /// Register an external dataflow as dependency, whose completion will trigger completion of this dataflow
+        /// if this dependencies finishes as the last amony all dependencies.
+        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
+        /// </summary>
+        public void RegisterDependency<T>(IOutputDataflow<T> dependencyDataflow)
+        {
+            if (this.IsMyChild(dependencyDataflow))
+            {
+                throw new ArgumentException("Cannot register a child as dependency. Child: " + dependencyDataflow.FullName, "dependencyDataflow");
+            }
+
+            this.RegisterDependency(dependencyDataflow.OutputBlock);
+        }
+
+        /// <summary>
+        /// Register an external block as dependency, whose completion will trigger completion of this dataflow
+        /// if this dependencies finishes as the last amony all dependencies.
+        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
+        /// </summary>
         public void RegisterDependency(IDataflowBlock upstreamBlock)
         {
             bool isFirstDependency = m_dependencies.IsEmpty;

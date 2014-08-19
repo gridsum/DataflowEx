@@ -22,14 +22,25 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public int? RecommendedParallelismIfMultiThreaded { get; set; }
 
-        public TimeSpan? MonitorInterval { get; set; }
+        private TimeSpan m_monitorInterval;
+        public TimeSpan MonitorInterval
+        {
+            get
+            {
+                return m_monitorInterval == TimeSpan.Zero ? DefaultInterval : m_monitorInterval;
+            }
+            set
+            {
+                this.m_monitorInterval = value;
+            }
+        }
 
         private static DataflowOptions s_defaultOptions = new DataflowOptions()
         {
             BlockMonitorEnabled = false,
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Succinct,
-            MonitorInterval = TimeSpan.FromSeconds(10),
+            MonitorInterval = DefaultInterval,
             RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
         };
 
@@ -38,7 +49,7 @@ namespace Gridsum.DataflowEx
             BlockMonitorEnabled = true,
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Verbose,
-            MonitorInterval = TimeSpan.FromSeconds(5),
+            MonitorInterval = DefaultInterval,
             RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
         };
 
@@ -55,6 +66,14 @@ namespace Gridsum.DataflowEx
             get
             {
                 return s_verboseOptions;
+            }
+        }
+
+        public static TimeSpan DefaultInterval
+        {
+            get
+            {
+                return TimeSpan.FromSeconds(10);
             }
         }
 

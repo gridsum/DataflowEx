@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
 
             while (true)
             {
-                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10) /* todo: use static value */);
+                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval);
 
                 bool empty = false;
                 
@@ -77,7 +77,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
                                     batchedFlow.TriggerBatch();
                                 }
 
-                                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval ?? TimeSpan.FromSeconds(10));
+                                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval);
 
                                 empty = this.IsRingEmpty();
                             });
