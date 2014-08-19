@@ -44,6 +44,7 @@ namespace Gridsum.DataflowEx
         {
             this.m_transformMany = transformMany;
             m_block = new TransformManyBlock<TIn, TOut>(new Func<TIn, IEnumerable<TOut>>(Transform));
+            RegisterChild(m_block);
         }
 
         private IEnumerable<TOut> Transform(TIn @in)

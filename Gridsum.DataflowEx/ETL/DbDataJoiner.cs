@@ -119,6 +119,7 @@
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
                     array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never)).ToDataflow();
+            transformer.Name = "transformer";
 
             transformer.LinkFromBlock(m_batchBlock);
             transformer.LinkTo(m_lookupNode);
