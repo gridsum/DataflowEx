@@ -23,14 +23,8 @@ namespace Gridsum.DataflowEx.Test.ETL
         [TestMethod]
         public async Task TestDataJoinerJoining()
         {
-
-            Debug.WriteLine("hello1...");
-
             Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString = 
-@"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDataJoiner.mdf;Initial Catalog=DataJoiner;Integrated Security=True;Connect Timeout=30";
-
+            var connectString = TestUtils.GetLocalDBConnectionString("TestDataJoinerJoining");
             var context = new InsertContext(connectString);
 
             for (int i = 0; i < 10; i++)
@@ -45,30 +39,36 @@ namespace Gridsum.DataflowEx.Test.ETL
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
                 8192);
 
+            int count = 0;
             var asserter =
                 new ActionBlock<KeyValuePair<Trunk, DataRowView>>(
                     delegate(KeyValuePair<Trunk, DataRowView> pair)
                         {
                             Assert.AreEqual(pair.Key.Pointer, pair.Value["Key"]);
                             Assert.AreEqual("Str" + pair.Key.Pointer, pair.Value["StrValue"]);
+                            count ++;
                         }).ToDataflow();
+
+            asserter.Name = "asserter";
             
             joiner.LinkTo(asserter);
 
-            Debug.WriteLine("hello2...");
+            var dataArray = new[]
+                                {
+                                    new Trunk() { Pointer = "3" }, 
+                                    new Trunk() { Pointer = "5" },
+                                    new Trunk() { Pointer = "7" }, 
+                                    new Trunk() { Pointer = "7" },
+                                    new Trunk() { Pointer = "9" },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                };
 
-            await joiner.ProcessAsync(
-                new[]
-                    {
-                        new Trunk() { Pointer = "3" }, 
-                        new Trunk() { Pointer = "5" }, 
-                        new Trunk() { Pointer = "7" },
-                        new Trunk() { Pointer = "7" },
-                        new Trunk() { Pointer = "9" },
-                        new Trunk() { Pointer = "99", Leaf = new Leaf() {StrValue = "Str99"}},
-                    });
+            await joiner.ProcessAsync(dataArray);
 
             await asserter.CompletionTask;
+
+            Assert.AreEqual(dataArray.Length, count);
         }
     }
 

@@ -37,12 +37,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestReferenceLoopDepth()
         {
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\loop.mdf;Initial Catalog=loop;Integrated Security=True;Connect Timeout=30";
-
+            var connectString = TestUtils.GetLocalDBConnectionString();
             //init database
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<LoopContext>());
+            Database.SetInitializer(new DropCreateDatabaseAlways<LoopContext>());
             var context = new LoopContext(connectString);
             context.LoopInits.Add(new LoopInit());
             context.SaveChanges();

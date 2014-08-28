@@ -68,13 +68,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestReader()
         {
-
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestReader.mdf;Initial Catalog=mytest;Integrated Security=True;Connect Timeout=30";
-
+            var connectString = TestUtils.GetLocalDBConnectionString();
             //init database
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<MyContext>());
+            Database.SetInitializer(new DropCreateDatabaseAlways<MyContext>());
             var context = new MyContext(connectString);
             context.Inits.Add(new Init());
             context.SaveChanges();

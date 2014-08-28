@@ -37,11 +37,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestNestClass()
         {
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\nestClassTest.mdf;Initial Catalog=nestClassTest;Integrated Security=True;Connect Timeout=30";
-
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<NestContext>());
+            var connectString = TestUtils.GetLocalDBConnectionString();
+            Database.SetInitializer(new DropCreateDatabaseAlways<NestContext>());
             var context = new NestContext(connectString);
             context.NestInits.Add(new NestInit());
             context.SaveChanges();

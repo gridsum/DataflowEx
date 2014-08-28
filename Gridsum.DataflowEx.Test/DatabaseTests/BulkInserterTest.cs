@@ -16,11 +16,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter()
         {
             //init db
-            System.Data.Entity.Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDbBulkInserter.mdf;Initial Catalog=dbinserter;Integrated Security=True;Connect Timeout=30";
-
+            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
+            var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
             context.SaveChanges();
@@ -59,10 +56,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         {
             //init db
             Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-                @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDbBulkInserter2.mdf;Initial Catalog=dbinserter2;Integrated Security=True;Connect Timeout=30";
-
+            var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
             context.SaveChanges();
@@ -114,9 +108,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestMultiDbBulkInserter()
         {
             Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString =
-               @"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestMultiDbBulkInserter_{0}.mdf;Initial Catalog=multidbinserter_{1};Integrated Security=True;Connect Timeout=30";
+            var connectString = TestUtils.GetLocalDBConnectionString("TestMultiDbBulkInserter_{0}");
             //init db
             int profileIdCount = 3;
             for (int i = 1; i <= profileIdCount; ++i)
