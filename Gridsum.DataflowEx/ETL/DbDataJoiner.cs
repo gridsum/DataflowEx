@@ -32,7 +32,7 @@
         Always,
     }
 
-    public class DbDataJoiner<TIn, TKey> : Dataflow<TIn, KeyValuePair<TIn, DataRowView>> where TIn : class 
+    public abstract class DbDataJoiner<TIn, TOut, TKey> : Dataflow<TIn, TOut> where TIn : class 
     {
         /// <summary>
         /// Used by the joiner to insert unmatched rows to the dim table.
@@ -97,7 +97,7 @@
         private readonly TargetTable m_dimTableTarget;
         private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private TransformManyDataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>> m_lookupNode;
+        private TransformManyDataflow<JoinBatch<TIn>, TOut> m_lookupNode;
         private DBColumnMapping m_joinOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
@@ -109,7 +109,7 @@
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, KeyValuePair<TIn, DataRowView>>(this.JoinBatch);
+            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TOut>(this.JoinBatch);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
 
@@ -158,14 +158,14 @@
             return pi;
         }
 
-        protected virtual IEnumerable<KeyValuePair<TIn, DataRowView>> JoinBatch(JoinBatch<TIn> batch)
+        protected virtual IEnumerable<TOut> JoinBatch(JoinBatch<TIn> batch)
         {
             if (m_indexedTable == null || batch.Strategy == CacheRefreshStrategy.Always)
             {
                 m_indexedTable = this.RegenerateJoinTable();
             }
 
-            var outputList = new List<KeyValuePair<TIn, DataRowView>>(m_batchSize);
+            var outputList = new List<TOut>(m_batchSize);
 
             Func<TIn, object> accessor = m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset);
 
@@ -176,7 +176,7 @@
                 if (idx != -1)
                 {
                     DataRowView row = this.m_indexedTable[idx];
-                    outputList.Add(new KeyValuePair<TIn, DataRowView>(input, row));
+                    outputList.Add(this.OnSuccessfulLookup(input, row));
                 }
                 else
                 {
@@ -187,25 +187,29 @@
             return outputList;
         }
 
+        /// <summary>
+        /// The function to call when an input item finds a row in the dimension table by joining condition.
+        /// Usually the implementation of this method should assign to some fields/properties(e.g. key column) of the input item according to the dimension row.
+        /// </summary>
+        protected abstract TOut OnSuccessfulLookup(TIn input, DataRowView rowInDimTable);
+
+        protected virtual string GetDimTableQueryString(string tableName)
+        {
+            return string.Format("select * from {0}", tableName);
+        }
+
         protected virtual DataView RegenerateJoinTable()
         {
             LogHelper.Logger.DebugFormat("{0} Pulling join table '{1}' to memory. Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
 
-//            string select = string.Format(
-//                "select {0}, {1} from {2}",
-//                m_joinOnMapping.DestColumnName,
-//                m_updateOnMapping.DestColumnName,
-//                m_dimTableTarget.TableName);
-
-            //todo: select partially here
-            string select = string.Format("select * from {0}", m_dimTableTarget.TableName);
+            string selectStatement = this.GetDimTableQueryString(m_dimTableTarget.TableName);
 
             DataTable cacheTable;
             using (var conn = new SqlConnection(this.m_dimTableTarget.ConnectionString))
             {
                 cacheTable = new DataTable();
-                using (var adapter = new SqlDataAdapter(@select, conn))
+                using (var adapter = new SqlDataAdapter(selectStatement, conn))
                 {
                     adapter.Fill(cacheTable);
                 }
@@ -240,12 +244,21 @@
             }
         }
 
-        public override ISourceBlock<KeyValuePair<TIn, DataRowView>> OutputBlock
+        public override ISourceBlock<TOut> OutputBlock
         {
             get
             {
                 return m_lookupNode.OutputBlock;
             }
+        }
+    }
+
+    public abstract class DbDataJoiner<TIn, TKey> : DbDataJoiner<TIn, TIn, TKey>
+        where TIn : class
+    {
+        protected DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, TargetTable dimTableTarget, int batchSize)
+            : base(joinOn, dimTableTarget, batchSize)
+        {
         }
     }
 }

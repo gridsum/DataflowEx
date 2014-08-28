@@ -9,6 +9,7 @@ namespace Gridsum.DataflowEx.Test.ETL
     using System.Data;
     using System.Data.Entity;
     using System.Diagnostics;
+    using System.Linq.Expressions;
     using System.Threading.Tasks.Dataflow;
 
     using Gridsum.DataflowEx.Databases;
@@ -20,6 +21,26 @@ namespace Gridsum.DataflowEx.Test.ETL
     [TestClass]
     public class TestDataJoiner
     {
+        class JoinerWithAsserter : DbDataJoiner<Trunk, string>
+        {
+            public int Count;
+
+            public JoinerWithAsserter(Expression<Func<Trunk, string>> joinOn, TargetTable dimTableTarget, int batchSize)
+                : base(joinOn, dimTableTarget, batchSize)
+            {
+                this.Count = 0;
+            }
+
+            protected override Trunk OnSuccessfulLookup(Trunk input, DataRowView rowInDimTable)
+            {
+                Assert.AreEqual(input.Pointer, rowInDimTable["Key"]);
+                Assert.AreEqual("Str" + input.Pointer, rowInDimTable["StrValue"]);
+                this.Count++;
+
+                return input;
+            }
+        }
+
         [TestMethod]
         public async Task TestDataJoinerJoining()
         {
@@ -34,24 +55,12 @@ namespace Gridsum.DataflowEx.Test.ETL
             
             context.SaveChanges();
 
-            var joiner = new DbDataJoiner<Trunk, string>(
+            var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
                 8192);
-
-            int count = 0;
-            var asserter =
-                new ActionBlock<KeyValuePair<Trunk, DataRowView>>(
-                    delegate(KeyValuePair<Trunk, DataRowView> pair)
-                        {
-                            Assert.AreEqual(pair.Key.Pointer, pair.Value["Key"]);
-                            Assert.AreEqual("Str" + pair.Key.Pointer, pair.Value["StrValue"]);
-                            count ++;
-                        }).ToDataflow();
-
-            asserter.Name = "asserter";
             
-            joiner.LinkTo(asserter);
+            joiner.LinkLeftToNull();
 
             var dataArray = new[]
                                 {
@@ -65,10 +74,8 @@ namespace Gridsum.DataflowEx.Test.ETL
                                 };
 
             await joiner.ProcessAsync(dataArray);
-
-            await asserter.CompletionTask;
-
-            Assert.AreEqual(dataArray.Length, count);
+            
+            Assert.AreEqual(dataArray.Length, joiner.Count);
         }
     }
 
