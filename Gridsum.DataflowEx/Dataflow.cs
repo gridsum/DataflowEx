@@ -18,8 +18,8 @@ namespace Gridsum.DataflowEx
 
     /// <summary>
     /// Core concept of DataflowEx. Represents a reusable dataflow component with its processing logic, which
-    /// may contain one or multiple children. A child could be either a block or a dataflow
-    /// Inheritors of this class should call RegisterBlock in their constructors.
+    /// may contain one or multiple children. A child could be either a block or a dataflow.
+    /// Inheritors of this class should call RegisterChild in their constructors.
     /// </summary>
     public class Dataflow : IDataflow
     {
@@ -101,7 +101,7 @@ namespace Gridsum.DataflowEx
         }
         
         /// <summary>
-        /// Register this block to block meta. Also make sure the dataflow will fail if the registered block fails.
+        /// Register this block as child. Also make sure the dataflow will fail if the registered block fails.
         /// </summary>
         public void RegisterChild(IDataflowBlock block, Action<Task> blockCompletionCallback = null, bool allowDuplicate = false, string displayName = null)
         {
@@ -113,6 +113,9 @@ namespace Gridsum.DataflowEx
             RegisterChild(new BlockMeta(block, this, blockCompletionCallback, displayName), allowDuplicate);
         }
 
+        /// <summary>
+        /// Register a sub dataflow as child. Also make sure the dataflow will fail if the registered dataflow fails.
+        /// </summary>
         public void RegisterChild(Dataflow childFlow, Action<Task> dataflowCompletionCallback = null, bool allowDuplicate = false)
         {
             if (childFlow == null)
@@ -120,7 +123,7 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("childFlow");
             }
 
-            if (this.HasCircularDependency(childFlow))
+            if (this.IsMyAncestor(childFlow))
             {
                 throw new ArgumentException(
                     string.Format("{0} Cannot register a child {1} who is already my ancestor", this.FullName, childFlow.FullName));
@@ -131,13 +134,16 @@ namespace Gridsum.DataflowEx
             RegisterChild(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback), allowDuplicate);
         }
 
-        private bool HasCircularDependency(Dataflow flow)
+        /// <summary>
+        /// Check if the flow is the ancestor of this flow
+        /// </summary>
+        private bool IsMyAncestor(Dataflow flow)
         {
             if (object.ReferenceEquals(flow, this)) return true;
 
             foreach (var subFlow in flow.Children.OfType<ChildDataflowMeta>().Select(_ => _.Flow))
             {
-                if (this.HasCircularDependency(subFlow))
+                if (this.IsMyAncestor(subFlow))
                 {
                     return true;
                 }
@@ -146,6 +152,9 @@ namespace Gridsum.DataflowEx
             return false;
         }
 
+        /// <summary>
+        /// Check if the flow is my child
+        /// </summary>
         public bool IsMyChild(IDataflow flow)
         {
             return m_children.Any(child => object.ReferenceEquals(child.Unwrap(), flow));

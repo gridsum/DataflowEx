@@ -65,6 +65,10 @@ namespace Gridsum.DataflowEx
                         m_host.Fault(exception); //fault other blocks if this is an original exception
                         //todo: log this original exception
                     }
+                    {
+                        //todo: extension point
+
+                    }
                 }
                 else if (task.Status == TaskStatus.Canceled)
                 {
