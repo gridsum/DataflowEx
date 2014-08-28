@@ -14,7 +14,7 @@
       Gridsum.DataflowEx provides Object-Oriented extensions to TPL Dataflow library.
       You can write reusable components with mutable states and easily join them as a high-level graph while still having the power of low level blocks from TPL Dataflow. Other cool features include: Upstream failure propagation, built-in performance monitor, auto complete support, sql bulk inserter, etc. Find more at https://github.com/gridsum/dataflowex.
     </description>
-    <releaseNotes>A better DataBrancher that supports multiple outputs. Add varbinary support for bulk insertion.</releaseNotes>
+    <releaseNotes>Add DbDataJoiner to help lookup and populate a dimension table. Also comes with a new ring completion mechanism.</releaseNotes>
     <copyright>Copyright 2014, Gridsum</copyright>
     <tags>tpl dataflow dataflowex block gridsum bulk</tags>
   </metadata>
