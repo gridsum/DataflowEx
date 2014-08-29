@@ -83,7 +83,7 @@ namespace Gridsum.DataflowEx
             if (m_condBuilder.Count == 0)
             {
                 //link first output as primary output
-                base.LinkTo(other);    
+                base.GoTo(other);    
             }
             else
             {
