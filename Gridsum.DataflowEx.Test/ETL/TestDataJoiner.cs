@@ -59,7 +59,8 @@ namespace Gridsum.DataflowEx.Test.ETL
                 t => t.Pointer,
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
                 8192);
-            
+
+            joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
             joiner.LinkLeftToNull();
 
             var dataArray = new[]

@@ -124,8 +124,8 @@ namespace Gridsum.DataflowEx.Test
             var b = new BatchBlock<int>(1000);
             b.Post(1);
             b.Post(2);
-
-            Assert.AreEqual(2, b.GetBufferCount().Total());
+            b.TriggerBatch();
+            Assert.AreEqual(b.BatchSize, b.GetBufferCount().Total());
         }
     }
 }
