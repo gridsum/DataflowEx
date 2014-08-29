@@ -44,10 +44,14 @@
         {
             private Func<TIn, TKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
+            private IEqualityComparer<TKey> m_keyComparer;
 
             public DimTableInserter(TargetTable targetTable, Expression<Func<TIn, TKey>> joinBy)
                 : base(targetTable, DataflowOptions.Default)
             {
+                m_keyComparer = typeof(TKey) == typeof(byte[])
+                                    ? (IEqualityComparer<TKey>)((object)new ByteArrayEqualityComparer())
+                                    : EqualityComparer<TKey>.Default;
                 m_keyGetter = joinBy.Compile();
                 m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
                 RegisterChild(m_outputBlock);
@@ -73,12 +77,12 @@
 
             public bool Equals(TIn x, TIn y)
             {
-                return m_keyGetter(x).Equals(m_keyGetter(y));
+                return this.m_keyComparer.Equals(m_keyGetter(x),m_keyGetter(y));
             }
 
             public int GetHashCode(TIn obj)
             {
-                return m_keyGetter(obj).GetHashCode();
+                return this.m_keyComparer.GetHashCode(m_keyGetter(obj));
             }
             
             public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
@@ -224,14 +228,17 @@
 //                    null);
 //            }
 
+            LogHelper.Logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
+                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
+
             DataView indexedTable = new DataView(
                 cacheTable,
                 null,
                 this.m_joinOnMapping.DestColumnName,
                 DataViewRowState.CurrentRows);
 
-            LogHelper.Logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
-                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
+            LogHelper.Logger.DebugFormat("{0} Indexing done for in-memory join table '{1}'. Label: {2}",
+                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
 
             return indexedTable;
         }
