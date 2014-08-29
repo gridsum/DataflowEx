@@ -64,6 +64,14 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        public DataflowOptions DataflowOptions
+        {
+            get
+            {
+                return m_dataflowOptions;
+            }
+        }
+
         public string FullName
         {
             get

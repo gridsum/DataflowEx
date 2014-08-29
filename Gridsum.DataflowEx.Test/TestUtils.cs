@@ -31,5 +31,27 @@ namespace Gridsum.DataflowEx.Test
                dbName );
             return connectString;
         }
+
+        public static byte[] ToByteArray(this string s)
+        {
+            return Encoding.UTF8.GetBytes(s);
+        }
+
+        public static bool ArrayEqual(byte[] a, byte[] b)
+        {
+            if (a.Length == b.Length)
+            {
+                for (int i = 0; i < a.Length; i++)
+                {
+                    if (a[i] != b[i]) return false;
+                }
+
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }
