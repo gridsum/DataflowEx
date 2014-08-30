@@ -49,7 +49,7 @@ namespace Gridsum.DataflowEx.Databases
         private readonly string m_destLabel;
         private readonly Dictionary<int, Func<T, object>> m_properties;
         private readonly ILog m_classLogger;
-        private DataTable m_schemaTable;
+        private Lazy<DataTable> m_schemaTable;
 
         #region ctor and init
 
@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx.Databases
             m_destinationTablename = string.IsNullOrWhiteSpace(target.TableName)
                 ? typeof (T).Name
                 : target.TableName;
-            m_schemaTable = null;
+            m_schemaTable = new Lazy<DataTable>(this.GetSchemaTable);
             m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();
             m_classLogger = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name + "." + this.GetType().GetFriendlyName()); 
@@ -84,22 +84,31 @@ namespace Gridsum.DataflowEx.Databases
                 m_properties.Add(mapping.DestColumnOffset, lambda.Compile());
             }
         }
-        
+
+        public DataTable SchemaTable
+        {
+            get
+            {
+                return m_schemaTable.Value;
+            }
+        }
+
         private DataTable GetSchemaTable()
         {
+            DataTable schemaTable = null;
             if (string.IsNullOrWhiteSpace(m_connectionString))
             {
                 LogHelper.Logger.Warn("connection string is null or empty, so database table can not be found.");
-                m_schemaTable = new DataTable();
+                schemaTable = new DataTable();
             }
-            if (m_schemaTable != null) return m_schemaTable;
+            if (schemaTable != null) return schemaTable;
             using (var conn = new SqlConnection(m_connectionString))
             {
-                m_schemaTable = new DataTable();
+                schemaTable = new DataTable();
                 new SqlDataAdapter(string.Format("SELECT * FROM {0}", m_destinationTablename), conn).FillSchema(
-                    m_schemaTable, SchemaType.Source);
+                    schemaTable, SchemaType.Source);
             }
-            return m_schemaTable;
+            return schemaTable;
         }
         
         /// <summary>
@@ -194,7 +203,7 @@ namespace Gridsum.DataflowEx.Databases
 
             #region 没有属性存在DbColumnMapping。因此，采用属性名称匹配数据库
 
-            DataTable dataTable = this.GetSchemaTable();
+            DataTable dataTable = this.SchemaTable;
 
             foreach (DataColumn column in dataTable.Columns)
             {
@@ -230,7 +239,7 @@ namespace Gridsum.DataflowEx.Databases
         /// <param name="mapping"></param>
         private void PopulateDbColumnMapping(LeafPropertyNode leaf, DBColumnMapping mapping)
         {
-            DataTable schemaTable = GetSchemaTable();
+            DataTable schemaTable = this.SchemaTable;
 
             if (mapping.IsDestColumnNameOk() && mapping.IsDestColumnOffsetOk())
             {

@@ -14,6 +14,7 @@ namespace Gridsum.DataflowEx.Databases
     public class DbBulkInserter<T> : Dataflow<T>, IBatchedDataflow where T : class
     {
         protected readonly TargetTable m_targetTable;
+        protected readonly TypeAccessor<T> m_typeAccessor;
         protected readonly int m_bulkSize;
         protected readonly string m_dbBulkInserterName;
         protected readonly PostBulkInsertDelegate<T> m_postBulkInsert;
@@ -40,6 +41,7 @@ namespace Gridsum.DataflowEx.Databases
             : base(options)
         {
             m_targetTable = targetTable;
+            m_typeAccessor = TypeAccessorManager<T>.GetAccessorForTable(targetTable);
             m_bulkSize = bulkSize;
             m_dbBulkInserterName = dbBulkInserterName;
             m_postBulkInsert = postBulkInsert;
@@ -58,7 +60,7 @@ namespace Gridsum.DataflowEx.Databases
 
         protected async virtual Task DumpToDB(T[] data, TargetTable targetTable)
         {
-            using (var bulkReader = new BulkDataReader<T>(TypeAccessorManager<T>.GetAccessorForTable(targetTable), data))
+            using (var bulkReader = new BulkDataReader<T>(m_typeAccessor, data))
             {
                 using (var conn = new SqlConnection(targetTable.ConnectionString))
                 {
@@ -110,6 +112,14 @@ namespace Gridsum.DataflowEx.Databases
         {
             get {
                 return m_dbBulkInserterName ?? base.Name;
+            }
+        }
+
+        public TypeAccessor<T> TypeAccessor
+        {
+            get
+            {
+                return m_typeAccessor;
             }
         }
 

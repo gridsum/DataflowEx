@@ -42,13 +42,16 @@
         /// </summary>
         class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
+            private readonly DBColumnMapping m_joinOnMapping;
+
             private Func<TIn, TKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TKey> m_keyComparer;
 
-            public DimTableInserter(TargetTable targetTable, Expression<Func<TIn, TKey>> joinBy)
+            public DimTableInserter(TargetTable targetTable, Expression<Func<TIn, TKey>> joinBy, DBColumnMapping joinOnMapping)
                 : base(targetTable, DataflowOptions.Default)
             {
+                this.m_joinOnMapping = joinOnMapping;
                 m_keyComparer = typeof(TKey) == typeof(byte[])
                                     ? (IEqualityComparer<TKey>)((object)new ByteArrayEqualityComparer())
                                     : EqualityComparer<TKey>.Default;
@@ -67,8 +70,55 @@
                 int newCount = newArray.Length;
                 LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
 
-                await base.DumpToDB(newArray, targetTable);
+                var tmpTargetTable = new TargetTable(
+                    targetTable.DestLabel,
+                    targetTable.ConnectionString,
+                    targetTable.TableName + "_tmp");
 
+                //create tmp table
+                string createTmpTable = string.Format(
+                    "if OBJECT_ID('{0}', 'U') is not null drop table dbo.profile2;"
+                    + "select * into {0} from {1} where 0 = 1",
+                    tmpTargetTable.TableName,
+                    targetTable.TableName);
+
+                using (var connection = new SqlConnection(targetTable.ConnectionString))
+                {
+                    SqlCommand command = new SqlCommand(createTmpTable, connection);
+                    command.ExecuteNonQuery();
+                }
+
+                await base.DumpToDB(newArray, tmpTargetTable);
+
+                //merge
+                string mergeTmpToDimTable =
+                    string.Format(
+                        "MERGE INTO {0} as TGT" + "USING {1} as SRC on TGT.{2} = SRC.{2}"
+                        + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4}"
+                        + "OUTPUT $action, inserted.{5}, deleted.{5}, inserted.{2}, deleted.{2}",
+                        targetTable.TableName,
+                        tmpTargetTable.TableName,
+                        m_joinOnMapping.DestColumnName,
+                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, ""),
+                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, "SRC"),
+                        Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
+                        );
+
+                using (var connection = new SqlConnection(targetTable.ConnectionString))
+                {
+                    SqlCommand command = new SqlCommand(mergeTmpToDimTable, connection);
+
+                    SqlDataReader reader = command.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        //todo: get sub cache from merge output
+                        Console.WriteLine(String.Format("{0}", reader[0]));
+                    }
+                }
+                
+                //todo: update global cache using the sub cache
+
+                //todo: lookup from the sub cache and output directly (no lookup again)
                 var redoBatch = new JoinBatch<TIn>(data, CacheRefreshStrategy.Always);
                 m_outputBlock.SafePost(redoBatch);
 
@@ -131,7 +181,7 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(dimTableTarget, joinOn);
+            m_dimInserter = new DimTableInserter(dimTableTarget, joinOn, m_joinOnMapping);
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
             m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
@@ -179,11 +229,12 @@
 
                 if (idx != -1)
                 {
-                    DataRowView row = this.m_indexedTable[idx];
+                    DataRowView row = m_indexedTable[idx];
                     outputList.Add(this.OnSuccessfulLookup(input, row));
                 }
                 else
                 {
+                    //post to dim inserter directly
                     m_dimInserter.InputBlock.SafePost(input);
                 }
             }
@@ -196,7 +247,7 @@
         /// Usually the implementation of this method should assign to some fields/properties(e.g. key column) of the input item according to the dimension row.
         /// </summary>
         protected abstract TOut OnSuccessfulLookup(TIn input, DataRowView rowInDimTable);
-
+        
         protected virtual string GetDimTableQueryString(string tableName)
         {
             return string.Format("select * from {0}", tableName);
@@ -218,16 +269,7 @@
                     adapter.Fill(cacheTable);
                 }
             }
-
-//            if (!typeof(TUpdate).IsAssignableFrom(cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType))
-//            {
-//                throw new InvalidDBColumnMappingException(
-//                    "Generic type is not assignable from db column type: "
-//                    + cacheTable.Columns[this.m_updateOnMapping.DestColumnName].DataType,
-//                    this.m_updateOnMapping,
-//                    null);
-//            }
-
+            
             LogHelper.Logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
 
