@@ -16,45 +16,46 @@
     public struct JoinBatch<TIn> where TIn : class
     {
         public readonly TIn[] Data;
-        public readonly CacheRefreshStrategy Strategy;
+        public readonly CacheLookupStrategy Strategy;
         
-        public JoinBatch(TIn[] batch, CacheRefreshStrategy strategy)
+        public JoinBatch(TIn[] batch, CacheLookupStrategy strategy)
         {
             Strategy = strategy;
             this.Data = batch;
         }
     }
 
-    public enum CacheRefreshStrategy
+    public enum CacheLookupStrategy
     {
-        Never,
-        Auto,
-        Always,
+        NoLookup,
+        LocalLookup,
+        RemoteLookup,
     }
 
-    public abstract class DbDataJoiner<TIn, TOut, TKey> : Dataflow<TIn, TOut> where TIn : class 
+    public abstract class DbDataJoiner<TIn, TLookupKey> : Dataflow<TIn, TIn> where TIn : class 
     {
         /// <summary>
         /// Used by the joiner to insert unmatched rows to the dim table.
         /// 2 differences between this and standard db bulkinserter:
         /// (1) It has a preprocess step to select distinct rows
-        /// (2) It will output original data out tagged with CacheRefreshStrategy.Always
+        /// (2) It will output original data out tagged with CacheLookupStrategy.NoLookup
         /// </summary>
         class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
+            private readonly DbDataJoiner<TIn, TLookupKey> m_host;
             private readonly DBColumnMapping m_joinOnMapping;
-
-            private Func<TIn, TKey> m_keyGetter;
+            private Func<TIn, TLookupKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
-            private IEqualityComparer<TKey> m_keyComparer;
+            private IEqualityComparer<TLookupKey> m_keyComparer;
 
-            public DimTableInserter(TargetTable targetTable, Expression<Func<TIn, TKey>> joinBy, DBColumnMapping joinOnMapping)
+            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy, DBColumnMapping joinOnMapping)
                 : base(targetTable, DataflowOptions.Default)
             {
+                this.m_host = host;
                 this.m_joinOnMapping = joinOnMapping;
-                m_keyComparer = typeof(TKey) == typeof(byte[])
-                                    ? (IEqualityComparer<TKey>)((object)new ByteArrayEqualityComparer())
-                                    : EqualityComparer<TKey>.Default;
+                m_keyComparer = typeof(TLookupKey) == typeof(byte[])
+                                    ? (IEqualityComparer<TLookupKey>)((object)new ByteArrayEqualityComparer())
+                                    : EqualityComparer<TLookupKey>.Default;
                 m_keyGetter = joinBy.Compile();
                 m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
                 RegisterChild(m_outputBlock);
@@ -104,6 +105,8 @@
                         Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
                         );
 
+                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>();
+
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
                     SqlCommand command = new SqlCommand(mergeTmpToDimTable, connection);
@@ -111,15 +114,33 @@
                     SqlDataReader reader = command.ExecuteReader();
                     while (reader.Read())
                     {
-                        //todo: get sub cache from merge output
-                        Console.WriteLine(String.Format("{0}", reader[0]));
+                        long dimKey = reader.GetInt64(1);
+                        TLookupKey joinColumnValue = (TLookupKey) reader[3];
+                        subCache.Add(
+                            joinColumnValue, 
+                            new PartialDimRow<TLookupKey> {AutoIncrementKey =  dimKey, JoinOn = joinColumnValue});
+                    }
+                }
+
+                var globalCache = m_host.m_rowCache;
+
+                //update global cache using the sub cache
+                lock (globalCache)
+                {
+                    foreach (var dimRow in subCache)
+                    {
+                        globalCache.Add(dimRow.Key, dimRow.Value);
                     }
                 }
                 
-                //todo: update global cache using the sub cache
+                //todo: lookup from the sub cache and output directly (no global cache lookup)
+                foreach (var item in data)
+                {
+                    m_host.OnSuccessfulLookup(item, subCache[m_keyGetter(item)]);
+                }
 
-                //todo: lookup from the sub cache and output directly (no lookup again)
-                var redoBatch = new JoinBatch<TIn>(data, CacheRefreshStrategy.Always);
+                //todo: add CacheLookupStrategy.NoLookup/LocalLookup/RemoteLookup
+                var redoBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
                 m_outputBlock.SafePost(redoBatch);
 
                 IsBusy = false;
@@ -149,29 +170,28 @@
         }
         
         private readonly TargetTable m_dimTableTarget;
-        private readonly int m_batchSize;
         private BatchBlock<TIn> m_batchBlock;
-        private TransformManyDataflow<JoinBatch<TIn>, TOut> m_lookupNode;
+        private TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
         private DBColumnMapping m_joinOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
-        private DataView m_indexedTable;
+        private RowCache<TLookupKey> m_rowCache;
 
-        public DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, TargetTable dimTableTarget, int batchSize)
+        public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
             : base(DataflowOptions.Default)
         {
             m_dimTableTarget = dimTableTarget;
-            m_batchSize = batchSize;
-            m_batchBlock = new BatchBlock<TIn>(this.m_batchSize);
-            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TOut>(this.JoinBatch);
+            m_batchBlock = new BatchBlock<TIn>(batchSize);
+            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
+            m_rowCache = new RowCache<TLookupKey>(cacheSize);
 
             m_joinOnMapping = m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
-                    array => new JoinBatch<TIn>(array, CacheRefreshStrategy.Never)).ToDataflow();
+                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup)).ToDataflow();
             transformer.Name = "ArrayToJoinBatchConverter";
 
             transformer.LinkFromBlock(m_batchBlock);
@@ -181,7 +201,7 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(dimTableTarget, joinOn, m_joinOnMapping);
+            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn, m_joinOnMapping);
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
             m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
@@ -212,41 +232,61 @@
             return pi;
         }
 
-        protected virtual IEnumerable<TOut> JoinBatch(JoinBatch<TIn> batch)
+        protected virtual IEnumerable<TIn> JoinBatch(JoinBatch<TIn> batch)
         {
-            if (m_indexedTable == null || batch.Strategy == CacheRefreshStrategy.Always)
+            if (m_rowCache.Count == 0)
             {
-                m_indexedTable = this.RegenerateJoinTable();
+                InitializeCache(m_rowCache);
             }
-
-            var outputList = new List<TOut>(m_batchSize);
-
+            
+            if (batch.Strategy == CacheLookupStrategy.NoLookup)
+            {
+                return batch.Data;
+            }
+            
             Func<TIn, object> accessor = m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset);
 
-            foreach (var input in batch.Data)
+            lock (m_rowCache) //may have race condition with dimtableinserter who will update the global cache
             {
-                int idx = this.m_indexedTable.Find(accessor(input));
-
-                if (idx != -1)
+                foreach (var input in batch.Data)
                 {
-                    DataRowView row = m_indexedTable[idx];
-                    outputList.Add(this.OnSuccessfulLookup(input, row));
-                }
-                else
-                {
-                    //post to dim inserter directly
-                    m_dimInserter.InputBlock.SafePost(input);
+                    IDimRow<TLookupKey> row;
+                    if (m_rowCache.TryGetValue((TLookupKey)accessor(input), out row))
+                    {
+                        this.OnSuccessfulLookup(input, row);
+                    }
+                    else
+                    {
+                        if (batch.Strategy == CacheLookupStrategy.RemoteLookup)
+                        {
+                            //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
+                            m_dimInserter.InputBlock.SafePost(input);
+                        }
+                        else
+                        {
+                            //Local lookup failed. record in garbage recorder as the input is discarded.
+                            this.GarbageRecorder.Record(input);
+                        }
+                    }
                 }
             }
 
-            return outputList;
+            return batch.Data;
+        }
+
+        /// <summary>
+        /// Override this method to customize row cache initialization logic
+        /// </summary>
+        protected virtual void InitializeCache(RowCache<TLookupKey> cache)
+        {
+            //no op by default
         }
 
         /// <summary>
         /// The function to call when an input item finds a row in the dimension table by joining condition.
         /// Usually the implementation of this method should assign to some fields/properties(e.g. key column) of the input item according to the dimension row.
         /// </summary>
-        protected abstract TOut OnSuccessfulLookup(TIn input, DataRowView rowInDimTable);
+        protected abstract void OnSuccessfulLookup(TIn input, IDimRow<TLookupKey> rowInDimTable);
         
         protected virtual string GetDimTableQueryString(string tableName)
         {
@@ -293,21 +333,12 @@
             }
         }
 
-        public override ISourceBlock<TOut> OutputBlock
+        public override ISourceBlock<TIn> OutputBlock
         {
             get
             {
                 return m_lookupNode.OutputBlock;
             }
-        }
-    }
-
-    public abstract class DbDataJoiner<TIn, TKey> : DbDataJoiner<TIn, TIn, TKey>
-        where TIn : class
-    {
-        protected DbDataJoiner(Expression<Func<TIn, TKey>> joinOn, TargetTable dimTableTarget, int batchSize)
-            : base(joinOn, dimTableTarget, batchSize)
-        {
         }
     }
 }
