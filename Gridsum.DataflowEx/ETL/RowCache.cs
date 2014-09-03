@@ -34,17 +34,25 @@
             this.m_dict = new Dictionary<TJoinKey, IDimRow<TJoinKey>>(keyEqualityComparer);
         }
 
-        public void Add(TJoinKey key, IDimRow<TJoinKey> row)
+        public bool TryAdd(TJoinKey key, IDimRow<TJoinKey> row)
         {
-            this.m_dict.Add(key, row);
-            IPriorityQueueHandle<IDimRow<TJoinKey>> handle = null;
-            this.m_rowPriorityQueue.Add(ref handle, row);
-            row.Handle = handle;
-
-            while (this.m_dict.Count > this.m_size)
+            if (this.m_dict.ContainsKey(key))
             {
-                var discardRow = this.m_rowPriorityQueue.DeleteMin();
-                this.m_dict.Remove(discardRow.JoinOn);
+                return false;
+            }
+            else
+            {
+                this.m_dict.Add(key, row);
+                IPriorityQueueHandle<IDimRow<TJoinKey>> handle = null;
+                this.m_rowPriorityQueue.Add(ref handle, row);
+                row.Handle = handle;
+
+                while (this.m_dict.Count > this.m_size)
+                {
+                    var discardRow = this.m_rowPriorityQueue.DeleteMin();
+                    this.m_dict.Remove(discardRow.JoinOn);
+                }
+                return true;
             }
         }
 

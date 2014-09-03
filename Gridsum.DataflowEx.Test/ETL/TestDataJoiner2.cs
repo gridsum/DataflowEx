@@ -52,7 +52,7 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
-                8192);
+                2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
 
@@ -65,6 +65,17 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
                                     new Trunk() { Pointer = "7".ToByteArray() }, 
                                     new Trunk() { Pointer = "7".ToByteArray() },
                                     new Trunk() { Pointer = "9".ToByteArray() },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                 };

@@ -43,7 +43,6 @@
         class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
             private readonly DbDataJoiner<TIn, TLookupKey> m_host;
-            private readonly DBColumnMapping m_joinOnMapping;
             private Func<TIn, TLookupKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TLookupKey> m_keyComparer;
@@ -59,7 +58,7 @@
                 m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
             }
             
-            protected override async Task DumpToDB(TIn[] data, TargetTable targetTable)
+            protected override async Task DumpToDBAsync(TIn[] data, TargetTable targetTable)
             {
                 IsBusy = true;
 
@@ -87,7 +86,7 @@
                     command.ExecuteNonQuery();
                 }
 
-                await base.DumpToDB(deduplicatedData, tmpTargetTable);
+                await base.DumpToDBAsync(deduplicatedData, tmpTargetTable);
 
                 //merge
                 string mergeTmpToDimTable =
@@ -99,7 +98,7 @@
                         + "OUTPUT $action, inserted.[{5}], deleted.[{5}], inserted.[{2}], deleted.[{2}] ;",
                         targetTable.TableName,
                         tmpTargetTable.TableName,
-                        m_joinOnMapping.DestColumnName,
+                        m_host.m_joinOnMapping.DestColumnName,
                         Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, ""),
                         Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, "SRC"),
                         Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
@@ -107,7 +106,7 @@
 
                 LogHelper.Logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, mergeTmpToDimTable);
 
-                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(m_keyComparer);
+                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(deduplicatedData.Length / 2, m_keyComparer);
 
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
@@ -115,11 +114,16 @@
 
                     SqlCommand command = new SqlCommand(mergeTmpToDimTable, connection);
 
+                    var autoKeyColumn = Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns);
+                    bool is64BitAutoKey = autoKeyColumn.DataType == typeof(long);
+
                     SqlDataReader reader = command.ExecuteReader();
                     while (reader.Read())
                     {
-                        long dimKey = reader.GetFieldType(1) == typeof(long) ? reader.GetInt64(1) : reader.GetInt32(1); //$inserted.AutoKey
+                        long dimKey = is64BitAutoKey ? reader.GetInt64(1) : reader.GetInt32(1); //$inserted.AutoKey
                         TLookupKey joinColumnValue = (TLookupKey) reader[3]; //$inserted.JoinOnColumn
+
+                        //add to the subcache no matter it is an "UPDATE" or "INSERT"
                         subCache.Add(
                             joinColumnValue, 
                             new PartialDimRow<TLookupKey> {AutoIncrementKey =  dimKey, JoinOn = joinColumnValue});
@@ -133,14 +137,16 @@
                 {
                     foreach (var dimRow in subCache)
                     {
-                        globalCache.Add(dimRow.Key, dimRow.Value);
+                        globalCache.TryAdd(dimRow.Key, dimRow.Value);
                     }
                 }
                 
                 //lookup from the sub cache (no global cache lookup)
+                var host = m_host;
+                var keyGetter = m_keyGetter;
                 foreach (var item in data)
                 {
-                    m_host.OnSuccessfulLookup(item, subCache[m_keyGetter(item)]);
+                    host.OnSuccessfulLookup(item, subCache[keyGetter(item)]);
                 }
 
                 //and output as a already-looked-up batch

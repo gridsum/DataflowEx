@@ -46,20 +46,17 @@ namespace Gridsum.DataflowEx.Databases
             m_dbBulkInserterName = dbBulkInserterName;
             m_postBulkInsert = postBulkInsert;
             m_batchBlock = new BatchBlock<T>(bulkSize);
-            m_actionBlock = new ActionBlock<T[]>(async array =>
-            {
-                LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
-                await DumpToDB(array, targetTable);
-                LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
-            });
+            m_actionBlock = new ActionBlock<T[]>(array => this.DumpToDBAsync(array, targetTable));
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
 
             RegisterChild(m_batchBlock);
             RegisterChild(m_actionBlock);
         }
 
-        protected async virtual Task DumpToDB(T[] data, TargetTable targetTable)
+        protected async virtual Task DumpToDBAsync(T[] data, TargetTable targetTable)
         {
+            LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+
             using (var bulkReader = new BulkDataReader<T>(m_typeAccessor, data))
             {
                 using (var conn = new SqlConnection(targetTable.ConnectionString))
@@ -104,6 +101,8 @@ namespace Gridsum.DataflowEx.Databases
                     await this.OnPostBulkInsert(conn, targetTable, data);
                 }
             }
+
+            LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
         }
 
         public override ITargetBlock<T> InputBlock { get { return m_batchBlock; } }
