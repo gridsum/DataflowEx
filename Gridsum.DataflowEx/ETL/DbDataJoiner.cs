@@ -351,43 +351,6 @@
         /// </summary>
         protected abstract void OnSuccessfulLookup(TIn input, IDimRow<TLookupKey> rowInDimTable);
         
-        protected virtual string GetDimTableQueryString(string tableName)
-        {
-            return string.Format("select * from {0}", tableName);
-        }
-
-        protected virtual DataView RegenerateJoinTable()
-        {
-            m_logger.DebugFormat("{0} Pulling join table '{1}' to memory. Label: {2}",
-                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
-
-            string selectStatement = this.GetDimTableQueryString(m_dimTableTarget.TableName);
-
-            DataTable cacheTable;
-            using (var conn = new SqlConnection(this.m_dimTableTarget.ConnectionString))
-            {
-                cacheTable = new DataTable();
-                using (var adapter = new SqlDataAdapter(selectStatement, conn))
-                {
-                    adapter.Fill(cacheTable);
-                }
-            }
-            
-            m_logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
-                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
-
-            DataView indexedTable = new DataView(
-                cacheTable,
-                null,
-                this.m_joinOnMapping.DestColumnName,
-                DataViewRowState.CurrentRows);
-
-            m_logger.DebugFormat("{0} Indexing done for in-memory join table '{1}'. Label: {2}",
-                this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
-
-            return indexedTable;
-        }
-
         public override ITargetBlock<TIn> InputBlock
         {
             get
