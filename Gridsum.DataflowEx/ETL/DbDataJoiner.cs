@@ -46,7 +46,10 @@
             private Func<TIn, TLookupKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TLookupKey> m_keyComparer;
-            
+            private readonly TargetTable m_tmpTargetTable;
+            private readonly string m_createTmpTable;
+            private readonly string m_mergeTmpToDimTable;
+
             public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy)
                 : base(targetTable, DataflowOptions.Default, host.m_batchSize)
             {
@@ -56,6 +59,34 @@
                 m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
                 RegisterChild(m_outputBlock);
                 m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
+
+                m_tmpTargetTable = new TargetTable(
+                    targetTable.DestLabel,
+                    targetTable.ConnectionString,
+                    targetTable.TableName + "_tmp");
+
+                //create tmp table
+                m_createTmpTable = string.Format(
+                    "if OBJECT_ID('{0}', 'U') is not null drop table {0};"
+                    + "select * into {0} from {1} where 0 = 1",
+                    this.m_tmpTargetTable.TableName,
+                    targetTable.TableName);
+
+                //merge
+                m_mergeTmpToDimTable =
+                    string.Format(
+                        "MERGE INTO {0} as TGT "
+                        + "USING {1} as SRC on TGT.[{2}] = SRC.[{2}] "
+                        + "WHEN MATCHED THEN UPDATE SET TGT.[{2}] = TGT.[{2}]"
+                        + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4} "
+                        + "OUTPUT inserted.[{5}], inserted.[{2}] ;",
+                        targetTable.TableName,
+                        this.m_tmpTargetTable.TableName,
+                        m_host.m_joinOnMapping.DestColumnName,
+                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, ""),
+                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, "SRC"),
+                        Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
+                        );
             }
             
             protected override async Task DumpToDBAsync(TIn[] data, TargetTable targetTable)
@@ -66,53 +97,25 @@
                 var deduplicatedData = data.Distinct(this).ToArray();
                 int newCount = deduplicatedData.Length;
                 LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
-
-                var tmpTargetTable = new TargetTable(
-                    targetTable.DestLabel,
-                    targetTable.ConnectionString,
-                    targetTable.TableName + "_tmp");
-
-                //create tmp table
-                string createTmpTable = string.Format(
-                    "if OBJECT_ID('{0}', 'U') is not null drop table {0};"
-                    + "select * into {0} from {1} where 0 = 1",
-                    tmpTargetTable.TableName,
-                    targetTable.TableName);
-
+                
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
                     connection.Open();
-                    SqlCommand command = new SqlCommand(createTmpTable, connection);
+                    SqlCommand command = new SqlCommand(m_createTmpTable, connection);
                     command.ExecuteNonQuery();
                 }
 
-                await base.DumpToDBAsync(deduplicatedData, tmpTargetTable);
+                await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable);
+                
+                LogHelper.Logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, m_mergeTmpToDimTable);
 
-                //merge
-                string mergeTmpToDimTable =
-                    string.Format(
-                        "MERGE INTO {0} as TGT " 
-                        + "USING {1} as SRC on TGT.[{2}] = SRC.[{2}] "
-                        + "WHEN MATCHED THEN UPDATE SET TGT.[{2}] = TGT.[{2}]"
-                        + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4} "
-                        + "OUTPUT $action, inserted.[{5}], deleted.[{5}], inserted.[{2}], deleted.[{2}] ;",
-                        targetTable.TableName,
-                        tmpTargetTable.TableName,
-                        m_host.m_joinOnMapping.DestColumnName,
-                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, ""),
-                        Utils.FlattenColumnNames(m_typeAccessor.SchemaTable.Columns, "SRC"),
-                        Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
-                        );
-
-                LogHelper.Logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, mergeTmpToDimTable);
-
-                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(deduplicatedData.Length / 2, m_keyComparer);
+                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(deduplicatedData.Length, m_keyComparer);
 
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
                     connection.Open();
 
-                    SqlCommand command = new SqlCommand(mergeTmpToDimTable, connection);
+                    SqlCommand command = new SqlCommand(this.m_mergeTmpToDimTable, connection);
 
                     var autoKeyColumn = Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns);
                     bool is64BitAutoKey = autoKeyColumn.DataType == typeof(long);
@@ -120,8 +123,8 @@
                     SqlDataReader reader = command.ExecuteReader();
                     while (reader.Read())
                     {
-                        long dimKey = is64BitAutoKey ? reader.GetInt64(1) : reader.GetInt32(1); //$inserted.AutoKey
-                        TLookupKey joinColumnValue = (TLookupKey) reader[3]; //$inserted.JoinOnColumn
+                        long dimKey = is64BitAutoKey ? reader.GetInt64(0) : reader.GetInt32(0); //$inserted.AutoKey
+                        TLookupKey joinColumnValue = (TLookupKey) reader[1]; //$inserted.JoinOnColumn
 
                         //add to the subcache no matter it is an "UPDATE" or "INSERT"
                         subCache.Add(
@@ -141,6 +144,8 @@
                     }
                 }
                 
+                LogHelper.Logger.DebugFormat("{0} Global cache now has {1} items after merging sub cache", FullName, globalCache.Count);
+
                 //lookup from the sub cache (no global cache lookup)
                 var host = m_host;
                 var keyGetter = m_keyGetter;
@@ -264,6 +269,8 @@
             
             Func<TIn, object> accessor = m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset);
 
+            var outputList = new List<TIn>(batch.Data.Length / 2);
+            int missCount = 0;
             lock (m_rowCache) //may have race condition with dimtableinserter who will update the global cache
             {
                 foreach (var input in batch.Data)
@@ -272,9 +279,12 @@
                     if (m_rowCache.TryGetValue((TLookupKey)accessor(input), out row))
                     {
                         this.OnSuccessfulLookup(input, row);
+                        outputList.Add(input);
                     }
                     else
                     {
+                        missCount ++;
+
                         if (batch.Strategy == CacheLookupStrategy.RemoteLookup)
                         {
                             //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
@@ -289,7 +299,9 @@
                 }
             }
 
-            return batch.Data;
+            LogHelper.Logger.DebugFormat("{0} {1} cache miss among {2} lookup", FullName, missCount, batch.Data.Length);
+
+            return outputList;
         }
 
         /// <summary>
