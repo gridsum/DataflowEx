@@ -34,6 +34,9 @@
     <DocumentationFile>bin\Release\Gridsum.DataflowEx.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="C5">
+      <HintPath>..\packages\C5.2.3.0.1\lib\net40\C5.dll</HintPath>
+    </Reference>
     <Reference Include="Common.Logging">
       <HintPath>..\packages\Common.Logging.2.2.0\lib\net40\Common.Logging.dll</HintPath>
     </Reference>
@@ -47,9 +50,9 @@
     </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.IO" />
-    <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.20.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+    <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.23.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.20\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
+      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.23\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -80,6 +83,9 @@
     <Compile Include="Databases\DBColumnMapping.cs" />
     <Compile Include="DataBrancher.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
+    <Compile Include="ETL\PartialDimRow.cs" />
+    <Compile Include="ETL\IDimRow.cs" />
+    <Compile Include="ETL\RowCache.cs" />
     <Compile Include="Exceptions\NoChildRegisteredException.cs" />
     <Compile Include="Exceptions\TaskEx.cs" />
     <Compile Include="IntHolder.cs" />
@@ -108,7 +114,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Gridsum.DataflowEx.nuspec" />
-    <None Include="packages.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

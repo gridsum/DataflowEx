@@ -3,6 +3,7 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
     using System;
     using System.Data;
     using System.Data.Entity;
+    using System.Data.Entity.Core.Common.CommandTrees.ExpressionBuilder;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Text;
@@ -26,13 +27,11 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
                 this.Count = 0;
             }
 
-            protected override Trunk OnSuccessfulLookup(Trunk input, DataRowView rowInDimTable)
+            protected override void OnSuccessfulLookup(Trunk input, IDimRow<byte[]> rowInDimTable)
             {
-                Assert.IsTrue(TestUtils.ArrayEqual(input.Pointer, (byte[])rowInDimTable["Key"]));
-                Assert.AreEqual("Str" + Encoding.UTF8.GetString(input.Pointer), rowInDimTable["StrValue"]);
+                Assert.IsTrue(TestUtils.ArrayEqual(input.Pointer, rowInDimTable.JoinOn));
+                //Assert.AreEqual("Str" + Encoding.UTF8.GetString(input.Pointer), rowInDimTable["StrValue"]);
                 this.Count++;
-
-                return input;
             }
         }
 
@@ -53,7 +52,7 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
-                8192);
+                2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
 
@@ -66,6 +65,17 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
                                     new Trunk() { Pointer = "7".ToByteArray() }, 
                                     new Trunk() { Pointer = "7".ToByteArray() },
                                     new Trunk() { Pointer = "9".ToByteArray() },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99".ToByteArray(), Leaf = new Leaf() { StrValue = "Str99" } },
                                 };
@@ -96,7 +106,6 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
 
         public int Id { get; set; }
 
-        [DBColumnMapping(DimLeaf)]
         public byte[] Key { get; set; }
 
         [DBColumnMapping(DimLeaf)]
