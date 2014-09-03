@@ -106,7 +106,6 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
 
         public int Id { get; set; }
 
-        [DBColumnMapping(DimLeaf)]
         public byte[] Key { get; set; }
 
         [DBColumnMapping(DimLeaf)]
