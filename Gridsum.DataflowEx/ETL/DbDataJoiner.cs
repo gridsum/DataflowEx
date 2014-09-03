@@ -10,6 +10,8 @@
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
 
+    using Common.Logging;
+
     using Gridsum.DataflowEx.AutoCompletion;
     using Gridsum.DataflowEx.Databases;
 
@@ -40,7 +42,7 @@
         /// (1) It has a preprocess step to select distinct rows
         /// (2) It will output original data out tagged with CacheLookupStrategy.NoLookup
         /// </summary>
-        class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
+        protected class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
             private readonly DbDataJoiner<TIn, TLookupKey> m_host;
             private Func<TIn, TLookupKey> m_keyGetter;
@@ -77,7 +79,7 @@
                     string.Format(
                         "MERGE INTO {0} as TGT "
                         + "USING {1} as SRC on TGT.[{2}] = SRC.[{2}] "
-                        + "WHEN MATCHED THEN UPDATE SET TGT.[{2}] = TGT.[{2}]"
+                        + "WHEN MATCHED THEN UPDATE SET TGT.[{2}] = TGT.[{2}] "
                         + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4} "
                         + "OUTPUT inserted.[{5}], inserted.[{2}] ;",
                         targetTable.TableName,
@@ -96,7 +98,7 @@
                 int oldCount = data.Length;
                 var deduplicatedData = data.Distinct(this).ToArray();
                 int newCount = deduplicatedData.Length;
-                LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
+                m_host.m_logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
                 
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
@@ -107,7 +109,7 @@
 
                 await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable);
                 
-                LogHelper.Logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, m_mergeTmpToDimTable);
+                m_host.m_logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, m_mergeTmpToDimTable);
 
                 var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(deduplicatedData.Length, m_keyComparer);
 
@@ -144,7 +146,7 @@
                     }
                 }
                 
-                LogHelper.Logger.DebugFormat("{0} Global cache now has {1} items after merging sub cache", FullName, globalCache.Count);
+                m_host.m_logger.DebugFormat("{0} Global cache now has {1} items after merging sub cache", FullName, globalCache.Count);
 
                 //lookup from the sub cache (no global cache lookup)
                 var host = m_host;
@@ -184,17 +186,16 @@
             public bool IsBusy { get; private set; }
         }
         
-        private readonly TargetTable m_dimTableTarget;
-
-        private readonly int m_batchSize;
-
-        private BatchBlock<TIn> m_batchBlock;
-        private TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
-        private DBColumnMapping m_joinOnMapping;
-        private TypeAccessor<TIn> m_typeAccessor;
-        private DimTableInserter m_dimInserter;
-        private RowCache<TLookupKey> m_rowCache;
-        private IEqualityComparer<TLookupKey> m_keyComparer;
+        protected readonly TargetTable m_dimTableTarget;
+        protected readonly int m_batchSize;
+        protected BatchBlock<TIn> m_batchBlock;
+        protected TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
+        protected DBColumnMapping m_joinOnMapping;
+        protected TypeAccessor<TIn> m_typeAccessor;
+        protected DimTableInserter m_dimInserter;
+        protected RowCache<TLookupKey> m_rowCache;
+        protected IEqualityComparer<TLookupKey> m_keyComparer;
+        protected ILog m_logger;
 
         public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
             : base(DataflowOptions.Default)
@@ -209,6 +210,7 @@
                                     ? (IEqualityComparer<TLookupKey>)((object)new ByteArrayEqualityComparer())
                                     : EqualityComparer<TLookupKey>.Default;
             m_rowCache = new RowCache<TLookupKey>(cacheSize, m_keyComparer);
+            m_logger = Utils.GetNamespaceLogger();
 
             m_joinOnMapping = m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             
@@ -224,7 +226,7 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn);
+            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn) {Name = "DimInserter"};
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
             m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
@@ -299,7 +301,7 @@
                 }
             }
 
-            LogHelper.Logger.DebugFormat("{0} {1} cache miss among {2} lookup", FullName, missCount, batch.Data.Length);
+            m_logger.DebugFormat("{0} {1} cache miss among {2} lookup in this round of JoinBatch()", FullName, missCount, batch.Data.Length);
 
             return outputList;
         }
@@ -309,7 +311,38 @@
         /// </summary>
         protected virtual void InitializeCache(RowCache<TLookupKey> cache)
         {
-            //no op by default
+            string selectPartial = string.Format(
+                "select TOP {3} [{0}], [{1}] from {2} order by [{0}] desc",
+                Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns).ColumnName,
+                m_joinOnMapping.DestColumnName,
+                m_dimTableTarget.TableName,
+                cache.SizeLimit);
+
+            m_logger.DebugFormat("[{0}] Start to initialize cache using sql: {1}", FullName, selectPartial);
+
+            using (var connection = new SqlConnection(m_dimTableTarget.ConnectionString))
+            {
+                connection.Open();
+
+                SqlCommand command = new SqlCommand(selectPartial, connection);
+
+                var autoKeyColumn = Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns);
+                bool is64BitAutoKey = autoKeyColumn.DataType == typeof(long);
+
+                SqlDataReader reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    long dimKey = is64BitAutoKey ? reader.GetInt64(0) : reader.GetInt32(0); //$inserted.AutoKey
+                    TLookupKey joinColumnValue = (TLookupKey)reader[1]; //$inserted.JoinOnColumn
+
+                    //add to the subcache no matter it is an "UPDATE" or "INSERT"
+                    cache.TryAdd(
+                        joinColumnValue,
+                        new PartialDimRow<TLookupKey> { AutoIncrementKey = dimKey, JoinOn = joinColumnValue });
+                }
+            }
+
+            m_logger.DebugFormat("[{0}] Global cache initialized with {1} items", FullName, cache.Count);
         }
 
         /// <summary>
@@ -325,7 +358,7 @@
 
         protected virtual DataView RegenerateJoinTable()
         {
-            LogHelper.Logger.DebugFormat("{0} Pulling join table '{1}' to memory. Label: {2}",
+            m_logger.DebugFormat("{0} Pulling join table '{1}' to memory. Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
 
             string selectStatement = this.GetDimTableQueryString(m_dimTableTarget.TableName);
@@ -340,7 +373,7 @@
                 }
             }
             
-            LogHelper.Logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
+            m_logger.DebugFormat("{0} Join table '{1}' pulled ({3} rows). Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel, cacheTable.Rows.Count);
 
             DataView indexedTable = new DataView(
@@ -349,7 +382,7 @@
                 this.m_joinOnMapping.DestColumnName,
                 DataViewRowState.CurrentRows);
 
-            LogHelper.Logger.DebugFormat("{0} Indexing done for in-memory join table '{1}'. Label: {2}",
+            m_logger.DebugFormat("{0} Indexing done for in-memory join table '{1}'. Label: {2}",
                 this.FullName, m_dimTableTarget.TableName, m_dimTableTarget.DestLabel);
 
             return indexedTable;

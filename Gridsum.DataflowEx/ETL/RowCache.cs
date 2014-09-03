@@ -22,14 +22,14 @@
             }
         }
 
-        private readonly int m_size;
+        private readonly int m_sizeLimit;
 
         private IntervalHeap<IDimRow<TJoinKey>> m_rowPriorityQueue;
         private Dictionary<TJoinKey, IDimRow<TJoinKey>> m_dict;
 
-        public RowCache(int size, IEqualityComparer<TJoinKey> keyEqualityComparer)
+        public RowCache(int sizeLimit, IEqualityComparer<TJoinKey> keyEqualityComparer)
         {
-            this.m_size = size;
+            this.m_sizeLimit = sizeLimit;
             this.m_rowPriorityQueue = new IntervalHeap<IDimRow<TJoinKey>>(new RowComparer());
             this.m_dict = new Dictionary<TJoinKey, IDimRow<TJoinKey>>(keyEqualityComparer);
         }
@@ -47,7 +47,7 @@
                 this.m_rowPriorityQueue.Add(ref handle, row);
                 row.Handle = handle;
 
-                while (this.m_dict.Count > this.m_size)
+                while (this.m_dict.Count > this.m_sizeLimit)
                 {
                     var discardRow = this.m_rowPriorityQueue.DeleteMin();
                     this.m_dict.Remove(discardRow.JoinOn);
@@ -78,6 +78,14 @@
             get
             {
                 return this.m_dict.Count;
+            }
+        }
+
+        public int SizeLimit
+        {
+            get
+            {
+                return m_sizeLimit;
             }
         }
     }

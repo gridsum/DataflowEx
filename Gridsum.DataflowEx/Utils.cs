@@ -4,8 +4,12 @@ using System.Linq;
 namespace Gridsum.DataflowEx
 {
     using System.Data;
+    using System.Diagnostics;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading.Tasks;
+
+    using Common.Logging;
 
     internal static class Utils
     {
@@ -61,6 +65,14 @@ namespace Gridsum.DataflowEx
         public static DataColumn GetAutoIncrementColumn(DataColumnCollection columns)
         {
             return columns.OfType<DataColumn>().First(c => c.AutoIncrement);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static ILog GetNamespaceLogger()
+        {
+            var frame = new StackFrame(1);
+            var callingMethod = frame.GetMethod();
+            return LogManager.GetLogger(callingMethod.DeclaringType.Namespace);
         }
     }
 }
