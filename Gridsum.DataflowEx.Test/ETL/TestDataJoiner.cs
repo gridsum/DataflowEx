@@ -31,13 +31,11 @@ namespace Gridsum.DataflowEx.Test.ETL
                 this.Count = 0;
             }
 
-            protected override Trunk OnSuccessfulLookup(Trunk input, DataRowView rowInDimTable)
+            protected override void OnSuccessfulLookup(Trunk input, IDimRow<string> rowInDimTable)
             {
-                Assert.AreEqual(input.Pointer, rowInDimTable["Key"]);
-                Assert.AreEqual("Str" + input.Pointer, rowInDimTable["StrValue"]);
+                Assert.AreEqual(input.Pointer, rowInDimTable.JoinOn);
+                //Assert.AreEqual("Str" + input.Pointer, rowInDimTable["StrValue"]);
                 this.Count++;
-
-                return input;
             }
         }
 
@@ -58,7 +56,7 @@ namespace Gridsum.DataflowEx.Test.ETL
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
                 new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
-                8192);
+                2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
             joiner.LinkLeftToNull();
@@ -70,6 +68,18 @@ namespace Gridsum.DataflowEx.Test.ETL
                                     new Trunk() { Pointer = "7" }, 
                                     new Trunk() { Pointer = "7" },
                                     new Trunk() { Pointer = "9" },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
+                                    new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
                                     new Trunk() { Pointer = "99", Leaf = new Leaf() { StrValue = "Str99" } },
                                 };
@@ -97,7 +107,6 @@ namespace Gridsum.DataflowEx.Test.ETL
 
         public int Id { get; set; }
 
-        [DBColumnMapping(DimLeaf)]
         public string Key { get; set; }
 
         [DBColumnMapping(DimLeaf)]

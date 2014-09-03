@@ -7,6 +7,8 @@ namespace Gridsum.DataflowEx.Databases
 {
     using System;
 
+    using Common.Logging;
+
     /// <summary>
     /// The class helps you to bulk insert parsed objects to the database. 
     /// </summary>
@@ -14,11 +16,13 @@ namespace Gridsum.DataflowEx.Databases
     public class DbBulkInserter<T> : Dataflow<T>, IBatchedDataflow where T : class
     {
         protected readonly TargetTable m_targetTable;
+        protected readonly TypeAccessor<T> m_typeAccessor;
         protected readonly int m_bulkSize;
         protected readonly string m_dbBulkInserterName;
         protected readonly PostBulkInsertDelegate<T> m_postBulkInsert;
         protected readonly BatchBlock<T> m_batchBlock;
         protected readonly ActionBlock<T[]> m_actionBlock;
+        protected readonly ILog m_logger;
 
         public DbBulkInserter(
             string connectionString,
@@ -40,25 +44,24 @@ namespace Gridsum.DataflowEx.Databases
             : base(options)
         {
             m_targetTable = targetTable;
+            m_typeAccessor = TypeAccessorManager<T>.GetAccessorForTable(targetTable);
             m_bulkSize = bulkSize;
             m_dbBulkInserterName = dbBulkInserterName;
             m_postBulkInsert = postBulkInsert;
             m_batchBlock = new BatchBlock<T>(bulkSize);
-            m_actionBlock = new ActionBlock<T[]>(async array =>
-            {
-                LogHelper.Logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
-                await DumpToDB(array, targetTable);
-                LogHelper.Logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, m_targetTable.TableName, this.FullName));
-            });
+            m_actionBlock = new ActionBlock<T[]>(array => this.DumpToDBAsync(array, targetTable));
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
+            m_logger = Utils.GetNamespaceLogger();
 
             RegisterChild(m_batchBlock);
             RegisterChild(m_actionBlock);
         }
 
-        protected async virtual Task DumpToDB(T[] data, TargetTable targetTable)
+        protected async virtual Task DumpToDBAsync(T[] data, TargetTable targetTable)
         {
-            using (var bulkReader = new BulkDataReader<T>(TypeAccessorManager<T>.GetAccessorForTable(targetTable), data))
+            m_logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+
+            using (var bulkReader = new BulkDataReader<T>(m_typeAccessor, data))
             {
                 using (var conn = new SqlConnection(targetTable.ConnectionString))
                 {
@@ -86,13 +89,13 @@ namespace Gridsum.DataflowEx.Databases
                     {
                         if (e is NullReferenceException)
                         {
-                            LogHelper.Logger.ErrorFormat(
+                            m_logger.ErrorFormat(
                                 "{0} NullReferenceException occurred in bulk insertion. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.", this.FullName);
                         }
 
-                        LogHelper.Logger.ErrorFormat("{0} Bulk insertion failed. Rolling back all changes...", this.FullName, e);
+                        m_logger.ErrorFormat("{0} Bulk insertion failed. Rolling back all changes...", this.FullName, e);
                         transaction.Rollback();
-                        LogHelper.Logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
+                        m_logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
 
                         //As this is an unrecoverable exception, rethrow it
                         throw;
@@ -102,6 +105,8 @@ namespace Gridsum.DataflowEx.Databases
                     await this.OnPostBulkInsert(conn, targetTable, data);
                 }
             }
+
+            m_logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
         }
 
         public override ITargetBlock<T> InputBlock { get { return m_batchBlock; } }
@@ -110,6 +115,14 @@ namespace Gridsum.DataflowEx.Databases
         {
             get {
                 return m_dbBulkInserterName ?? base.Name;
+            }
+        }
+
+        public TypeAccessor<T> TypeAccessor
+        {
+            get
+            {
+                return m_typeAccessor;
             }
         }
 
