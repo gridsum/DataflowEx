@@ -7,16 +7,31 @@
 
     public class RowCache<TJoinKey>
     {
+        class RowComparer : Comparer<IDimRow<TJoinKey>>
+        {
+            public override int Compare(IDimRow<TJoinKey> x, IDimRow<TJoinKey> y)
+            {
+                TimeSpan span = x.LastHitTime - y.LastHitTime;
+
+                if (span.Ticks < 0) return -1;
+                else if (span.Ticks > 0) return 1;
+                else
+                {
+                    return 0;
+                }
+            }
+        }
+
         private readonly int m_size;
 
         private IntervalHeap<IDimRow<TJoinKey>> m_rowPriorityQueue;
         private Dictionary<TJoinKey, IDimRow<TJoinKey>> m_dict;
 
-        public RowCache(int size)
+        public RowCache(int size, IEqualityComparer<TJoinKey> keyEqualityComparer)
         {
             this.m_size = size;
-            this.m_rowPriorityQueue = new IntervalHeap<IDimRow<TJoinKey>>();
-            this.m_dict = new Dictionary<TJoinKey, IDimRow<TJoinKey>>();
+            this.m_rowPriorityQueue = new IntervalHeap<IDimRow<TJoinKey>>(new RowComparer());
+            this.m_dict = new Dictionary<TJoinKey, IDimRow<TJoinKey>>(keyEqualityComparer);
         }
 
         public void Add(TJoinKey key, IDimRow<TJoinKey> row)

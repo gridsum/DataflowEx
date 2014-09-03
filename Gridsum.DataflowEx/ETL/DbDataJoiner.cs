@@ -47,16 +47,13 @@
             private Func<TIn, TLookupKey> m_keyGetter;
             private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TLookupKey> m_keyComparer;
-
-            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy, DBColumnMapping joinOnMapping)
-                : base(targetTable, DataflowOptions.Default)
+            
+            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy)
+                : base(targetTable, DataflowOptions.Default, host.m_batchSize)
             {
                 this.m_host = host;
-                this.m_joinOnMapping = joinOnMapping;
-                m_keyComparer = typeof(TLookupKey) == typeof(byte[])
-                                    ? (IEqualityComparer<TLookupKey>)((object)new ByteArrayEqualityComparer())
-                                    : EqualityComparer<TLookupKey>.Default;
                 m_keyGetter = joinBy.Compile();
+                m_keyComparer = m_host.m_keyComparer;
                 m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
                 RegisterChild(m_outputBlock);
                 m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
@@ -67,8 +64,8 @@
                 IsBusy = true;
 
                 int oldCount = data.Length;
-                var newArray = data.Distinct(this).ToArray();
-                int newCount = newArray.Length;
+                var deduplicatedData = data.Distinct(this).ToArray();
+                int newCount = deduplicatedData.Length;
                 LogHelper.Logger.DebugFormat("{0} batch distincted from {1} down to {2}", this.FullName, oldCount, newCount);
 
                 var tmpTargetTable = new TargetTable(
@@ -78,25 +75,28 @@
 
                 //create tmp table
                 string createTmpTable = string.Format(
-                    "if OBJECT_ID('{0}', 'U') is not null drop table dbo.profile2;"
+                    "if OBJECT_ID('{0}', 'U') is not null drop table {0};"
                     + "select * into {0} from {1} where 0 = 1",
                     tmpTargetTable.TableName,
                     targetTable.TableName);
 
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
+                    connection.Open();
                     SqlCommand command = new SqlCommand(createTmpTable, connection);
                     command.ExecuteNonQuery();
                 }
 
-                await base.DumpToDB(newArray, tmpTargetTable);
+                await base.DumpToDB(deduplicatedData, tmpTargetTable);
 
                 //merge
                 string mergeTmpToDimTable =
                     string.Format(
-                        "MERGE INTO {0} as TGT" + "USING {1} as SRC on TGT.{2} = SRC.{2}"
-                        + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4}"
-                        + "OUTPUT $action, inserted.{5}, deleted.{5}, inserted.{2}, deleted.{2}",
+                        "MERGE INTO {0} as TGT " 
+                        + "USING {1} as SRC on TGT.[{2}] = SRC.[{2}] "
+                        + "WHEN MATCHED THEN UPDATE SET TGT.[{2}] = TGT.[{2}]"
+                        + "WHEN NOT MATCHED THEN INSERT {3} VALUES {4} "
+                        + "OUTPUT $action, inserted.[{5}], deleted.[{5}], inserted.[{2}], deleted.[{2}] ;",
                         targetTable.TableName,
                         tmpTargetTable.TableName,
                         m_joinOnMapping.DestColumnName,
@@ -105,17 +105,21 @@
                         Utils.GetAutoIncrementColumn(m_typeAccessor.SchemaTable.Columns)
                         );
 
-                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>();
+                LogHelper.Logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, mergeTmpToDimTable);
+
+                var subCache = new Dictionary<TLookupKey, PartialDimRow<TLookupKey>>(m_keyComparer);
 
                 using (var connection = new SqlConnection(targetTable.ConnectionString))
                 {
+                    connection.Open();
+
                     SqlCommand command = new SqlCommand(mergeTmpToDimTable, connection);
 
                     SqlDataReader reader = command.ExecuteReader();
                     while (reader.Read())
                     {
-                        long dimKey = reader.GetInt64(1);
-                        TLookupKey joinColumnValue = (TLookupKey) reader[3];
+                        long dimKey = reader.GetFieldType(1) == typeof(long) ? reader.GetInt64(1) : reader.GetInt32(1); //$inserted.AutoKey
+                        TLookupKey joinColumnValue = (TLookupKey) reader[3]; //$inserted.JoinOnColumn
                         subCache.Add(
                             joinColumnValue, 
                             new PartialDimRow<TLookupKey> {AutoIncrementKey =  dimKey, JoinOn = joinColumnValue});
@@ -133,27 +137,27 @@
                     }
                 }
                 
-                //todo: lookup from the sub cache and output directly (no global cache lookup)
+                //lookup from the sub cache (no global cache lookup)
                 foreach (var item in data)
                 {
                     m_host.OnSuccessfulLookup(item, subCache[m_keyGetter(item)]);
                 }
 
-                //todo: add CacheLookupStrategy.NoLookup/LocalLookup/RemoteLookup
-                var redoBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                m_outputBlock.SafePost(redoBatch);
+                //and output as a already-looked-up batch
+                var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
+                m_outputBlock.SafePost(doneBatch);
 
                 IsBusy = false;
             }
 
             public bool Equals(TIn x, TIn y)
             {
-                return this.m_keyComparer.Equals(m_keyGetter(x),m_keyGetter(y));
+                return m_keyComparer.Equals(m_keyGetter(x),m_keyGetter(y));
             }
 
             public int GetHashCode(TIn obj)
             {
-                return this.m_keyComparer.GetHashCode(m_keyGetter(obj));
+                return m_keyComparer.GetHashCode(m_keyGetter(obj));
             }
             
             public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
@@ -170,22 +174,30 @@
         }
         
         private readonly TargetTable m_dimTableTarget;
+
+        private readonly int m_batchSize;
+
         private BatchBlock<TIn> m_batchBlock;
         private TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
         private DBColumnMapping m_joinOnMapping;
         private TypeAccessor<TIn> m_typeAccessor;
         private DimTableInserter m_dimInserter;
         private RowCache<TLookupKey> m_rowCache;
+        private IEqualityComparer<TLookupKey> m_keyComparer;
 
         public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
             : base(DataflowOptions.Default)
         {
             m_dimTableTarget = dimTableTarget;
+            m_batchSize = batchSize;
             m_batchBlock = new BatchBlock<TIn>(batchSize);
             m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
-            m_rowCache = new RowCache<TLookupKey>(cacheSize);
+            m_keyComparer = typeof(TLookupKey) == typeof(byte[])
+                                    ? (IEqualityComparer<TLookupKey>)((object)new ByteArrayEqualityComparer())
+                                    : EqualityComparer<TLookupKey>.Default;
+            m_rowCache = new RowCache<TLookupKey>(cacheSize, m_keyComparer);
 
             m_joinOnMapping = m_typeAccessor.DbColumnMappings.First(m => m.Host.PropertyInfo == this.ExtractPropertyInfo(joinOn));
             
@@ -201,7 +213,7 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn, m_joinOnMapping);
+            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn);
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
             m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);

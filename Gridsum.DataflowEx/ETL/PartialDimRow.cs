@@ -10,7 +10,7 @@ namespace Gridsum.DataflowEx.ETL
     /// <summary>
     /// Represents a partial dim row from merge output result
     /// </summary>
-    public class PartialDimRow<TLookupKey> : IDimRow<TLookupKey>, IComparable<PartialDimRow<TLookupKey>>
+    public class PartialDimRow<TLookupKey> : IDimRow<TLookupKey>
     {
         public PartialDimRow()
         {
@@ -31,17 +31,5 @@ namespace Gridsum.DataflowEx.ETL
         public IPriorityQueueHandle<IDimRow<TLookupKey>> Handle { get; set; }
 
         public DateTime LastHitTime { get; set; }
-
-        public int CompareTo(PartialDimRow<TLookupKey> other)
-        {
-            TimeSpan span = this.LastHitTime - other.LastHitTime;
-
-            if (span.Ticks < 0) return -1;
-            else if (span.Ticks > 0) return 1;
-            else
-            {
-                return 0;
-            }
-        }
     }
 }

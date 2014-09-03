@@ -40,9 +40,16 @@ namespace Gridsum.DataflowEx
             sb.Append('(');
             foreach (DataColumn column in columns)
             {
+                if (column.AutoIncrement) continue; //skip auto increment column
+
                 sb.Append(tableName);
-                sb.Append('.');
+                if (!string.IsNullOrEmpty(tableName))
+                {
+                    sb.Append('.');
+                }
+                sb.Append('[');
                 sb.Append(column.ColumnName);
+                sb.Append(']');
                 sb.Append(',');
             }
 
