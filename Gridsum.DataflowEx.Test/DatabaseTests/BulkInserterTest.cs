@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
+    using System.Runtime.InteropServices;
     using System.Text;
 
     [TestClass]
@@ -180,7 +181,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [DBColumnMapping(GSProduct.SEOD, "Uid")]
         public Guid UID { get; set; }
 
-        [DBColumnMapping(GSProduct.SEOD, "A Bad Column")]
+        [DBColumnMapping(GSProduct.SEOD, "A Bad Column", null, ColumnMappingOption.Optional)]
         public string BadColumn { get; set; }
     }
 
