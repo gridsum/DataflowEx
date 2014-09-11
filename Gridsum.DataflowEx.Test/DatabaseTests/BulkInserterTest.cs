@@ -179,6 +179,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
         [DBColumnMapping(GSProduct.SEOD, "Uid")]
         public Guid UID { get; set; }
+
+        [DBColumnMapping(GSProduct.SEOD, "A Bad Column")]
+        public string BadColumn { get; set; }
     }
 
     public class Entity3
