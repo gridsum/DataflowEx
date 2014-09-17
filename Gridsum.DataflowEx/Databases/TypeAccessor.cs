@@ -176,6 +176,9 @@ namespace Gridsum.DataflowEx.Databases
                 {
                     this.PopulateDbColumnMapping(leafNode, mapping);
                 }
+
+                //filter ignored column mappings
+                leafNode.DbColumnMappings = leafNode.DbColumnMappings.Where(m => m.IsDestColumnOffsetOk()).ToList();
             }
 
             List<LeafPropertyNode> mappedLeafs = leafs.Where(_ => _.DbColumnMappings.Count > 0).ToList();
@@ -247,12 +250,21 @@ namespace Gridsum.DataflowEx.Databases
 
                 if (col == null)
                 {
-                    var desc = string.Format(
+                    if (mapping.Option == ColumnMappingOption.Optional)
+                    {
+                        m_classLogger.DebugFormat("Optional column mapping ignored for table {0}: {1}", m_destinationTablename, mapping);
+                        mapping.DestColumnOffset = -1;
+                        return;
+                    }
+                    else
+                    {
+                        var desc = string.Format(
                             "can not find column with offset {0} in table {1} ",
                             mapping.DestColumnOffset,
                             m_destinationTablename);
 
-                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                        throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                    }
                 }
 
                 if (col.ColumnName != mapping.DestColumnName)
@@ -274,12 +286,21 @@ namespace Gridsum.DataflowEx.Databases
                 DataColumn col = schemaTable.Columns[mapping.DestColumnOffset];
                 if (col == null)
                 {
-                    var desc = string.Format(
+                    if (mapping.Option == ColumnMappingOption.Optional)
+                    {
+                        m_classLogger.DebugFormat("Optional column mapping ignored for table {0}: {1}", m_destinationTablename, mapping);
+                        mapping.DestColumnOffset = -1;
+                        return;
+                    }
+                    else
+                    {
+                        var desc = string.Format(
                             "can not find column with offset {0} in table {1} ",
                             mapping.DestColumnOffset,
                             m_destinationTablename);
 
-                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                        throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                    }
                 }
                 
                 mapping.DestColumnName = col.ColumnName;
@@ -296,12 +317,24 @@ namespace Gridsum.DataflowEx.Databases
                 DataColumn col = schemaTable.Columns[mapping.DestColumnName];
                 if (col == null)
                 {
-                    var desc = string.Format(
+                    if (mapping.Option == ColumnMappingOption.Optional)
+                    {
+                        m_classLogger.DebugFormat(
+                            "Optional column mapping ignored for table {0}: {1}",
+                            m_destinationTablename,
+                            mapping);
+                        mapping.DestColumnOffset = -1;
+                        return;
+                    }
+                    else
+                    {
+                        var desc = string.Format(
                             "can not find column with name {0} in table {1} ",
                             mapping.DestColumnName,
                             m_destinationTablename);
 
-                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                        throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                    }
                 }
 
                 mapping.DestColumnOffset = col.Ordinal;
@@ -316,12 +349,21 @@ namespace Gridsum.DataflowEx.Databases
             DataColumn guessColumn = schemaTable.Columns[leaf.PropertyInfo.Name];
             if (guessColumn == null)
             {
-                var desc = string.Format(
+                if (mapping.Option == ColumnMappingOption.Optional)
+                {
+                    m_classLogger.DebugFormat("Optional column mapping ignored for table {0}: {1}", m_destinationTablename, mapping);
+                    mapping.DestColumnOffset = -1;
+                    return;
+                }
+                else
+                {
+                    var desc = string.Format(
                             "can not find column with property name {0} in table {1} ",
                             leaf.PropertyInfo.Name,
                             m_destinationTablename);
 
-                throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                    throw new InvalidDBColumnMappingException(desc, mapping, leaf);
+                }
             }
             mapping.DestColumnOffset = guessColumn.Ordinal;
             mapping.DestColumnName = guessColumn.ColumnName;

@@ -29,7 +29,7 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         /// <param name="destLabel">产品名称</param>
         public DBColumnMapping(string destLabel)
-            : this(destLabel, -1, null, null)
+            : this(destLabel, -1, null, null, ColumnMappingOption.Mandatory)
         {
         }
 
@@ -40,8 +40,8 @@ namespace Gridsum.DataflowEx.Databases
         /// <param name="destColumnOffset">将要匹配的数据库表的列位置</param>
         /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
         /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
-        public DBColumnMapping(string destLabel, int destColumnOffset, object defaultValue = null) 
-            : this(destLabel, destColumnOffset, null, defaultValue) { }
+        public DBColumnMapping(string destLabel, int destColumnOffset, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory) 
+            : this(destLabel, destColumnOffset, null, defaultValue, option) { }
 
         /// <summary>
         /// 用途：
@@ -51,17 +51,18 @@ namespace Gridsum.DataflowEx.Databases
         /// <param name="destColumnName">将要匹配的数据库表的列名称</param>
         /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
         /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
-        public DBColumnMapping(string destLabel, string destColumnName, object defaultValue = null)
-            : this(destLabel, -1, destColumnName, defaultValue)
+        public DBColumnMapping(string destLabel, string destColumnName, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory)
+            : this(destLabel, -1, destColumnName, defaultValue, option)
         {
         }
         
-        protected DBColumnMapping(string destLabel, int destColumnOffset, string destColumnName, object defaultValue)
+        protected DBColumnMapping(string destLabel, int destColumnOffset, string destColumnName, object defaultValue, ColumnMappingOption option)
         {
             DestLabel = destLabel;
             DestColumnOffset = destColumnOffset;
             DestColumnName = destColumnName;
             DefaultValue = defaultValue;
+            this.Option = option;
         }
 
         /// <summary>
@@ -83,6 +84,8 @@ namespace Gridsum.DataflowEx.Databases
         /// </summary>
         public object DefaultValue { get; internal set; }
 
+        public ColumnMappingOption Option { get; set; }
+
         public PropertyTreeNode Host { get; set; }
 
         public bool IsDestColumnOffsetOk()
@@ -103,5 +106,22 @@ namespace Gridsum.DataflowEx.Databases
                 this.DestColumnOffset,
                 this.DefaultValue);
         }
+    }
+
+    /// <summary>
+    /// The option of a db column mapping
+    /// </summary>
+    public enum ColumnMappingOption
+    {
+        /// <summary>
+        /// The column must exist in the destination table
+        /// </summary>
+        Mandatory,
+
+        /// <summary>
+        /// The column mapping can be ignored if the column is not found in the destination table
+        /// This option is useful when you have one dest label for multiple different tables
+        /// </summary>
+        Optional
     }
 }
