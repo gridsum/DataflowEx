@@ -146,4 +146,90 @@ It is now that easy with <kbd>ProcessAsync</kbd> :)
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
+Understanding Dataflow abstract classes
+-------------
+IDataflowBlock is the fundamental piece in TPL Dataflow while IDataflow is the counterpart in DataflowEx. Take a look at the IDataflow design:
+```c#
+public interface IDataflow
+{
+    IEnumerable<IDataflowBlock> Blocks { get; }
+    Task CompletionTask { get; }
+    void Fault(Exception exception);
+    string Name { get; }    
+}
+
+public interface IDataflow<in TIn> : IDataflow
+{
+    ITargetBlock<TIn> InputBlock { get; }
+}
+
+public interface IOutputDataflow<out TOut> : IDataflow
+{
+    ISourceBlock<TOut> OutputBlock { get; }
+    void LinkTo(IDataflow<TOut> other);
+}
+
+public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>, IOutputDataflow<TOut>
+{
+}
+```
+IDataflow looks like IDataflowBlock, doesn't it? Well, remember IDataflow now represents a dataflow graph which may contain one or more low-level blocks. We think a graph may have inputs and outputs so those strongly-typed generic IDataflows are designed. 
+
+> **Note:** If you see IOutputDataflow&lt;TOut&gt;.**LinkTo**(IDataflow&lt;TOut&gt; other), congratulations to you as you find out the API supports (and encourages) graph level data linking.
+
+So on top of IDataflow there is an implementation called Dataflow, which should be the base class for all DataflowEx flows. Besides acting as the handle of the graph, it has many useful functionalities built-in. Let's explore them one by one.
+
+### 1. Lifecycle management
+
+A key role of the Dataflow base class is to monitor the health of its children and provides a single completion state to the outside, namely the CompletionTask property.
+
+So first things first, we need a way to tell the dataflow who is its child. That is done through the **Dataflow.RegisterChild** method (you have seen it in the last example). Dataflow class will now keep the reference of the child in its internal data structure and the lifecycle of child will start to affect its parent.
+
+> **Note:** RegisterChild() method is not restricted to be called inside dataflow constructor. In fact, it can be used wherever necessary. Dataflow class uses a smart mechanism here to ensure dynamically registered child will affect the Dataflow's CompletionTask, even if you acquire the CompletionTask reference beforehand. This feature empowers the scenario that your dataflow is changing its shape at runtime. Just don't forget to call RegisterChild() when new child is created on demand.
+
+There are 2 kinds of child that you can register, a dataflow block or a sub dataflow. The latter means Dataflow nesting is supported! Feel free to build different levels of dataflow components to provide even better modularity and encapsulation. Let's look at an example:
+```C#
+using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx;
+
+public class LineAggregatorFlow : Dataflow<string>
+{
+    private Dataflow<string, string> _lineProcessor;
+    private AggregatorFlow _aggregator;
+    public LineAggregatorFlow() : base(DataflowOptions.Default)
+    {
+        _lineProcessor = new TransformManyBlock<string, string>(line => line.Split(' ')).ToDataflow();
+        _aggregator = new AggregatorFlow();
+        _lineProcessor.LinkTo(_aggregator);
+        RegisterChild(_lineProcessor);
+        RegisterChild(_aggregator);
+    }
+
+    public override ITargetBlock<string> InputBlock { get { return _lineProcessor.InputBlock; } }
+    public int this[string key] { get { return _aggregator.Result[key]; } }
+}
+
+//consumer here
+var lineAggregator = new LineAggregatorFlow();
+await lineAggregator.ProcessAsync(new[] { "a=1 b=2 a=5", "c=6 b=8" });
+Console.WriteLine("sum(a) = {0}", lineAggregator["a"]); //prints sum(a) = 6
+```
+The example builds a LineAggregatorFlow on top of the existing AggregatorFlow to provide further functionalities. You get the idea how existing modules can be reused and seamlessly integrated to build a clearly-designed sophisticated dataflow graph.
+
+> **Tip:** Notice that instead of creating a Dataflow class for <kbd>_lineProcessor</kbd>, IPropagatorBlock&lt;TIn, TOut&gt;.ToDataflow() is used to avoid class creation as we just want a trivial wrapper over the delegate. This extension method is defined in DataflowUtils.cs where there are more helpers to convert from blocks and delegates to Dataflows.
+
+Back to the topic of lifecycle, when a child is registered (no matter it is a block or sub flow), how will it affect the parent? The following rules answer the question:
+
+- The parent comes to its completion only when **all** of its children completes.
+- The parent fails if **any** of its children fails.
+- When one of the children fails, the parent will notify and wait other children to shutdown, and then comes to Faulted state.
+
+So, in this form, the parent takes care of each child to guarantee nothing is wrong. Whenever something bad happens, the parent dataflow takes a fast-fail approach while those normal children still have a chance to gracefully stop.
+
+> **Tip:** To provide custom shutdown behavior on sibling failure, override Dataflow.Fault().
+
+This is all about the lifecyle management. A parent keeps his child under umbrella and never leaves any behind. On the other side, be careful completion signal is correctly propagated along the dataflow chain when your job is done. If a child never gets a completion signal, the parent's CompletionTask will never come to an end.
+
+> **Note:** Dataflow class doesn't require children to be connected. The dataflow network/linking is constructed at your wish. So if a children will not get completion signal automatically through linking, you need to manually complete it on some condition, or you can use child1.**RegisterDependency**(child2): the child will complete when all of its dependencies complete. RegisterDependency() has nothing to do with data. It only handles completion.
+
 UNDER CONSTRUCTION..
