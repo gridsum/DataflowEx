@@ -122,6 +122,8 @@ Though there seems to be more code, it is quite clear. We have a class Aggregato
 
 In this form, dataflow blocks and data become class members. Block behaviors become class methods (which allows the outside to override!). We also implemented the abstract <kbd>InputBlock</kbd> property of Dataflow&lt;TIn&gt; and exposes our internal data as an extra Result property. 
 
+There are two important calls to RegisterChild() in the constructor. We will come back to this later.
+
 Now let's come to the consumer side of the AggregatorFlow class:
 ```c#
 var aggregatorFlow = new AggregatorFlow();
@@ -136,17 +138,17 @@ You see that we now operate on a single instance of AggregatorFlow, without know
 
 > **Note:** The Dataflow class exposes a **CompletionTask** property (just like IDataflowBlock.Completion) to represent the life of the whole dataflow. The whole dataflow won't complete till every single child block in the flow completes . Here in the example we await on the task to make sure the dataflow completes. More on this topic below.
 
-By the way, Dataflow&lt;TIn&gt; provides some helper methods to boost productivity:
+By the way, Dataflow&lt;TIn&gt; provides some helper methods to boost productivity. To achieve the same effect:
 ```c#
 var aggregatorFlow = new AggregatorFlow();
 await aggregatorFlow.ProcessAsync(new[] { "a=1", "b=2", "a=5" }, completeFlowOnFinish:true);
 Console.WriteLine("sum(a) = {0}", aggregatorFlow.Result["a"]); //prints sum(a) = 6
 ```
-It is now that easy with <kbd>ProcessAsync</kbd> :)
+It is now that easy with <kbd>ProcessAsync</kbd> as DataflowEx handles the tedious Post-and-complete boilerplate code for you :)
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
-Understanding Dataflow abstract classes
+Understanding class Dataflow 
 -------------
 IDataflowBlock is the fundamental piece in TPL Dataflow while IDataflow is the counterpart in DataflowEx. Take a look at the IDataflow design:
 ```c#
@@ -177,7 +179,7 @@ IDataflow looks like IDataflowBlock, doesn't it? Well, remember IDataflow now re
 
 > **Note:** If you see IOutputDataflow&lt;TOut&gt;.**LinkTo**(IDataflow&lt;TOut&gt; other), congratulations to you as you find out the API supports (and encourages) graph level data linking.
 
-So on top of IDataflow there is an implementation called Dataflow, which should be the base class for all DataflowEx flows. Besides acting as the handle of the graph, it has many useful functionalities built-in. Let's explore them one by one.
+So on top of IDataflow there is an implementation called **Dataflow**, which should be the base class for all DataflowEx flows. Besides acting as the handle of the graph, it has many useful functionalities built-in. Let's explore them one by one.
 
 ### 1. Lifecycle management
 
@@ -228,8 +230,32 @@ So, in this form, the parent takes care of each child to guarantee nothing is wr
 
 > **Tip:** To provide custom shutdown behavior on sibling failure, override Dataflow.Fault().
 
-This is all about the lifecyle management. A parent keeps his child under umbrella and never leaves any behind. On the other side, be careful completion signal is correctly propagated along the dataflow chain when your job is done. If a child never gets a completion signal, the parent's CompletionTask will never come to an end.
+This is all about the lifecyle management. A parent keeps his child under umbrella and never leaves any baby behind. 
 
-> **Note:** Dataflow class doesn't require children to be connected. The dataflow network/linking is constructed at your wish. So if a children will not get completion signal automatically through linking, you need to manually complete it on some condition, or you can use child1.**RegisterDependency**(child2): the child will complete when all of its dependencies complete. RegisterDependency() has nothing to do with data. It only handles completion.
+### 2. Graph construction
+
+Normally you construct your graph in the constructor of your own dataflow class which inherits from Dataflow. There are typically 3 steps to construct a dataflow graph:
+
+>1. Create dataflow blocks or sub-flow instances
+>2. Connect flows and blocks to shape a network
+>3. Register flows and blocks as children
+
+As you can see, previous examples all follows the same pattern. 
+
+The 2nd step is worth digging into here. If you are dealing with raw blocks, ISourceBlock.LinkTo is your friend. And probably you want to set DataflowLinkOptions.PropagateCompletion to true if you want completion to be passed down automatically. This is traditional TPL Dataflow linking, as demonstrated by class <kbd>AggregatorFlow</kbd>.
+
+> **Tip:** When programming TPL Dataflow, how many times do you find your blocks never complete? And how many times do you find out the reason to be forgetting to set PropagateCompletion? :) 
+
+But the real connecting power resides in the dataflow level connecting. DataflowEx put some effort here to provide a number of utilites and best practices to help graph construction: Dataflow classes have rich linking APIs. So you don't bother call block-level linking any more.
+
+The first to mention is IOutputDataflow.LinkTo (as demonstrated in <kbd>LineAggregatorFlow</kbd>), counterpart of the low level ISourceBlock.LinkTo. As its name implies, it connects the output block to the input block of the given parameter, and **propagates completion by default**. DataflowEx encourages completion propagation.
+
+There is one more secret about IOutputDataflow&lt;TOut&gt;.LinkTo (default implementation in Dataflow&lt;TIn, TOut&gt;): it supports one target dataflow being linked-to multiple times and **guarantees the target dataflow receives a completion signal only when ALL upstream dataflows complete**. Notice this behavior is different from block level linking with PropagateCompletion set to true, which means the target block receives a completion signal when **any** of the upstream blocks completes. We think our choice is what you need in most cases.
+
+Does Dataflow class allow an orphan child that links to no one and is not linked to? Yes. Your graph need not be a fully-connected one if you wish. You can have 'islands'. But be careful to how these islands receives a completion signal. Always ensure that completion signal should be correctly propagated along the dataflow chain when your job is done. If a child never gets a completion signal, the parent's CompletionTask will never come to an end.
+
+> **Note:** Dataflow class doesn't require children to be connected. The dataflow network/linking is constructed at your wish. So if a children will not get completion signal automatically through linking, you need to manually complete it on some condition, or you can use **RegisterDependency()**. The orphan child will complete when all of its dependencies complete. RegisterDependency() has nothing to do with data. It only handles completion.
+
+>**Tip:** To tell you the truth, Dataflow.LinkTo() also uses RegisterDependency() internally to achieve the 'WhenAll' behavior.
 
 UNDER CONSTRUCTION..
