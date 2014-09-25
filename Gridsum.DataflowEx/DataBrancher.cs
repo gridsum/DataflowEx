@@ -16,7 +16,7 @@ namespace Gridsum.DataflowEx
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
     public class DataBrancher<T> : Dataflow<T, T>
     {
-        private ImmutableList<BufferBlock<T>> m_copyBuffers;
+        private ImmutableList<Dataflow<T, T>> m_copyBuffers;
         private readonly TransformBlock<T, T> m_transformBlock;
 
         public DataBrancher() : this(DataflowOptions.Default) {}
@@ -25,22 +25,19 @@ namespace Gridsum.DataflowEx
 
         public DataBrancher(Func<T,T> copyFunc, DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
-            m_copyBuffers = ImmutableList<BufferBlock<T>>.Empty;
+            m_copyBuffers = ImmutableList<Dataflow<T, T>>.Empty;
 
             m_transformBlock = new TransformBlock<T, T>(
                 arg =>
                     {
                         T copy = copyFunc == null ? arg : copyFunc(arg);
-                        foreach (var bufferBlock in m_copyBuffers)
+                        foreach (var buffer in m_copyBuffers)
                         {
-                            bufferBlock.SafePost(copy);
+                            buffer.Post(copy);
                         }
                         return arg;
                     });
-
-            //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
-            m_transformBlock.LinkNormalCompletionTo(() => m_copyBuffers);
-
+            
             RegisterChild(m_transformBlock);
         }
 
@@ -55,32 +52,27 @@ namespace Gridsum.DataflowEx
         }
 
         /// <summary>
-        /// The copied data stream
-        /// </summary>
-        public ImmutableList<BufferBlock<T>> CopiedOutputBlocks
-        {
-            get { return m_copyBuffers; }
-        }
-
-        /// <summary>
         /// Link the copied data stream to another block
         /// </summary>
         public void LinkCopyTo(IDataflow<T> other)
         {
             //first, create a new copy block
-            var copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
+            Dataflow<T, T> copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
             {
                 BoundedCapacity = m_dataflowOptions.RecommendedCapacity ?? int.MaxValue
-            });
+            }).ToDataflow();
 
             RegisterChild(copyBuffer);
+            copyBuffer.RegisterDependency(m_transformBlock);
+
             m_copyBuffers = m_copyBuffers.Add(copyBuffer);
-            LinkBlockToFlow(copyBuffer, other);
+            copyBuffer.Name = "Buffer" + m_copyBuffers.Count;
+            copyBuffer.LinkTo(other);
         }
 
         public override IDataflow<T> GoTo(IDataflow<T> other)
         {
-            if (m_condBuilder.Count == 0)
+            if (m_condBuilder.Count == 0) //not linked to any target yet
             {
                 //link first output as primary output
                 base.GoTo(other);    

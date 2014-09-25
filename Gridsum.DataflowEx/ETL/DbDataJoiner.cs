@@ -46,11 +46,11 @@
         {
             private readonly DbDataJoiner<TIn, TLookupKey> m_host;
             private Func<TIn, TLookupKey> m_keyGetter;
-            private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TLookupKey> m_keyComparer;
             private readonly TargetTable m_tmpTargetTable;
             private readonly string m_createTmpTable;
             private readonly string m_mergeTmpToDimTable;
+            private Dataflow<JoinBatch<TIn>, JoinBatch<TIn>> m_outputBuffer;
 
             public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy)
                 : base(targetTable, DataflowOptions.Default, host.m_batchSize)
@@ -58,10 +58,11 @@
                 this.m_host = host;
                 m_keyGetter = joinBy.Compile();
                 m_keyComparer = m_host.m_keyComparer;
-                m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
-                RegisterChild(m_outputBlock);
-                m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
-
+                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>().ToDataflow();
+                m_outputBuffer.Name = "OutputBuffer";
+                RegisterChild(m_outputBuffer);
+                m_outputBuffer.RegisterDependency(m_actionBlock);
+                
                 m_tmpTargetTable = new TargetTable(
                     targetTable.DestLabel,
                     targetTable.ConnectionString,
@@ -158,7 +159,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                m_outputBlock.SafePost(doneBatch);
+                this.m_outputBuffer.Post(doneBatch);
 
                 IsBusy = false;
             }
@@ -175,12 +176,12 @@
             
             public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
             {
-                return m_outputBlock;
+                return m_outputBuffer.OutputBlock;
             } }
 
             public void LinkTo(IDataflow<JoinBatch<TIn>> other)
             {
-                this.LinkBlockToFlow(m_outputBlock, other);
+                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other);
             }
 
             public bool IsBusy { get; private set; }
@@ -229,7 +230,8 @@
             m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn) {Name = "DimInserter"};
             var hb = new HeartbeatNode<JoinBatch<TIn>>();
 
-            m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
+            m_dimInserter.RegisterDependency(m_lookupNode);
+
             m_dimInserter.LinkTo(hb);
             hb.LinkTo(m_lookupNode);
 

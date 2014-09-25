@@ -73,28 +73,5 @@ namespace Gridsum.DataflowEx
 
             throw new ArgumentException("Fail to auto-detect buffer count of block: " + Utils.GetFriendlyName(block.GetType()), "block");
         }
-
-        /// <summary>
-        /// Link the block's success completion to other blocks. If the block failed or is canceled, nothing will be done.
-        /// </summary>
-        public static void LinkNormalCompletionTo(this IDataflowBlock block, Func<IEnumerable<IDataflowBlock>> blocksGetter)
-        {
-            block.Completion.ContinueWith(t =>
-            {
-                //propagate completion only the task succeeded (RegisterBlock already takes care of Faulted and Canceled)
-                if (t.Status == TaskStatus.RanToCompletion)
-                {
-                    foreach (var linkedBlock in blocksGetter())
-                    {
-                        linkedBlock.Complete();
-                    }
-                }
-            });
-        }
-
-        public static void LinkNormalCompletionTo(this IDataflowBlock block, IDataflowBlock downStreamBlock)
-        {
-            LinkNormalCompletionTo(block, () => new [] {downStreamBlock});
-        }
     }
 }

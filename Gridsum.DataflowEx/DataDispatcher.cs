@@ -38,6 +38,7 @@ namespace Gridsum.DataflowEx
                                       {
                                           var child = this.CreateChildFlow(key);
                                           RegisterChild(child);
+                                          child.RegisterDependency(m_dispatcherBlock);
                                           return child;
                                       });
 
@@ -49,10 +50,6 @@ namespace Gridsum.DataflowEx
                     });
 
             RegisterChild(m_dispatcherBlock);
-
-            //propagate completion to children as we don't have 'link'
-            //no need to propagate errors as register handles that (given that dyamic blocks are registered)
-            m_dispatcherBlock.LinkNormalCompletionTo(() => m_destinations.Values.Select(_=>_.Value.InputBlock));
         }
 
         /// <summary>

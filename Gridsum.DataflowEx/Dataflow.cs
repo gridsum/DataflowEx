@@ -679,11 +679,23 @@ namespace Gridsum.DataflowEx
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
         
+        /// <summary>
+        /// Link data stream to the given dataflow and propagates completion
+        /// </summary>
+        /// <param name="other">The dataflow to connect to</param>
         public void LinkTo(IDataflow<TOut> other)
         {
             this.GoTo(other);
         }
 
+        /// <summary>
+        /// Link data stream to the given dataflow and propagates completion. 
+        /// </summary>
+        /// <remarks>
+        /// Same as LinkTo() but this method helps you to chain calls like a.GoTo(b).GoTo(c);
+        /// </remarks>
+        /// <param name="other">The dataflow to connect to</param>
+        /// <returns>returns the dataflow to connect to</returns>
         public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other)
         {
             m_condBuilder.Add(new Predicate<TOut>(@out => true));
