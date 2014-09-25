@@ -27,10 +27,11 @@ namespace Gridsum.DataflowEx
         protected internal readonly DataflowOptions m_dataflowOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
-        protected ImmutableList<IDataflowChildMeta> m_children = ImmutableList.Create<IDataflowChildMeta>();
+        protected ImmutableList<IDataflowDependency> m_children = ImmutableList.Create<IDataflowDependency>();
         protected ImmutableList<Dataflow> m_parents = ImmutableList.Create<Dataflow>();
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
+        protected ImmutableList<IDataflowDependency> m_dependencies = ImmutableList.Create<IDataflowDependency>();
         protected string m_defaultName;
 
         public Dataflow(DataflowOptions dataflowOptions)
@@ -92,7 +93,7 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        public ImmutableList<IDataflowChildMeta> Children
+        public ImmutableList<IDataflowDependency> Children
         {
             get
             {
@@ -118,7 +119,7 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("block");
             }
 
-            RegisterChild(new BlockMeta(block, this, blockCompletionCallback, displayName), allowDuplicate);
+            RegisterChild(new BlockDependency(block, this, DependencyKind.Internal, blockCompletionCallback, displayName), allowDuplicate);
         }
 
         /// <summary>
@@ -139,7 +140,7 @@ namespace Gridsum.DataflowEx
          
             //add myself as parents
             childFlow.m_parents = childFlow.m_parents.Add(this);
-            RegisterChild(new ChildDataflowMeta(childFlow, this, dataflowCompletionCallback), allowDuplicate);
+            RegisterChild(new DataflowDependency(childFlow, this, DependencyKind.Internal, dataflowCompletionCallback), allowDuplicate);
         }
 
         /// <summary>
@@ -171,7 +172,7 @@ namespace Gridsum.DataflowEx
         {
             if (object.ReferenceEquals(flow, this)) return true;
 
-            foreach (var subFlow in flow.Children.OfType<ChildDataflowMeta>().Select(_ => _.Flow))
+            foreach (var subFlow in flow.Children.OfType<DataflowDependency>().Select(_ => _.Flow))
             {
                 if (this.IsMyAncestor(subFlow))
                 {
@@ -190,7 +191,7 @@ namespace Gridsum.DataflowEx
             return m_children.Any(child => object.ReferenceEquals(child.Unwrap(), flow));
         }
 
-        internal void RegisterChild(IDataflowChildMeta childMeta, bool allowDuplicate)
+        internal void RegisterChild(IDataflowDependency childMeta, bool allowDuplicate)
         {
             var child = childMeta.Unwrap();
 
@@ -265,7 +266,7 @@ namespace Gridsum.DataflowEx
 
                             if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                             {
-                                IDataflowChildMeta c = child;
+                                IDataflowDependency c = child;
                                 LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                             }
                         }
@@ -313,7 +314,7 @@ namespace Gridsum.DataflowEx
 
             try
             {
-                await TaskEx.AwaitableWhenAll(() => m_children, b => b.ChildCompletion);
+                await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
                 this.CleanUp();
@@ -360,7 +361,7 @@ namespace Gridsum.DataflowEx
 
             foreach (var child in m_children)
             {
-                if (!child.ChildCompletion.IsCompleted)
+                if (!child.Completion.IsCompleted)
                 {
                     string msg = string.Format("{0} is shutting down", child.DisplayName);
                     LogHelper.Logger.Error(msg);
@@ -410,6 +411,11 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        public virtual void Complete()
+        {
+            throw new NotSupportedException(string.Format("{0} doesn't know how to explicitly complete.", this.FullName));
+        }
+
         //Linkd MY block to OHTER dataflow
         protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
         {
@@ -440,12 +446,73 @@ namespace Gridsum.DataflowEx
                 }
             });
         }
+
+        /// <summary>
+        /// Register an external dataflow as dependency, whose completion will trigger completion of this dataflow
+        /// if this dependencies finishes as the last amony all dependencies.
+        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
+        /// </summary>
+        public void RegisterDependency(Dataflow dependencyDataflow)
+        {
+            if (this.IsMyChild(dependencyDataflow))
+            {
+                throw new ArgumentException("Cannot register a child as dependency. Child: " + dependencyDataflow.FullName, "dependencyDataflow");
+            }
+
+            this.RegisterDependency(new DataflowDependency(dependencyDataflow, this, DependencyKind.External));
+        }
+
+        public void RegisterDependency(IDataflowBlock upstreamBlock)
+        {
+            this.RegisterDependency(new BlockDependency(upstreamBlock, this, DependencyKind.External));
+        }
+
+        /// <summary>
+        /// Register an external block as dependency, whose completion will trigger completion of this dataflow
+        /// if this dependencies finishes as the last amony all dependencies.
+        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
+        /// </summary>
+        public void RegisterDependency(IDataflowDependency dependency)
+        {
+            bool isFirstDependency = m_dependencies.IsEmpty;
+
+            m_dependencies = m_dependencies.Add(dependency);
+
+            if (isFirstDependency)
+            {
+                TaskEx.AwaitableWhenAll(() => m_dependencies, f => f.Completion).ContinueWith(
+                    upstreamTask =>
+                    {
+                        if (!this.CompletionTask.IsCompleted)
+                        {
+                            if (upstreamTask.IsFaulted)
+                            {
+                                this.Fault(new LinkedDataflowFailedException());
+                            }
+                            else if (upstreamTask.IsCanceled)
+                            {
+                                this.Fault(new LinkedDataflowCanceledException());
+                            }
+                            else
+                            {
+                                if (m_dependencies.Count > 1)
+                                {
+                                    LogHelper.Logger.InfoFormat("{0} All of my dependencies are done. Completing myself.", this.FullName);
+                                }
+                                this.Complete();
+                            }
+                        }
+                    });
+            }
+            else
+            {
+                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies.", this.FullName, m_dependencies.Count);
+            }
+        }
     }
 
     public abstract class Dataflow<TIn> : Dataflow, IDataflow<TIn>
     {
-        protected ImmutableList<IDataflowBlock> m_dependencies = ImmutableList.Create<IDataflowBlock>();
-
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
         }
@@ -503,7 +570,7 @@ namespace Gridsum.DataflowEx
         {
             get
             {
-                foreach (var dataflowMeta in m_children.OfType<ChildDataflowMeta>())
+                foreach (var dataflowMeta in m_children.OfType<DataflowDependency>())
                 {
                     if (dataflowMeta.Blocks.Contains(this.InputBlock))
                     {
@@ -598,62 +665,9 @@ namespace Gridsum.DataflowEx
             return ProcessMultipleAsync(enumerables, completeLogReaderOnFinish);
         }
 
-        /// <summary>
-        /// Register an external dataflow as dependency, whose completion will trigger completion of this dataflow
-        /// if this dependencies finishes as the last amony all dependencies.
-        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
-        /// </summary>
-        public void RegisterDependency<T>(IOutputDataflow<T> dependencyDataflow)
+        public override void Complete()
         {
-            if (this.IsMyChild(dependencyDataflow))
-            {
-                throw new ArgumentException("Cannot register a child as dependency. Child: " + dependencyDataflow.FullName, "dependencyDataflow");
-            }
-
-            this.RegisterDependency(dependencyDataflow.OutputBlock);
-        }
-
-        /// <summary>
-        /// Register an external block as dependency, whose completion will trigger completion of this dataflow
-        /// if this dependencies finishes as the last amony all dependencies.
-        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
-        /// </summary>
-        public void RegisterDependency(IDataflowBlock upstreamBlock)
-        {
-            bool isFirstDependency = m_dependencies.IsEmpty;
-
-            m_dependencies = m_dependencies.Add(upstreamBlock);
-
-            if (isFirstDependency)
-            {
-                TaskEx.AwaitableWhenAll(() => m_dependencies, f => f.Completion).ContinueWith(
-                    upstreamTask =>
-                        {
-                            if (!this.CompletionTask.IsCompleted)
-                            {
-                                if (upstreamTask.IsFaulted)
-                                {
-                                    this.Fault(new LinkedDataflowFailedException());
-                                }
-                                else if (upstreamTask.IsCanceled)
-                                {
-                                    this.Fault(new LinkedDataflowCanceledException());
-                                }
-                                else
-                                {
-                                    if (m_dependencies.Count > 1)
-                                    {
-                                        LogHelper.Logger.InfoFormat("{0} All of my dependencies are done. Completing myself.", this.FullName);
-                                    }
-                                    this.InputBlock.Complete();
-                                }
-                            }
-                        });
-            }
-            else
-            {
-                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies.", this.FullName, m_dependencies.Count);
-            }
+            this.InputBlock.Complete();
         }
     }
 
