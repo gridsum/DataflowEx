@@ -144,5 +144,10 @@ namespace Gridsum.DataflowEx
                 yield return s;
             }
         }
+
+        public static void Post<TIn>(this Dataflow<TIn> dataflow, TIn item)
+        {
+            dataflow.InputBlock.SafePost(item);
+        }
     }
 }

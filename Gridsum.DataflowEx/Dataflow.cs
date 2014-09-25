@@ -143,6 +143,28 @@ namespace Gridsum.DataflowEx
         }
 
         /// <summary>
+        /// Register multiple blocks as children
+        /// </summary>
+        public void RegisterChildren(params IDataflowBlock[] blocks)
+        {
+            foreach (var dataflowBlock in blocks)
+            {
+                this.RegisterChild(dataflowBlock);
+            }
+        }
+
+        /// <summary>
+        /// Register multiple sub-flows as children
+        /// </summary>
+        public void RegisterChildren(params Dataflow[] subFlows)
+        {
+            foreach (var flow in subFlows)
+            {
+                this.RegisterChild(flow);
+            }
+        }
+
+        /// <summary>
         /// Check if the flow is the ancestor of this flow
         /// </summary>
         private bool IsMyAncestor(Dataflow flow)
@@ -528,7 +550,7 @@ namespace Gridsum.DataflowEx
             return count;
         }
 
-        protected async Task SignalAndWaitForCompletionAsync()
+        public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
             this.InputBlock.Complete(); //no more input
