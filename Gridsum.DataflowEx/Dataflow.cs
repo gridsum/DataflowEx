@@ -735,7 +735,7 @@ namespace Gridsum.DataflowEx
             }
 
             m_condBuilder.Add(predicate);
-            var converter = new TransformBlock<TOut, TTarget>(transform);
+            var converter = new TransformBlock<TOut, TTarget>(transform, m_dataflowOptions.ToExecutionBlockOption());
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
             
             LinkBlockToFlow(converter, other);            
@@ -810,7 +810,7 @@ namespace Gridsum.DataflowEx
                             this.FullName, 
                             survivor);
                         throw new InvalidDataException(string.Format("An object came to error region of {0}: {1}", this.FullName, survivor));
-                    });
+                    }, m_dataflowOptions.ToExecutionBlockOption());
 
             this.OutputBlock.LinkTo(actionBlock, m_defaultLinkOption, left);
             this.RegisterChild(actionBlock);

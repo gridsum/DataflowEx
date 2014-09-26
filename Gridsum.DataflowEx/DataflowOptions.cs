@@ -75,7 +75,7 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        public ExecutionDataflowBlockOptions ExtractToBlockOption(bool isBlockMultiThreaded = false)
+        public ExecutionDataflowBlockOptions ToExecutionBlockOption(bool isBlockMultiThreaded = false)
         {
             var option = new ExecutionDataflowBlockOptions();
 
@@ -86,10 +86,22 @@ namespace Gridsum.DataflowEx
 
             if (isBlockMultiThreaded)
             {
-                //todo: modify the default MaxDegreeOfParallelism
+                //todo: modify the default 
                 option.MaxDegreeOfParallelism = this.RecommendedParallelismIfMultiThreaded ?? Environment.ProcessorCount;
             }
 
+            return option;
+        }
+
+        public GroupingDataflowBlockOptions ToGroupingBlockOption()
+        {
+            var option = new GroupingDataflowBlockOptions();
+
+            if (this.RecommendedCapacity != null)
+            {
+                option.BoundedCapacity = this.RecommendedCapacity.Value;
+            }
+            
             return option;
         }
 

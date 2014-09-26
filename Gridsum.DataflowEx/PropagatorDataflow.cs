@@ -39,11 +39,11 @@ namespace Gridsum.DataflowEx
         private readonly Func<TIn, IEnumerable<TOut>> m_transformMany;
         private TransformManyBlock<TIn, TOut> m_block;
 
-        public TransformManyDataflow(Func<TIn, IEnumerable<TOut>> transformMany)
-            : base(DataflowOptions.Default)
+        public TransformManyDataflow(Func<TIn, IEnumerable<TOut>> transformMany, DataflowOptions options)
+            : base(options)
         {
             this.m_transformMany = transformMany;
-            m_block = new TransformManyBlock<TIn, TOut>(new Func<TIn, IEnumerable<TOut>>(Transform));
+            m_block = new TransformManyBlock<TIn, TOut>(new Func<TIn, IEnumerable<TOut>>(Transform), options.ToExecutionBlockOption());
             RegisterChild(m_block);
         }
 

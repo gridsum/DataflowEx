@@ -52,13 +52,13 @@
             private readonly string m_mergeTmpToDimTable;
             private Dataflow<JoinBatch<TIn>, JoinBatch<TIn>> m_outputBuffer;
 
-            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy)
-                : base(targetTable, DataflowOptions.Default, host.m_batchSize)
+            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy, DataflowOptions option)
+                : base(targetTable, option, host.m_batchSize)
             {
                 this.m_host = host;
                 m_keyGetter = joinBy.Compile();
                 m_keyComparer = m_host.m_keyComparer;
-                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>().ToDataflow();
+                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>(option.ToGroupingBlockOption()).ToDataflow();
                 m_outputBuffer.Name = "OutputBuffer";
                 RegisterChild(m_outputBuffer);
                 m_outputBuffer.RegisterDependency(m_actionBlock);
@@ -198,13 +198,13 @@
         protected IEqualityComparer<TLookupKey> m_keyComparer;
         protected ILog m_logger;
 
-        public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
-            : base(DataflowOptions.Default)
+        public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, DataflowOptions option, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
+            : base(option)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
-            m_batchBlock = new BatchBlock<TIn>(batchSize);
-            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch);
+            m_batchBlock = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption());
+            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch, option);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
             m_keyComparer = typeof(TLookupKey) == typeof(byte[])
@@ -217,7 +217,7 @@
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
-                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup)).ToDataflow();
+                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow();
             transformer.Name = "ArrayToJoinBatchConverter";
 
             transformer.LinkFromBlock(m_batchBlock);
@@ -227,8 +227,8 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn) {Name = "DimInserter"};
-            var hb = new HeartbeatNode<JoinBatch<TIn>>();
+            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn, option) {Name = "DimInserter"};
+            var hb = new HeartbeatNode<JoinBatch<TIn>>(option);
 
             m_dimInserter.RegisterDependency(m_lookupNode);
 

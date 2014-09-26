@@ -36,7 +36,7 @@ namespace Gridsum.DataflowEx
                             buffer.Post(copy);
                         }
                         return arg;
-                    });
+                    }, dataflowOptions.ToExecutionBlockOption());
             
             RegisterChild(m_transformBlock);
         }
@@ -57,10 +57,7 @@ namespace Gridsum.DataflowEx
         public void LinkCopyTo(IDataflow<T> other)
         {
             //first, create a new copy block
-            Dataflow<T, T> copyBuffer = new BufferBlock<T>(new DataflowBlockOptions()
-            {
-                BoundedCapacity = m_dataflowOptions.RecommendedCapacity ?? int.MaxValue
-            }).ToDataflow();
+            Dataflow<T, T> copyBuffer = new BufferBlock<T>(m_dataflowOptions.ToGroupingBlockOption()).ToDataflow();
 
             RegisterChild(copyBuffer);
             copyBuffer.RegisterDependency(m_transformBlock);
