@@ -28,8 +28,12 @@ namespace Gridsum.DataflowEx
         protected ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>> m_destinations;
         private Func<TKey, Lazy<Dataflow<TIn>>> m_initer;
 
-        public DataDispatcher(Func<TIn, TKey> dispatcherFunc)
-            : base(DataflowOptions.Default)
+        public DataDispatcher(Func<TIn, TKey> dispatcherFunc) : this(dispatcherFunc, DataflowOptions.Default)
+        {
+        }
+
+        public DataDispatcher(Func<TIn, TKey> dispatcherFunc, DataflowOptions option)
+            : base(option)
         {
             m_destinations = new ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>>();
 
@@ -38,6 +42,7 @@ namespace Gridsum.DataflowEx
                                       {
                                           var child = this.CreateChildFlow(key);
                                           RegisterChild(child);
+                                          child.RegisterDependency(m_dispatcherBlock);
                                           return child;
                                       });
 
@@ -46,13 +51,9 @@ namespace Gridsum.DataflowEx
                     {
                         var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
                         childFlow.InputBlock.SafePost(input);
-                    });
+                    }, option.ToExecutionBlockOption());
 
             RegisterChild(m_dispatcherBlock);
-
-            //propagate completion to children as we don't have 'link'
-            //no need to propagate errors as register handles that (given that dyamic blocks are registered)
-            m_dispatcherBlock.LinkNormalCompletionTo(() => m_destinations.Values.Select(_=>_.Value.InputBlock));
         }
 
         /// <summary>

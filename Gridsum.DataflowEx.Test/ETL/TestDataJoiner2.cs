@@ -22,7 +22,7 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
             public int Count;
 
             public JoinerWithAsserter(Expression<Func<Trunk, byte[]>> joinOn, TargetTable dimTableTarget, int batchSize)
-                : base(joinOn, dimTableTarget, batchSize)
+                : base(joinOn, dimTableTarget, DataflowOptions.Default, batchSize)
             {
                 this.Count = 0;
             }

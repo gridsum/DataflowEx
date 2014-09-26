@@ -40,8 +40,7 @@ namespace Gridsum.DataflowEx
             BlockMonitorEnabled = false,
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Succinct,
-            MonitorInterval = DefaultInterval,
-            RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
+            MonitorInterval = DefaultInterval
         };
 
         private static DataflowOptions s_verboseOptions = new DataflowOptions()
@@ -49,8 +48,7 @@ namespace Gridsum.DataflowEx
             BlockMonitorEnabled = true,
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Verbose,
-            MonitorInterval = DefaultInterval,
-            RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
+            MonitorInterval = DefaultInterval
         };
 
         public static DataflowOptions Default
@@ -77,7 +75,7 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        public ExecutionDataflowBlockOptions ExtractToBlockOption(bool isBlockMultiThreaded = false)
+        public ExecutionDataflowBlockOptions ToExecutionBlockOption(bool isBlockMultiThreaded = false)
         {
             var option = new ExecutionDataflowBlockOptions();
 
@@ -88,9 +86,22 @@ namespace Gridsum.DataflowEx
 
             if (isBlockMultiThreaded)
             {
+                //todo: modify the default 
                 option.MaxDegreeOfParallelism = this.RecommendedParallelismIfMultiThreaded ?? Environment.ProcessorCount;
             }
 
+            return option;
+        }
+
+        public GroupingDataflowBlockOptions ToGroupingBlockOption()
+        {
+            var option = new GroupingDataflowBlockOptions();
+
+            if (this.RecommendedCapacity != null)
+            {
+                option.BoundedCapacity = this.RecommendedCapacity.Value;
+            }
+            
             return option;
         }
 

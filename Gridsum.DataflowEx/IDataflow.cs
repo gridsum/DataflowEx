@@ -13,6 +13,11 @@ namespace Gridsum.DataflowEx
         string Name { get; }
         string FullName { get; }
         int BufferedCount { get; }
+
+        /// <summary>
+        /// Signals to the IDataflow that it should not accept any more messages
+        /// </summary>
+        void Complete();
     }
 
     public interface IDataflow<in TIn> : IDataflow

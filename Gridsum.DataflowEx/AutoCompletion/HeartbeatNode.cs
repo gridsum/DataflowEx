@@ -23,7 +23,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         private long m_beats;
         private TransformBlock<T, T> m_block;
 
-        public HeartbeatNode() : base(DataflowOptions.Default)
+        public HeartbeatNode(DataflowOptions options) : base(options)
         {
             m_beats = 0;
 
@@ -35,7 +35,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
                     return arg;
                 };
 
-            m_block = new TransformBlock<T, T>(f);
+            m_block = new TransformBlock<T, T>(f, options.ToExecutionBlockOption());
             RegisterChild(m_block);
         }
 

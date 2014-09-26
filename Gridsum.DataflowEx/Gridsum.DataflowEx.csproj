@@ -89,7 +89,7 @@
     <Compile Include="Exceptions\NoChildRegisteredException.cs" />
     <Compile Include="Exceptions\TaskEx.cs" />
     <Compile Include="IntHolder.cs" />
-    <Compile Include="IDataflowChildMeta.cs" />
+    <Compile Include="IDataflowDependency.cs" />
     <Compile Include="LogHelper.cs" />
     <Compile Include="Databases\DbBulkInserter.cs" />
     <Compile Include="IDataflow.cs" />

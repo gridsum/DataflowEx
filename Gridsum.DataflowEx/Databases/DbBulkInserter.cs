@@ -48,8 +48,8 @@ namespace Gridsum.DataflowEx.Databases
             m_bulkSize = bulkSize;
             m_dbBulkInserterName = dbBulkInserterName;
             m_postBulkInsert = postBulkInsert;
-            m_batchBlock = new BatchBlock<T>(bulkSize);
-            m_actionBlock = new ActionBlock<T[]>(array => this.DumpToDBAsync(array, targetTable));
+            m_batchBlock = new BatchBlock<T>(bulkSize, options.ToGroupingBlockOption());
+            m_actionBlock = new ActionBlock<T[]>(array => this.DumpToDBAsync(array, targetTable), options.ToExecutionBlockOption());
             m_batchBlock.LinkTo(m_actionBlock, m_defaultLinkOption);
             m_logger = Utils.GetNamespaceLogger();
 

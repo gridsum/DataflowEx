@@ -46,22 +46,23 @@
         {
             private readonly DbDataJoiner<TIn, TLookupKey> m_host;
             private Func<TIn, TLookupKey> m_keyGetter;
-            private BufferBlock<JoinBatch<TIn>> m_outputBlock;
             private IEqualityComparer<TLookupKey> m_keyComparer;
             private readonly TargetTable m_tmpTargetTable;
             private readonly string m_createTmpTable;
             private readonly string m_mergeTmpToDimTable;
+            private Dataflow<JoinBatch<TIn>, JoinBatch<TIn>> m_outputBuffer;
 
-            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy)
-                : base(targetTable, DataflowOptions.Default, host.m_batchSize)
+            public DimTableInserter(DbDataJoiner<TIn, TLookupKey> host, TargetTable targetTable, Expression<Func<TIn, TLookupKey>> joinBy, DataflowOptions option)
+                : base(targetTable, option, host.m_batchSize)
             {
                 this.m_host = host;
                 m_keyGetter = joinBy.Compile();
                 m_keyComparer = m_host.m_keyComparer;
-                m_outputBlock = new BufferBlock<JoinBatch<TIn>>();
-                RegisterChild(m_outputBlock);
-                m_actionBlock.LinkNormalCompletionTo(m_outputBlock);
-
+                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>(option.ToGroupingBlockOption()).ToDataflow();
+                m_outputBuffer.Name = "OutputBuffer";
+                RegisterChild(m_outputBuffer);
+                m_outputBuffer.RegisterDependency(m_actionBlock);
+                
                 m_tmpTargetTable = new TargetTable(
                     targetTable.DestLabel,
                     targetTable.ConnectionString,
@@ -158,7 +159,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                m_outputBlock.SafePost(doneBatch);
+                this.m_outputBuffer.Post(doneBatch);
 
                 IsBusy = false;
             }
@@ -175,12 +176,12 @@
             
             public ISourceBlock<JoinBatch<TIn>> OutputBlock { get
             {
-                return m_outputBlock;
+                return m_outputBuffer.OutputBlock;
             } }
 
             public void LinkTo(IDataflow<JoinBatch<TIn>> other)
             {
-                this.LinkBlockToFlow(m_outputBlock, other);
+                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other);
             }
 
             public bool IsBusy { get; private set; }
@@ -197,13 +198,13 @@
         protected IEqualityComparer<TLookupKey> m_keyComparer;
         protected ILog m_logger;
 
-        public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
-            : base(DataflowOptions.Default)
+        public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, DataflowOptions option, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
+            : base(option)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
-            m_batchBlock = new BatchBlock<TIn>(batchSize);
-            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch);
+            m_batchBlock = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption());
+            m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch, option);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
             m_keyComparer = typeof(TLookupKey) == typeof(byte[])
@@ -216,7 +217,7 @@
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
-                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup)).ToDataflow();
+                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow();
             transformer.Name = "ArrayToJoinBatchConverter";
 
             transformer.LinkFromBlock(m_batchBlock);
@@ -226,10 +227,11 @@
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
-            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn) {Name = "DimInserter"};
-            var hb = new HeartbeatNode<JoinBatch<TIn>>();
+            m_dimInserter = new DimTableInserter(this, dimTableTarget, joinOn, option) {Name = "DimInserter"};
+            var hb = new HeartbeatNode<JoinBatch<TIn>>(option);
 
-            m_lookupNode.OutputBlock.LinkNormalCompletionTo(m_dimInserter.InputBlock);
+            m_dimInserter.RegisterDependency(m_lookupNode);
+
             m_dimInserter.LinkTo(hb);
             hb.LinkTo(m_lookupNode);
 
