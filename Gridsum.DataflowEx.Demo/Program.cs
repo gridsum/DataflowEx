@@ -47,7 +47,8 @@
             Console.WriteLine("sum(a) = {0}", dict["a"]); //prints sum(a) = 6
 
 
-            CalcAsync().Wait();
+            //CalcAsync().Wait();
+            SlowFlowAsync().Wait();
         }
 
         public static async Task CalcAsync()
@@ -70,6 +71,26 @@
 
             var intFlow = new ComplexIntFlow();
             await intFlow.ProcessAsync(new[] { 1, 2, 3});
+        }
+
+        public static async Task SlowFlowAsync()
+        {
+            var slowFlow = new SlowFlow( new DataflowOptions
+                        {
+                            FlowMonitorEnabled = true, 
+                            MonitorInterval = TimeSpan.FromSeconds(5) 
+                        });
+
+            slowFlow.Post("a");
+            slowFlow.Post("ab");
+            slowFlow.Post("abc");
+            slowFlow.Post("abcd");
+            slowFlow.Post("abcde");
+            slowFlow.Post("abcdef");
+            slowFlow.Post("abcdefg");
+            slowFlow.Post("abcdefgh");
+            slowFlow.Post("abcdefghi");
+            await slowFlow.SignalAndWaitForCompletionAsync();
         }
     }
 }
