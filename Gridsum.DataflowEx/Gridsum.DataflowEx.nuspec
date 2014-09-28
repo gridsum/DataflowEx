@@ -15,7 +15,7 @@
       You can write reusable components with mutable states and easily join them as a high-level graph while still having the power of low level blocks from TPL Dataflow. Other cool features include: Upstream failure propagation, built-in performance monitor, auto complete support, sql bulk inserter, etc. Find more at https://github.com/gridsum/dataflowex.
     </description>
     <releaseNotes>
-* 1.0.9.1 - Built-in flows now respect given DataflowOptions wherever applicable.
+* 1.0.9.* - Built-in flows now respect given DataflowOptions wherever applicable.
 * 1.0.9   - Allows optional db column mapping.
 * 1.0.8   - Add DbDataJoiner to help lookup and populate a dimension table. Also comes with a new ring completion mechanism.
 * 1.0.7   - A better DataBrancher that supports multiple outputs. Add varbinary support for bulk insertion.
