@@ -236,9 +236,59 @@ Does Dataflow class allow an orphan child that links to no one and is not linked
 
 All right. Time for a demo to show the graph construction and complex completion propagation.
 
+```C#
+public class ComplexIntFlow : Dataflow<int>
+{
+    private ITargetBlock<int> _headBlock;
+    public ComplexIntFlow() : base(DataflowOptions.Default)
+    {
+        Dataflow<int, int> node2 = DataflowUtils.FromDelegate<int, int>(i => i);
+        Dataflow<int, int> node3 = DataflowUtils.FromDelegate<int, int>(i => i * -1)
 
+        Dataflow<int, int> node1 = DataflowUtils.FromDelegate<int, int>(
+            i => {
+                    if (i % 2 == 0) { node2.Post(i); }
+                    else { node3.Post(i); }
+                    return 999;
+                });
+        
+        Dataflow<int> printer = DataflowUtils.FromDelegate<int>(Console.WriteLine);
+
+        node1.Name = "node1";
+        node2.Name = "node2";
+        node3.Name = "node3";
+        printer.Name = "printer";
+
+        node1.LinkTo(printer);
+        node2.LinkTo(printer);
+        node3.LinkTo(printer);
+
+        //Completion propagation: node1 ---> node2
+        node2.RegisterDependency(node1);
+        //Completion propagation: node1 + node2 ---> node3
+        node3.RegisterDependency(node1);
+        node3.RegisterDependency(node2);
+
+        this.RegisterChild(node1);
+        this.RegisterChild(node2);
+        this.RegisterChild(node3);
+        this.RegisterChild(printer, t => { 
+            if (t.Status == TaskStatus.RanToCompletion) 
+                Console.WriteLine("Printer done!");
+        });
+
+        this._headBlock = node1.InputBlock;
+    }
+
+    public override ITargetBlock<int> InputBlock { get { return this._headBlock; } }
+}
+```
+
+Code tells :) In this example (1) Node1, Node2 and Node3 all flow to the printer node. (2) Node2's life cycle depends on Node1. (3) Node3 depends on Node1 and Node2. So when the graph comes to it completion, the order will be Node1 -> Node2 -> Node3 -> Printer. This is powered by linking and dependency registration built-in in DataflowEx. 
 
 ### 3. Logging is your friend
+
+
 
 //example on 1 to M to 1?
 
