@@ -4,23 +4,7 @@
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
     using Gridsum.DataflowEx;
-
-    public static class DataflowExEx
-    {
-        public static void Post<TIn>(this Dataflow<TIn> dataflow, TIn item)
-        {
-            dataflow.InputBlock.SafePost(item);
-        }
-
-        public static void RegisterChildren(this Dataflow dataflow, params Dataflow[] children)
-        {
-            foreach (var child in children)
-            {
-                dataflow.RegisterChild(child);
-            }
-        }
-    }
-
+    
     public class ComplexIntFlow : Dataflow<int>
     {
         private ITargetBlock<int> _headBlock;
@@ -43,6 +27,15 @@
             node3.Name = "node3";
             printer.Name = "printer";
 
+            this.RegisterChild(node1);
+            this.RegisterChild(node2);
+            this.RegisterChild(node3);
+            this.RegisterChild(printer, t =>
+            {
+                if (t.Status == TaskStatus.RanToCompletion)
+                    Console.WriteLine("Printer done!");
+            });
+
             node1.LinkTo(printer);
             node2.LinkTo(printer);
             node3.LinkTo(printer);
@@ -52,15 +45,7 @@
             //Completion propagation: node1 + node2 ---> node3
             node3.RegisterDependency(node1);
             node3.RegisterDependency(node2);
-
-            this.RegisterChild(node1);
-            this.RegisterChild(node2);
-            this.RegisterChild(node3);
-            this.RegisterChild(printer, t => { 
-                if (t.Status == TaskStatus.RanToCompletion) 
-                    Console.WriteLine("Printer done!");
-            });
-
+            
             this._headBlock = node1.InputBlock;
         }
 

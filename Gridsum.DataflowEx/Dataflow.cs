@@ -333,7 +333,7 @@ namespace Gridsum.DataflowEx
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
                 this.CleanUp();
-                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.FullName));
+                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
             catch (Exception)
             {
