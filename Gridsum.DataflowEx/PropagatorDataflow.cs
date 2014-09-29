@@ -36,21 +36,21 @@ namespace Gridsum.DataflowEx
 
     public class TransformManyDataflow<TIn, TOut> : Dataflow<TIn, TOut>, IRingNode
     {
-        private readonly Func<TIn, IEnumerable<TOut>> m_transformMany;
+        private readonly Func<TIn, Task<IEnumerable<TOut>>> m_transformMany;
         private TransformManyBlock<TIn, TOut> m_block;
-
-        public TransformManyDataflow(Func<TIn, IEnumerable<TOut>> transformMany, DataflowOptions options)
+        
+        public TransformManyDataflow(Func<TIn, Task<IEnumerable<TOut>>> transformMany, DataflowOptions options)
             : base(options)
         {
             this.m_transformMany = transformMany;
-            m_block = new TransformManyBlock<TIn, TOut>(new Func<TIn, IEnumerable<TOut>>(Transform), options.ToExecutionBlockOption());
+            m_block = new TransformManyBlock<TIn, TOut>(new Func<TIn, Task<IEnumerable<TOut>>>(Transform), options.ToExecutionBlockOption());
             RegisterChild(m_block);
         }
 
-        private IEnumerable<TOut> Transform(TIn @in)
+        private async Task<IEnumerable<TOut>> Transform(TIn @in)
         {
             IsBusy = true;
-            var outs = m_transformMany(@in);
+            var outs = await m_transformMany(@in);
             IsBusy = false;
             return outs;
         }

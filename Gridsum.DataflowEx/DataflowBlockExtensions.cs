@@ -14,6 +14,7 @@ namespace Gridsum.DataflowEx
 
     public static class DataflowBlockExtensions
     {
+        [Obsolete]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SafePost<TIn>(this ITargetBlock<TIn> target, TIn item, int interval = 200, int retryCount = 3)
         {
@@ -40,7 +41,7 @@ namespace Gridsum.DataflowEx
             throw new PostToBlockFailedException(
                 string.Format("Safe post to {0} failed after {1} retries", Utils.GetFriendlyName(target.GetType()), retryCount));
         }
-
+        
         public static Tuple<int,int> GetBufferCount(this IDataflowBlock block)
         {
             dynamic b = block;

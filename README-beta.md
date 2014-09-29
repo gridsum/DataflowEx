@@ -1,6 +1,6 @@
 Welcome to DataflowEx
 ===================
-DataflowEx is a collection of extensions to TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides abstraction/management on top of dataflow blocks to make your life easier.
+DataflowEx is a collection of extensions to TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides abstraction/management on top of dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
 
@@ -124,9 +124,9 @@ It is now that easy with <kbd>ProcessAsync</kbd> as DataflowEx handles the tedio
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
-Understanding class Dataflow 
+Understanding Dataflow class
 -------------
-IDataflowBlock is the fundamental piece in TPL Dataflow while IDataflow is the counterpart in DataflowEx. Take a look at the IDataflow design:
+Just like IDataflowBlock is the fundamental piece in TPL Dataflow, IDataflow is the counterpart in DataflowEx library. Take a look at the IDataflow design:
 ```c#
 public interface IDataflow
 {
@@ -236,14 +236,326 @@ Does Dataflow class allow an orphan child that links to no one and is not linked
 
 All right. Time for a demo to show the graph construction and complex completion propagation.
 
+```C#
+public class ComplexIntFlow : Dataflow<int>
+{
+    private ITargetBlock<int> _headBlock;
+    public ComplexIntFlow() : base(DataflowOptions.Default)
+    {
+        Dataflow<int, int> node2 = DataflowUtils.FromDelegate<int, int>(i => i);
+        Dataflow<int, int> node3 = DataflowUtils.FromDelegate<int, int>(i => i * -1)
 
+        Dataflow<int, int> node1 = DataflowUtils.FromDelegate<int, int>(
+            i => {
+                    if (i % 2 == 0) { node2.Post(i); }
+                    else { node3.Post(i); }
+                    return 999;
+                });
+        
+        Dataflow<int> printer = DataflowUtils.FromDelegate<int>(Console.WriteLine);
+
+        node1.Name = "node1";
+        node2.Name = "node2";
+        node3.Name = "node3";
+        printer.Name = "printer";
+
+        node1.LinkTo(printer);
+        node2.LinkTo(printer);
+        node3.LinkTo(printer);
+
+        //Completion propagation: node1 ---> node2
+        node2.RegisterDependency(node1);
+        //Completion propagation: node1 + node2 ---> node3
+        node3.RegisterDependency(node1);
+        node3.RegisterDependency(node2);
+
+        this.RegisterChild(node1);
+        this.RegisterChild(node2);
+        this.RegisterChild(node3);
+        this.RegisterChild(printer, t => { 
+            if (t.Status == TaskStatus.RanToCompletion) 
+                Console.WriteLine("Printer done!");
+        });
+
+        this._headBlock = node1.InputBlock;
+    }
+
+    public override ITargetBlock<int> InputBlock { get { return this._headBlock; } }
+}
+
+//Consumer
+var intFlow = new ComplexIntFlow();
+await intFlow.ProcessAsync(new[] { 1, 2, 3});
+```
+
+Code tells :) In this example (1) Node1, Node2 and Node3 all flow to the printer node. (2) Node2's life cycle depends on Node1. (3) Node3 depends on Node1 and Node2. So when the graph comes to it completion, the order will be Node1 -> Node2 -> Node3 -> Printer. This is powered by linking and dependency registration built-in in DataflowEx. 
 
 ### 3. Logging is your friend
+
+To help you better understand how DataflowEx works and sometimes diagnose your application, DataflowEx provides extensive logging where we think necessary. So you get insights of the blocks/dataflows managed by DataflowEx without tedious debugging. Please just check the log, which is always our first advice.
+
+Technically [Common.Logging](http://www.nuget.org/packages/Common.Logging/) is used as the underlying logging framework so that it can easily be integrated to your own logging system with an adapter, no matter you are using Log4Net, NLog or Enterprise Library Logging. For detailed documentation on Common.Logging, please checkout [this link](http://netcommon.sourceforge.net/docs/2.1.0/reference/html/index.html).
+
+I'll use NLog as an example to print out logging of ComplexIntFlow. In the app.config, configure a NLogLoggerFactoryAdapter to route common.logging messages to NLog.
+
+```xml
+<configuration>
+  <configSections>
+    <sectionGroup name="common">
+      <section name="logging" type="Common.Logging.ConfigurationSectionHandler, Common.Logging" requirePermission="false" />
+    </sectionGroup>
+  </configSections>
+  
+  <common>
+    <logging>
+      <factoryAdapter type="Common.Logging.NLog.NLogLoggerFactoryAdapter, Common.Logging.NLog20">
+        <arg key="configType" value="FILE" />
+        <arg key="configFile" value="~/NLog.config" />
+      </factoryAdapter>
+    </logging>
+  </common>
+</configuration>
+```
+
+Meanwhile, set up NLog in you NLog.config:
+
+```xml
+<nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <variable name="logFormat" value="${date:format=yy/MM/dd HH\:mm\:ss} [${logger}].[${level}] ${message} ${exception:format=tostring} "/>
+
+  <targets>
+    <target xsi:type="Console" name="console" layout="${logFormat}"/>
+    <target xsi:type="File" name ="file" fileName="Gridsum.DataflowEx.Demo.log" layout="${logFormat}" keepFileOpen="true"/>
+  </targets>
+
+  <rules>
+    <logger name ="Gridsum.DataflowEx*" minlevel="Trace" writeTo="console,file"></logger>
+  </rules>
+</nlog>
+```
+
+Then the logging infomation will be written to both the console and a log file. 
+
+> **Note:** Notice that "Gridsum.DataflowEx*" is used as the logger name in the rules section. This represents the logging categories used by DataflowEx. In fact, most logging of DataflowEx is recorded under category "Gridsum.DataflowEx" and a few uses subcategories with the prefix (e.g. "Gridsum.DataflowEx.Databases"). So an extra wildcard ¡®*¡¯ includes every message from the library.
+
+O.K. Let's take a look of the log file after executing the ComplexIntFlow demo:
+
+```
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[printer] now has 2 dependencies.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[printer] now has 3 dependencies.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[node3] now has 2 dependencies.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1] Successfully pulled and posted 3 Int32s to [ComplexIntFlow1]->[node1].  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1] Finished reading from enumerable and posting to the dataflow.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1] Telling myself there is no more input and wait for children completion  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[node1] completed  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[node2] completed  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[node3] All of my dependencies are done. Completing myself.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[node3] completed  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[printer] All of my dependencies are done. Completing myself.  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1]->[printer] completed  
+14/09/28 11:18:33 [Gridsum.DataflowEx].[Info] [ComplexIntFlow1] completed  
+```
+
+Nice and clear, isn't it? The output also proves that dataflow dependency works correctly introduced in the last topic.
+
+Logging provides more than lifecycle information. It includes **block/dataflow buffer information** as well, which is extremely helpful when checking dataflow health, finding bottlenecks and diagnosing deadlock problems. If you need flow-level buffer monitor, set DataflowOptions.FlowMonitorEnabled to true and then pass the DataflowOptions object to the constructor of dataflow classes. If you need block-level buffer information, set DataflowOptions.BlockMonitorEnabled to true. With everything set up, the Dataflow base class will start an asynchronous loop to check and log states of all its children with an given interval (the default interval is 10 seconds).
+
+To demonstrate buffer monitoring logging, let's create a SlowFlow on purpose:
+
+```c#
+public class SlowFlow : Dataflow<string>
+{
+    private Dataflow<string, char> _splitter;
+    private Dataflow<char> _printer;
+
+    public SlowFlow(DataflowOptions dataflowOptions)
+        : base(dataflowOptions)
+    {
+        _splitter = new TransformManyBlock<string, char>(new Func<string, IEnumerable<char>>(this.SlowSplit), 
+            dataflowOptions.ToExecutionBlockOption())
+            .ToDataflow(dataflowOptions, "SlowSplitter");
+
+        _printer = new ActionBlock<char>(c => Console.WriteLine(c),
+            dataflowOptions.ToExecutionBlockOption())
+            .ToDataflow(dataflowOptions, "Printer");
+
+        RegisterChild(_splitter);
+        RegisterChild(_printer);
+
+        _splitter.LinkTo(_printer);
+    }
+
+    private IEnumerable<char> SlowSplit(string s)
+    {
+        foreach (var c in s)
+        {
+            Thread.Sleep(1000); //slow down
+            yield return c;
+        }
+    }
+
+    public override ITargetBlock<string> InputBlock { get { return _splitter.InputBlock; } }
+}
+
+//consumer
+var slowFlow = new SlowFlow( new DataflowOptions
+            {
+                FlowMonitorEnabled = true, 
+                MonitorInterval = TimeSpan.FromSeconds(2),
+                PerformanceMonitorMode = DataflowOptions.PerformanceLogMode.Verbose
+            });
+
+await slowFlow.ProcessAsync(new[]
+                                {
+                                    "abcd", 
+                                    "abc", 
+                                    "ab", 
+                                    "a"
+                                });
+```
+The slow flow class has a slow splitter block if you see the Thread.Sleep(). Then we properly set some options when constructing a SlowFlow instance:
+
+>1. **FlowMonitorEnabled** tells the flow to log its buffer status periodically. Since the dataflow option is normally passed on to its children. Child flows will also log their buffer status.
+>2. **MonitorInterval** sets the time interval between two adjacent buffer status calls.
+>3. **PerformanceMonitorMode** sets whether or not to output logging information if a flow has 0 items buffered. Setting it to **Verbose** will log empty flows while setting to **Succint** will not.
+
+Let's have a look at the log after executing the above code:
+
+```
+14/09/29 11:38:00 [Gridsum.DataflowEx].[Info] [SlowFlow1] Telling myself there is no more input and wait for children completion  
+14/09/29 11:38:02 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter] has 3 todo items (in:3, out:0) at this moment.  
+14/09/29 11:38:02 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1] has 3 todo items (in:3, out:0) at this moment.  
+14/09/29 11:38:02 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[Printer] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:04 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[Printer] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:04 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1] has 3 todo items (in:3, out:0) at this moment.  
+14/09/29 11:38:04 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter] has 3 todo items (in:3, out:0) at this moment.  
+14/09/29 11:38:06 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[Printer] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:06 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1] has 2 todo items (in:2, out:0) at this moment.  
+14/09/29 11:38:06 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter] has 2 todo items (in:2, out:0) at this moment.  
+14/09/29 11:38:08 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter] has 1 todo items (in:1, out:0) at this moment.  
+14/09/29 11:38:08 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1] has 1 todo items (in:1, out:0) at this moment.  
+14/09/29 11:38:08 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[Printer] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:10 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[Printer] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:10 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:10 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter] has 0 todo items (in:0, out:0) at this moment.  
+14/09/29 11:38:10 [Gridsum.DataflowEx].[Info] [SlowFlow1]->[SlowSplitter] completed  
+14/09/29 11:38:10 [Gridsum.DataflowEx].[Info] [SlowFlow1]->[Printer] completed  
+14/09/29 11:38:10 [Gridsum.DataflowEx].[Info] [SlowFlow1] completed  
+```
+
+Now we easily find out the bottle neck of the flow to be [SlowFlow1]->[SlowSplitter], which has more todo items than other modules.
+
+What if you have a flow that contains many blocks? Fortunately there is another property on DataflowOptions you can set, **BlockMonitorEnabled**, to disclose block level buffer status. After setting it to true, you get logs like:
+
+```
+14/09/29 11:53:55 [Gridsum.DataflowEx.PerfMon].[Debug] [SlowFlow1]->[SlowSplitter]->(TransformManyBlock<String, Char>) has 3 todo items (in:3, out:0) at this moment.   
+```
+
+The evil block has nowhere to escape :)
+
+> **Note:** DataflowEx provides a default DataflowOptions instance: DataflowOptions.Default. It has FlowMonitorEnabled set to true, BlockMonitorEnabled set to false, MonitorInterval as 10 seconds and PerformanceMonitorMode being Succint.
+
+### 4. Error handling
+
+If we look back to the very first Dataflow implementation, the AggregatorFlow class, there is a couple of conditions required for the input, in a silent way. For example, in the Split method:
+```
+protected virtual KeyValuePair<string, int> Split(string input)
+{
+    string[] splitted = input.Split('=');
+    return new KeyValuePair<string, int>(splitted[0], int.Parse(splitted[1]));
+}
+```
+If the input does not obey the "key={int}" format, an exception will be thrown. So, what is next? What will happen to the Dataflow graph?
+
+DataflowEx takes a **fast-fail** approach on exception handling just like TPL Dataflow. When an exception is thrown, the low-level block ends to the Faulted state first. Then the Dataflow instance who is the parent of the failing block gets notified. It will immediately propagate the fatal error: notify its other children to shutdown immediately. After all its children is done/completed, the parent Dataflow also comes to its completion, with the original exception wrapped in the CompletionTask whose status is also Faulted.
+
+In the case of Dataflow nesting, the exception will be raised all the way from leaf to root, according to the child registration tree. One thing to remember is that, **DataflowEx never ever swallows an unhandled exception**. The library propagates it, store it in the CompletionTask and finally throw it where the top level Dataflow's CompletionTask is awaited.
+
+Thus for AggregatorFlow, if we pass in some invalid input (e.g. "a=badstring"), an unhandled exception is thrown on Main method (Exception will also be logged by DataflowEx internally):
+```
+Unhandled Exception: System.AggregateException: One or more errors occurred. ---> System.AggregateException: One or more
+ errors occurred. ---> System.FormatException: Input string was not in a correct format.
+   at System.Number.StringToNumber(String str, NumberStyles options, NumberBuffer& number, NumberFormatInfo info, Boolea
+n parseDecimal)
+   at System.Number.ParseInt32(String s, NumberStyles style, NumberFormatInfo info)
+   at Gridsum.DataflowEx.Demo.AggregatorFlow.Split(String input) in c:\Users\karld_000\Documents\SourceTree\DataflowEx\G
+ridsum.DataflowEx.Demo\AggregatorFlow.cs:line 41
+   at System.Threading.Tasks.Dataflow.TransformBlock`2.ProcessMessage(Func`2 transform, KeyValuePair`2 messageWithId)
+   at System.Threading.Tasks.Dataflow.TransformBlock`2.<>c__DisplayClass10.<.ctor>b__3(KeyValuePair`2 messageWithId)
+   at System.Threading.Tasks.Dataflow.Internal.TargetCore`1.ProcessMessagesLoopCore()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Gridsum.DataflowEx.Exceptions.TaskEx.<AwaitableWhenAll>d__3`1.MoveNext() in c:\Users\karld_000\Documents\SourceTre
+e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Gridsum.DataflowEx.Exceptions.TaskEx.<AwaitableWhenAll>d__3`1.MoveNext() in c:\Users\karld_000\Documents\SourceTre
+e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
+   --- End of inner exception stack trace ---
+   at Gridsum.DataflowEx.Exceptions.TaskEx.<AwaitableWhenAll>d__3`1.MoveNext() in c:\Users\karld_000\Documents\SourceTre
+e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 71
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Gridsum.DataflowEx.Dataflow.<GetCompletionTask>d__1c.MoveNext() in c:\Users\karld_000\Documents\SourceTree\Dataflo
+wEx\Gridsum.DataflowEx\Dataflow.cs:line 345
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Gridsum.DataflowEx.Demo.Program.<CalcAsync>d__6.MoveNext() in c:\Users\karld_000\Documents\SourceTree\DataflowEx\G
+ridsum.DataflowEx.Demo\Program.cs:line 66
+   --- End of inner exception stack trace ---
+   at System.Threading.Tasks.Task.ThrowIfExceptional(Boolean includeTaskCanceledExceptions)
+   at System.Threading.Tasks.Task.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at Gridsum.DataflowEx.Demo.Program.Main(String[] args) in c:\Users\karld_000\Documents\SourceTree\DataflowEx\Gridsum.
+DataflowEx.Demo\Program.cs:line 50
+```
+
+Hence, if you think the exception is expected or tolerable, please catch it in the very beginning in the delegate passed to the low level block. Otherwise, the domino effect will spread and fail the whole dataflow graph. 
+
+Summary
+-------------
+To sum up, DataflowEx enables you to write reusable components along with TPL Dataflow. Cool features include:
+
+* Inheritance and polymorphism for dataflows and their hehaviors
+* Block chain encapsulation as a reusable unit
+* Easy conditional chaining 
+* Automatic failure propagation within dataflow
+* Built-in performance metrics monitor
+* Auto complete support for circular dataflow graph
+* Dataflow friendly sql bulk inserter
+* Helper methods to convert raw blocks to dataflows
+
+Simply download [Gridsum.DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) and have a try!
+
+//example on 1 to M to 1?
+
+Advanced DataflowEx
+-------------
+
+UNDER CONSTRUCTION..
+
+
+### 5. Tips Build your own dataflows
+create, register and link
+block or dataflow?
+
+
+Design principle
+
+error prapagates to the root level
+
+
+Btw, two level.
 
 //example on 1 to M to 1?
 
 
-UNDER CONSTRUCTION..
+
 
 todo: LinkSubTypeTo() & TransformAndLink()
 
@@ -252,7 +564,7 @@ LinkTo()
 
 
 logging
-**DataflowOptions** how to respect it (pass it on)
+**DataflowOptions** and how to respect it (pass it on)
 dynamic registration
 
 Lifecycle management
@@ -287,3 +599,29 @@ StatisticsRecorder
 Performance considerations£º don't have too many blocks.
 
 any issue contact karldodd
+
+&lt;, and &amp;.
+
+Old words:
+
+Gridsum.DataflowEx
+==========
+
+Gridsum.DataflowEx is Gridsum's Object-Oriented extensions to TPL Dataflow library.
+
+TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
+1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
+2. Blocks need to interop with each other (e.g. should be linked carefully) and you get a chain/graph. In many times the chain need to be treated as a single processing unit but you have to construct it tediously from ground up here and there, whereever you need it. These boilerplate codes are far from graceful due to the non-OO design.
+
+By introducing the core concept of IDataflow, Gridsum.DataflowEx is born to solve all this with an OO design on top of TPL Dataflow. You can now easily write reusable components with extension points along with TPL Dataflow! Cool features include:
+
+* Inheritance and polymorphism for dataflows and their hehaviors
+* Block chain encapsulation as a reusable unit
+* Easy conditional chaining 
+* Upstream failure propagation within dataflow
+* Built-in performance metrics monitor
+* Auto complete support for circular dataflow graph (NEW!)
+* Dataflow friendly sql bulk inserter (NEW!)
+* Helper methods to convert raw blocks to dataflows
+
+Simply download Gridsum.DataflowEx and have a try!

@@ -67,7 +67,8 @@ namespace Gridsum.DataflowEx.Exceptions
 
             if (cachedException != null)
             {
-                throw cachedException;
+                //should not throw cacheException directly here, otherwise the original stack trace is lost.
+                throw new AggregateException(cachedException);
             }
         }
 

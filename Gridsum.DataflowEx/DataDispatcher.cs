@@ -46,11 +46,11 @@ namespace Gridsum.DataflowEx
                                           return child;
                                       });
 
-            m_dispatcherBlock = new ActionBlock<TIn>(
+            m_dispatcherBlock = new ActionBlock<TIn>(async
                 input =>
                     {
                         var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
-                        childFlow.InputBlock.SafePost(input);
+                        await childFlow.SendAsync(input);
                     }, option.ToExecutionBlockOption());
 
             RegisterChild(m_dispatcherBlock);

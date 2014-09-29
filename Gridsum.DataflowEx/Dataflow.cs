@@ -275,7 +275,7 @@ namespace Gridsum.DataflowEx
 
                     if (m_dataflowOptions.BlockMonitorEnabled)
                     {
-                        foreach(var child in m_children)
+                        foreach(IDataflowDependency child in m_children)
                         {
                             var bufferStatus = child.BufferStatus;
 
@@ -332,16 +332,17 @@ namespace Gridsum.DataflowEx
                 await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
+                //todo: move it to finally
                 this.CleanUp();
-                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.FullName));
+                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
-            catch (Exception)
+            catch (AggregateException e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw;
+                throw; //TaskEx.UnwrapWithPriority(e);
             }
         }
 
@@ -545,7 +546,7 @@ namespace Gridsum.DataflowEx
         public Task<long> PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
         {
             return Task.Run(
-                () =>
+                async () =>
                     {
                         long count = 0;
                         try
@@ -553,7 +554,7 @@ namespace Gridsum.DataflowEx
                             foreach (var item in reader)
                             {
                                 ct.ThrowIfCancellationRequested();
-                                InputBlock.SafePost(item);
+                                await this.SendAsync(item);
                                 count++;
                             }
                         }
@@ -784,6 +785,7 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
+            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
         
