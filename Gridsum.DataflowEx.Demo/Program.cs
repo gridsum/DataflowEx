@@ -7,6 +7,8 @@
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
 
+    using Gridsum.DataflowEx.Test;
+
     class Program
     {
         static void Main(string[] args)
@@ -78,18 +80,20 @@
             var slowFlow = new SlowFlow( new DataflowOptions
                         {
                             FlowMonitorEnabled = true, 
-                            MonitorInterval = TimeSpan.FromSeconds(5) 
+                            MonitorInterval = TimeSpan.FromSeconds(2),
+                            RecommendedCapacity = 5,
+                            PerformanceMonitorMode = DataflowOptions.PerformanceLogMode.Verbose
                         });
 
-            slowFlow.Post("a");
-            slowFlow.Post("ab");
-            slowFlow.Post("abc");
-            slowFlow.Post("abcd");
-            slowFlow.Post("abcde");
-            slowFlow.Post("abcdef");
-            slowFlow.Post("abcdefg");
-            slowFlow.Post("abcdefgh");
-            slowFlow.Post("abcdefghi");
+            await slowFlow.SendAsync("a");
+            await slowFlow.SendAsync("ab");
+            await slowFlow.SendAsync("abc");
+            await slowFlow.SendAsync("abcd");
+            //await slowFlow.SendAsync("abcde");
+//          //await slowFlow.SendAsync("abcdef");
+//          //await slowFlow.SendAsync("abcdefg");
+//          //await slowFlow.SendAsync("abcdefgh");
+//          //await slowFlow.SendAsync("abcdefghi");
             await slowFlow.SignalAndWaitForCompletionAsync();
         }
     }

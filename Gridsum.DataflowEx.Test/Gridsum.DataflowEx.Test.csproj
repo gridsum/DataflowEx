@@ -88,12 +88,14 @@
     <Compile Include="BlockExtensionTest.cs" />
     <Compile Include="TestBlockBehaviors.cs" />
     <Compile Include="TestDataBrancher.cs" />
+    <Compile Include="TestFlowBlocking.cs" />
     <Compile Include="TestLogReader.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TestAutoComplete.cs" />
     <Compile Include="TestStringCondition.cs" />
     <Compile Include="TestImmutable.cs" />
     <Compile Include="TestStatisticsRecorder.cs" />
+    <Compile Include="SlowFlow.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj">

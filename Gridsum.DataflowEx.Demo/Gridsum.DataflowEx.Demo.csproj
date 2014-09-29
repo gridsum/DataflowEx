@@ -66,7 +66,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AggregatorFlow.cs" />
-    <Compile Include="SlowFlow.cs" />
     <Compile Include="ComplexIntFlow.cs" />
     <Compile Include="LineAggregatorFlow.cs" />
     <Compile Include="Program.cs" />
@@ -83,6 +82,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Gridsum.DataflowEx.Test\Gridsum.DataflowEx.Test.csproj">
+      <Project>{e5089ad2-0be8-48e8-b361-a4c38b016c76}</Project>
+      <Name>Gridsum.DataflowEx.Test</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj">
       <Project>{a4fd6288-ae2e-4c28-b7d4-d317d1601e86}</Project>
       <Name>Gridsum.DataflowEx</Name>

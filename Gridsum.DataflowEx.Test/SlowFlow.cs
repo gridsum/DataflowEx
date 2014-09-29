@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 
-namespace Gridsum.DataflowEx.Demo
+namespace Gridsum.DataflowEx.Test
 {
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks.Dataflow;
-    
+
     public class SlowFlow : Dataflow<string>
     {
         private Dataflow<string, char> _splitter;
@@ -14,15 +14,14 @@ namespace Gridsum.DataflowEx.Demo
         public SlowFlow(DataflowOptions dataflowOptions)
             : base(dataflowOptions)
         {
-            _splitter = new TransformManyBlock<string, char>(new Func<string, IEnumerable<char>>(this.SlowSplit))
+            _splitter = new TransformManyBlock<string, char>(new Func<string, IEnumerable<char>>(this.SlowSplit), 
+                dataflowOptions.ToExecutionBlockOption())
                 .ToDataflow(dataflowOptions, "SlowSplitter");
-                
+
             _printer = new ActionBlock<char>(c =>
-                {
-                    Thread.Sleep(2000); 
-                    Console.WriteLine(c); 
-                })
-                .ToDataflow(dataflowOptions, "Printer");
+            {
+                Console.WriteLine(c);
+            }, dataflowOptions.ToExecutionBlockOption()).ToDataflow(dataflowOptions, "Printer");
 
             RegisterChild(_splitter);
             RegisterChild(_printer);

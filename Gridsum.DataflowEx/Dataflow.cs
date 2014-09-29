@@ -786,6 +786,7 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
+            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
         
