@@ -50,8 +50,8 @@
             Console.WriteLine("sum(a) = {0}", dict["a"]); //prints sum(a) = 6
 
 
-            //CalcAsync().Wait();
-            //SlowFlowAsync().Wait();
+            CalcAsync().Wait();
+            SlowFlowAsync().Wait();
             FailDemoAsync().Wait();
         }
 
@@ -61,7 +61,7 @@
             aggregatorFlow.Post("a=1");
             aggregatorFlow.Post("b=2");
             aggregatorFlow.Post("a=5");
-            aggregatorFlow.InputBlock.Complete();
+            aggregatorFlow.Complete();
             await aggregatorFlow.CompletionTask;
             Console.WriteLine("sum(a) = {0}", aggregatorFlow.Result["a"]); //prints sum(a) = 6
 
@@ -100,8 +100,12 @@
         public static async Task FailDemoAsync()
         {
             var aggregatorFlow = new AggregatorFlow();
-
-            await aggregatorFlow.ProcessAsync(new[] { "a=1", "a=badstring" });
+            aggregatorFlow.Post("a=1");
+            aggregatorFlow.Post("b=2");
+            aggregatorFlow.Post("a=5");
+            aggregatorFlow.Post("a=badstring");
+            aggregatorFlow.Complete();
+            await aggregatorFlow.CompletionTask;
         }
     }
 }
