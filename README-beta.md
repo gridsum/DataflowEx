@@ -1,6 +1,6 @@
 Welcome to DataflowEx
 ===================
-DataflowEx is a collection of extensions to TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides abstraction/management on top of dataflow blocks to make your life easier.
+DataflowEx is a collection of extensions to TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides abstraction/management on top of dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
 
@@ -517,7 +517,20 @@ DataflowEx.Demo\Program.cs:line 50
 
 Hence, if you think the exception is expected or tolerable, please catch it in the very beginning in the delegate passed to the low level block. Otherwise, the domino effect will spread and fail the whole dataflow graph. 
 
+Summary
+-------------
+To sum up, DataflowEx enables you to write reusable components along with TPL Dataflow. Cool features include:
 
+* Inheritance and polymorphism for dataflows and their hehaviors
+* Block chain encapsulation as a reusable unit
+* Easy conditional chaining 
+* Automatic failure propagation within dataflow
+* Built-in performance metrics monitor
+* Auto complete support for circular dataflow graph
+* Dataflow friendly sql bulk inserter
+* Helper methods to convert raw blocks to dataflows
+
+Simply download [Gridsum.DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) and have a try!
 
 //example on 1 to M to 1?
 
@@ -588,3 +601,27 @@ Performance considerations£º don't have too many blocks.
 any issue contact karldodd
 
 &lt;, and &amp;.
+
+Old words:
+
+Gridsum.DataflowEx
+==========
+
+Gridsum.DataflowEx is Gridsum's Object-Oriented extensions to TPL Dataflow library.
+
+TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
+1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
+2. Blocks need to interop with each other (e.g. should be linked carefully) and you get a chain/graph. In many times the chain need to be treated as a single processing unit but you have to construct it tediously from ground up here and there, whereever you need it. These boilerplate codes are far from graceful due to the non-OO design.
+
+By introducing the core concept of IDataflow, Gridsum.DataflowEx is born to solve all this with an OO design on top of TPL Dataflow. You can now easily write reusable components with extension points along with TPL Dataflow! Cool features include:
+
+* Inheritance and polymorphism for dataflows and their hehaviors
+* Block chain encapsulation as a reusable unit
+* Easy conditional chaining 
+* Upstream failure propagation within dataflow
+* Built-in performance metrics monitor
+* Auto complete support for circular dataflow graph (NEW!)
+* Dataflow friendly sql bulk inserter (NEW!)
+* Helper methods to convert raw blocks to dataflows
+
+Simply download Gridsum.DataflowEx and have a try!
