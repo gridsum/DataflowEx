@@ -8,7 +8,7 @@ Beginner (15min):
 http://channel9.msdn.com/posts/TPL-Dataflow-Tour
 
 Advanced (63min):
-http://channel9.msdn.com/posts/TPL-Dataflow-Tour
+http://channel9.msdn.com/Shows/Going+Deep/Stephen-Toub-Inside-TPL-Dataflow
 
 Background
 -------------
