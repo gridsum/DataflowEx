@@ -18,10 +18,9 @@ namespace Gridsum.DataflowEx.Test
                 dataflowOptions.ToExecutionBlockOption())
                 .ToDataflow(dataflowOptions, "SlowSplitter");
 
-            _printer = new ActionBlock<char>(c =>
-            {
-                Console.WriteLine(c);
-            }, dataflowOptions.ToExecutionBlockOption()).ToDataflow(dataflowOptions, "Printer");
+            _printer = new ActionBlock<char>(c => Console.WriteLine(c),
+                dataflowOptions.ToExecutionBlockOption())
+                .ToDataflow(dataflowOptions, "Printer");
 
             RegisterChild(_splitter);
             RegisterChild(_printer);
@@ -33,17 +32,11 @@ namespace Gridsum.DataflowEx.Test
         {
             foreach (var c in s)
             {
-                Thread.Sleep(1000);
+                Thread.Sleep(1000); //slow down
                 yield return c;
             }
         }
 
-        public override ITargetBlock<string> InputBlock
-        {
-            get
-            {
-                return _splitter.InputBlock;
-            }
-        }
+        public override ITargetBlock<string> InputBlock { get { return _splitter.InputBlock; } }
     }
 }

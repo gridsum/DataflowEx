@@ -261,8 +261,6 @@ namespace Gridsum.DataflowEx
         {
             try
             {
-                await Task.Delay(50);
-
                 while (m_children.Count == 0 || !this.CompletionTask.IsCompleted)
                 {
                     if (m_dataflowOptions.FlowMonitorEnabled)
@@ -284,7 +282,7 @@ namespace Gridsum.DataflowEx
                             if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                             {
                                 IDataflowDependency c = child;
-                                LogHelper.PerfMon.Debug(h => h("My child {0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                                LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                             }
                         }
                     }
@@ -334,16 +332,17 @@ namespace Gridsum.DataflowEx
                 await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
+                //todo: move it to finally
                 this.CleanUp();
                 LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
-            catch (Exception)
+            catch (AggregateException e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw;
+                throw; //TaskEx.UnwrapWithPriority(e);
             }
         }
 

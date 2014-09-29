@@ -8,6 +8,7 @@
     using System.Threading.Tasks.Dataflow;
 
     using Gridsum.DataflowEx.Test;
+    using Gridsum.DataflowEx.Test.DatabaseTests;
 
     class Program
     {
@@ -50,15 +51,16 @@
 
 
             //CalcAsync().Wait();
-            SlowFlowAsync().Wait();
+            //SlowFlowAsync().Wait();
+            FailDemoAsync().Wait();
         }
 
         public static async Task CalcAsync()
         {
             var aggregatorFlow = new AggregatorFlow();
-            aggregatorFlow.InputBlock.Post("a=1");
-            aggregatorFlow.InputBlock.Post("b=2");
-            aggregatorFlow.InputBlock.Post("a=5");
+            aggregatorFlow.Post("a=1");
+            aggregatorFlow.Post("b=2");
+            aggregatorFlow.Post("a=5");
             aggregatorFlow.InputBlock.Complete();
             await aggregatorFlow.CompletionTask;
             Console.WriteLine("sum(a) = {0}", aggregatorFlow.Result["a"]); //prints sum(a) = 6
@@ -80,21 +82,26 @@
             var slowFlow = new SlowFlow( new DataflowOptions
                         {
                             FlowMonitorEnabled = true, 
+                            BlockMonitorEnabled = true,
                             MonitorInterval = TimeSpan.FromSeconds(2),
-                            RecommendedCapacity = 5,
                             PerformanceMonitorMode = DataflowOptions.PerformanceLogMode.Verbose
                         });
+            
+            await slowFlow.ProcessAsync(new[]
+                                            {
+                                                "abcd", 
+                                                "abc", 
+                                                "ab", 
+                                                "a"
+                                            });
+            
+        }
 
-            await slowFlow.SendAsync("a");
-            await slowFlow.SendAsync("ab");
-            await slowFlow.SendAsync("abc");
-            await slowFlow.SendAsync("abcd");
-            //await slowFlow.SendAsync("abcde");
-//          //await slowFlow.SendAsync("abcdef");
-//          //await slowFlow.SendAsync("abcdefg");
-//          //await slowFlow.SendAsync("abcdefgh");
-//          //await slowFlow.SendAsync("abcdefghi");
-            await slowFlow.SignalAndWaitForCompletionAsync();
+        public static async Task FailDemoAsync()
+        {
+            var aggregatorFlow = new AggregatorFlow();
+
+            await aggregatorFlow.ProcessAsync(new[] { "a=1", "a=badstring" });
         }
     }
 }

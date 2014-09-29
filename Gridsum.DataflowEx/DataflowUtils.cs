@@ -31,7 +31,7 @@ namespace Gridsum.DataflowEx
         //todo: options passed in are probably useless
         public static Dataflow<TIn> ToDataflow<TIn>(this ITargetBlock<TIn> block, DataflowOptions options = null, string name = null)
         {
-            var flow = FromBlock(block, options);
+            var flow = FromBlock(block, options ?? DataflowOptions.Default);
             flow.Name = name;
             return flow;
         }
