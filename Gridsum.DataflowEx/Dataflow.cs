@@ -132,7 +132,7 @@ namespace Gridsum.DataflowEx
                 throw new ArgumentNullException("childFlow");
             }
 
-            if (this.IsMyAncestor(childFlow))
+            if (childFlow.IsMyChild(this))
             {
                 throw new ArgumentException(
                     string.Format("{0} Cannot register a child {1} who is already my ancestor", this.FullName, childFlow.FullName));
@@ -164,31 +164,46 @@ namespace Gridsum.DataflowEx
                 this.RegisterChild(flow);
             }
         }
+        
+        /// <summary>
+        /// Check if the flow is my child or myself
+        /// </summary>
+        public bool IsMyChild(IDataflow flow)
+        {
+            return this.IsMyChildImpl(flow);
+        }
 
         /// <summary>
-        /// Check if the flow is the ancestor of this flow
+        /// Check if the flow is my child or myself
         /// </summary>
-        private bool IsMyAncestor(Dataflow flow)
+        public bool IsMyChild(IDataflowBlock block)
         {
-            if (object.ReferenceEquals(flow, this)) return true;
+            return this.IsMyChildImpl(block);
+        }
 
-            foreach (var subFlow in flow.Children.OfType<DataflowDependency>().Select(_ => _.Flow))
+        private bool IsMyChildImpl(object obj)
+        {
+            if (object.ReferenceEquals(obj, this)) return true;
+
+            foreach (IDataflowDependency child in m_children)
             {
-                if (this.IsMyAncestor(subFlow))
+                if (child is BlockDependency)
                 {
-                    return true;
+                    if (object.ReferenceEquals(obj, child.Unwrap()))
+                    {
+                        return true;
+                    }
+                }
+                else if (child is DataflowDependency)
+                {
+                    if ((child as DataflowDependency).Flow.IsMyChildImpl(obj))
+                    {
+                        return true;
+                    }
                 }
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Check if the flow is my child
-        /// </summary>
-        public bool IsMyChild(IDataflow flow)
-        {
-            return m_children.Any(child => object.ReferenceEquals(child.Unwrap(), flow));
         }
 
         internal void RegisterChild(IDataflowDependency childMeta, bool allowDuplicate)
@@ -260,7 +275,7 @@ namespace Gridsum.DataflowEx
 
                     if (m_dataflowOptions.BlockMonitorEnabled)
                     {
-                        foreach(var child in m_children)
+                        foreach(IDataflowDependency child in m_children)
                         {
                             var bufferStatus = child.BufferStatus;
 
@@ -317,16 +332,17 @@ namespace Gridsum.DataflowEx
                 await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
                 
+                //todo: move it to finally
                 this.CleanUp();
-                LogHelper.Logger.Info(string.Format("Dataflow {0} completed", this.FullName));
+                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
-            catch (Exception)
+            catch (AggregateException e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw;
+                throw; //TaskEx.UnwrapWithPriority(e);
             }
         }
 
@@ -419,15 +435,20 @@ namespace Gridsum.DataflowEx
         //Linkd MY block to OHTER dataflow
         protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
         {
-            //todo: add check logic , also consider removing this.CompletionTask constraint
+            if (!IsMyChild(block))
+            {
+                throw new InvalidOperationException(string.Format("{0} Cannot link block to flow as the output block is not my child.", this.FullName));
+            }
 
             block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
 
             //todo: change API and get rid of the cast in v 1.1
-            (otherDataflow as Dataflow<T>).RegisterDependency(block);
+            var targetFlow = (Dataflow<T>)otherDataflow;
+
+            targetFlow.RegisterDependency(this);
 
             //Make sure other dataflow also fails me
-            otherDataflow.CompletionTask.ContinueWith(otherTask =>
+            targetFlow.CompletionTask.ContinueWith(otherTask =>
             {
                 if (this.CompletionTask.IsCompleted)
                 {
@@ -525,7 +546,7 @@ namespace Gridsum.DataflowEx
         public Task<long> PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
         {
             return Task.Run(
-                () =>
+                async () =>
                     {
                         long count = 0;
                         try
@@ -533,7 +554,7 @@ namespace Gridsum.DataflowEx
                             foreach (var item in reader)
                             {
                                 ct.ThrowIfCancellationRequested();
-                                InputBlock.SafePost(item);
+                                await this.SendAsync(item);
                                 count++;
                             }
                         }
@@ -738,6 +759,7 @@ namespace Gridsum.DataflowEx
             var converter = new TransformBlock<TOut, TTarget>(transform, m_dataflowOptions.ToExecutionBlockOption());
             this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
             
+            RegisterChild(converter);
             LinkBlockToFlow(converter, other);            
         }
 
@@ -763,6 +785,7 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
+            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
         

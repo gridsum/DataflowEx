@@ -28,12 +28,12 @@ namespace Gridsum.DataflowEx
             m_copyBuffers = ImmutableList<Dataflow<T, T>>.Empty;
 
             m_transformBlock = new TransformBlock<T, T>(
-                arg =>
+                async arg =>
                     {
                         T copy = copyFunc == null ? arg : copyFunc(arg);
                         foreach (var buffer in m_copyBuffers)
                         {
-                            buffer.Post(copy);
+                            await buffer.SendAsync(copy);
                         }
                         return arg;
                     }, dataflowOptions.ToExecutionBlockOption());

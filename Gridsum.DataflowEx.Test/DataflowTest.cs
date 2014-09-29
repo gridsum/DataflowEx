@@ -29,7 +29,13 @@ namespace Gridsum.DataflowEx.Test
             {
                 Assert.Fail("should have caught {0} but there was no exception.", typeof(TE).Name);
             }
-            else if (!(caught is TE))
+
+            if (caught is AggregateException)
+            {
+                caught = TaskEx.UnwrapWithPriority((AggregateException)caught);
+            }
+
+            if (!(caught is TE))
             {
                 Assert.Fail("should have caught {0} but {1} occurred", typeof(TE).Name, caught.GetType().Name);
             }
@@ -174,7 +180,7 @@ namespace Gridsum.DataflowEx.Test
         }
 
         [TestMethod]
-        [ExpectedException(typeof(InvalidDataException))]
+        [ExpectedException(typeof(AggregateException))]
         public async Task TestLinkLeftToError()
         {
             var flow = DataflowUtils.FromBlock(new BufferBlock<object>());

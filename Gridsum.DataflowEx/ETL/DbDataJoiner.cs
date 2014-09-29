@@ -159,7 +159,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                this.m_outputBuffer.Post(doneBatch);
+                this.m_outputBuffer.SendAsync(doneBatch);
 
                 IsBusy = false;
             }
@@ -259,7 +259,7 @@
             return pi;
         }
 
-        protected virtual IEnumerable<TIn> JoinBatch(JoinBatch<TIn> batch)
+        protected virtual async Task<IEnumerable<TIn>> JoinBatch(JoinBatch<TIn> batch)
         {
             if (m_rowCache.Count == 0)
             {
@@ -274,7 +274,9 @@
             Func<TIn, object> accessor = m_typeAccessor.GetPropertyAccessor(this.m_joinOnMapping.DestColumnOffset);
 
             var outputList = new List<TIn>(batch.Data.Length / 2);
+            var remoteLookupList = new List<TIn>(batch.Data.Length / 2);
             int missCount = 0;
+            
             lock (m_rowCache) //may have race condition with dimtableinserter who will update the global cache
             {
                 foreach (var input in batch.Data)
@@ -291,8 +293,7 @@
 
                         if (batch.Strategy == CacheLookupStrategy.RemoteLookup)
                         {
-                            //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
-                            m_dimInserter.InputBlock.SafePost(input);
+                            remoteLookupList.Add(input);
                         }
                         else
                         {
@@ -301,6 +302,12 @@
                         }
                     }
                 }
+            }
+
+            foreach (var cacheMiss in remoteLookupList)
+            {
+                //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
+                await m_dimInserter.SendAsync(cacheMiss);
             }
 
             m_logger.DebugFormat("{0} {1} cache miss among {2} lookup in this round of JoinBatch()", FullName, missCount, batch.Data.Length);
