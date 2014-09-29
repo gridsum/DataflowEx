@@ -261,6 +261,8 @@ namespace Gridsum.DataflowEx
         {
             try
             {
+                await Task.Delay(50);
+
                 while (m_children.Count == 0 || !this.CompletionTask.IsCompleted)
                 {
                     if (m_dataflowOptions.FlowMonitorEnabled)
@@ -275,14 +277,14 @@ namespace Gridsum.DataflowEx
 
                     if (m_dataflowOptions.BlockMonitorEnabled)
                     {
-                        foreach(var child in m_children)
+                        foreach(IDataflowDependency child in m_children)
                         {
                             var bufferStatus = child.BufferStatus;
 
                             if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
                             {
                                 IDataflowDependency c = child;
-                                LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
+                                LogHelper.PerfMon.Debug(h => h("My child {0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                             }
                         }
                     }
@@ -545,7 +547,7 @@ namespace Gridsum.DataflowEx
         public Task<long> PullFromAsync(IEnumerable<TIn> reader, CancellationToken ct)
         {
             return Task.Run(
-                () =>
+                async () =>
                     {
                         long count = 0;
                         try
@@ -553,7 +555,7 @@ namespace Gridsum.DataflowEx
                             foreach (var item in reader)
                             {
                                 ct.ThrowIfCancellationRequested();
-                                InputBlock.SafePost(item);
+                                await this.SendAsync(item);
                                 count++;
                             }
                         }

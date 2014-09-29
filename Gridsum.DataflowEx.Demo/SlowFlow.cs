@@ -15,14 +15,14 @@ namespace Gridsum.DataflowEx.Demo
             : base(dataflowOptions)
         {
             _splitter = new TransformManyBlock<string, char>(new Func<string, IEnumerable<char>>(this.SlowSplit))
-                .ToDataflow("SlowSplitter");
+                .ToDataflow(dataflowOptions, "SlowSplitter");
                 
             _printer = new ActionBlock<char>(c =>
                 {
                     Thread.Sleep(2000); 
                     Console.WriteLine(c); 
                 })
-                .ToDataflow("Printer");
+                .ToDataflow(dataflowOptions, "Printer");
 
             RegisterChild(_splitter);
             RegisterChild(_printer);

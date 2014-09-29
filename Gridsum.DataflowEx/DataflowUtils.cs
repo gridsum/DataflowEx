@@ -14,6 +14,8 @@ namespace Gridsum.DataflowEx
 {
     using System.IO;
 
+    using Microsoft.SqlServer.Server;
+
     public static class DataflowUtils
     {
         public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action)
@@ -26,16 +28,20 @@ namespace Gridsum.DataflowEx
             return new TargetDataflow<TIn>(block);
         }
 
-        public static Dataflow<TIn> ToDataflow<TIn>(this ITargetBlock<TIn> block, string name = null)
+        public static Dataflow<TIn> ToDataflow<TIn>(this ITargetBlock<TIn> block, DataflowOptions options = null, string name = null)
         {
-            var flow = FromBlock(block);
+            var flow = FromBlock(block, options);
             flow.Name = name;
             return flow;
         }
 
-        public static Dataflow<TIn, TOut> ToDataflow<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block, string name = null)
+        public static Dataflow<TIn, TOut> ToDataflow<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block, DataflowOptions options = null, string name = null)
         {
-            var flow = FromBlock(block, name);
+            var flow = FromBlock(block, options ?? DataflowOptions.Default);
+            if (name != null)
+            {
+                flow.Name = name;
+            }
             return flow;
         }
 
@@ -145,9 +151,43 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        public static void Post<TIn>(this Dataflow<TIn> dataflow, TIn item)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static async Task SendAsync<TIn>(this Dataflow<TIn> dataflow, TIn item)
         {
-            dataflow.InputBlock.SafePost(item);
+            bool success =  await dataflow.InputBlock.SendAsync(item);
+
+            if (!success)
+            {
+                ThrowSendFailedException(dataflow);
+            }
+        }
+
+        private static void ThrowSendFailedException<TIn>(Dataflow<TIn> dataflow)
+        {
+            if (dataflow.InputBlock.Completion.IsCompleted)
+            {
+                string msg = string.Format(
+                    "SendAsync to {0} failed as its input block is {1}",
+                    dataflow.FullName,
+                    dataflow.InputBlock.Completion.Status);
+
+                throw new PostToBlockFailedException(msg);
+            }
+            else
+            {
+                var bufferStatus = dataflow.BufferStatus;
+                string msg = string.Format(
+                    "SendAsync to {0} failed. Its buffer state is (in:{1}, out:{2})",
+                    dataflow.FullName,
+                    bufferStatus.Item1,
+                    bufferStatus.Item2);
+                throw new PostToBlockFailedException(msg);
+            }
+        }
+
+        public static bool Post<TIn>(this Dataflow<TIn> dataflow, TIn item)
+        {
+            return dataflow.InputBlock.Post(item);
         }
     }
 }

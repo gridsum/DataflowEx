@@ -127,5 +127,24 @@ namespace Gridsum.DataflowEx.Test
             b.TriggerBatch();
             Assert.AreEqual(b.BatchSize, b.GetBufferCount().Total());
         }
+
+        [TestMethod]
+        public async Task TestBoundedCapacity()
+        {
+            //var b = new BatchBlock<int>(2, new GroupingDataflowBlockOptions() { BoundedCapacity = 10 });
+            var b = new BufferBlock<int>(new DataflowBlockOptions() { BoundedCapacity = 10 });
+
+            for (int i = 0; i < 10; i++)
+            {
+                b.Post(i);
+            }
+
+            Assert.AreEqual(false, b.Post(999));
+
+            var status = (b as ITargetBlock<int>).OfferMessage(new DataflowMessageHeader(1L), 999, null, false);
+            Console.WriteLine(status);
+            //await b.SafePost(999);
+            
+        }
     }
 }
