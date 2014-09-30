@@ -19,7 +19,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         private Dataflow<TOut, TOut> m_after;
         private Dataflow<TIn, TOut> m_Dataflow;
 
-        public AutoCompleteWrapper(Dataflow<TIn, TOut> dataflow, TimeSpan processTimeout) : base(DataflowOptions.Default)
+        public AutoCompleteWrapper(Dataflow<TIn, TOut> dataflow, TimeSpan processTimeout, DataflowOptions options) : base(options)
         {
             m_Dataflow = dataflow;
             m_processTimeout = processTimeout;

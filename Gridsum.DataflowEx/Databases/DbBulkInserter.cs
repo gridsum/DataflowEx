@@ -139,7 +139,7 @@ namespace Gridsum.DataflowEx.Databases
             get
             {
                 var bs = base.BufferStatus;
-                return new Tuple<int, int>(bs.Item1 * m_bulkSize, bs.Item2 * m_bulkSize);
+                return new Tuple<int, int>(bs.Item1 * m_bulkSize, bs.Item2);
             }
         }
 

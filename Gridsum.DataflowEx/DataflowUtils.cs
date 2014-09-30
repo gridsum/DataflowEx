@@ -106,7 +106,7 @@ namespace Gridsum.DataflowEx
             where TIn : ITracableItem
             where TOut : ITracableItem 
         {
-            return new AutoCompleteWrapper<TIn, TOut>(dataflow, timeout);
+            return new AutoCompleteWrapper<TIn, TOut>(dataflow, timeout, dataflow.DataflowOptions);
         }
                 
         public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, IDataflow<TOut> out1, IDataflow<TOut> out2, Func<TOut, TOut> copyFunc = null)
