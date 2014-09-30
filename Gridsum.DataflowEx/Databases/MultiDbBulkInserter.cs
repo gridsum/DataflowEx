@@ -27,7 +27,7 @@ namespace Gridsum.DataflowEx.Databases
             int bulkSize = 4096 * 2, 
             string displayName = null,
             PostBulkInsertDelegate<T> postBulkInsert = null)
-            : base(dispatchFunc)
+            : base(dispatchFunc, options)
         {
             m_options = options;
             m_connectionGetter = connectionGetter;
