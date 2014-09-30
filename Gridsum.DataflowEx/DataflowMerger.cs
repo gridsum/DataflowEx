@@ -18,7 +18,7 @@ namespace Gridsum.DataflowEx
         protected readonly Dataflow<T1, T2> m_b1;
         protected readonly Dataflow<T2, T3> m_b2;
 
-        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2) : this(b1, b2, DataflowOptions.Default)
+        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2) : this(b1, b2, b1.DataflowOptions)
         {
         }
 
@@ -57,7 +57,7 @@ namespace Gridsum.DataflowEx
         protected readonly Dataflow<T2, T3> m_b2;
         protected readonly Dataflow<T3, T4> m_b3;
 
-        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2, Dataflow<T3, T4> b3): this(b1, b2, b3, DataflowOptions.Default)
+        public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2, Dataflow<T3, T4> b3): this(b1, b2, b3, b1.DataflowOptions)
         { }
 
         public DataflowMerger(Dataflow<T1, T2> b1, Dataflow<T2, T3> b2, Dataflow<T3, T4> b3, DataflowOptions options)
