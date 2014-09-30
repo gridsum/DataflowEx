@@ -532,77 +532,40 @@ To sum up, DataflowEx enables you to write reusable components along with TPL Da
 
 Simply download [Gridsum.DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) and have a try!
 
-//example on 1 to M to 1?
-
 Advanced DataflowEx
 -------------
 
 UNDER CONSTRUCTION..
 
-
-### 5. Tips Build your own dataflows
+Tips Build your own dataflows / Design principle
 create, register and link
+**DataflowOptions** and how to respect it (pass it on)
 block or dataflow?
-
-
-Design principle
-
-error prapagates to the root level
-
-
-Btw, two level.
-
-//example on 1 to M to 1?
-
-
-
 
 todo: LinkSubTypeTo() & TransformAndLink()
 
-Graph Linking()
-LinkTo()
-
-
-logging
-**DataflowOptions** and how to respect it (pass it on)
-dynamic registration
-
-Lifecycle management
-
-a powerful dispatch and gather example
+boundedcapacity on big load
+total parallelism / parallelism setting
+Performance considerations£º don't have too many blocks.
 
 UNDER CONSTRUCTION..
 
-parallelism setting
-
-Nesting
-graph linking
-graph
-reuseable
-life cycle management (normal exit, error handling)
-performance monitor
-Dataflow class 
-Dataflow<TIn, TOut> class
-Flow nesting
-Common classes
 DataBrancher
 DataDispatcher
-utils classes
-Database bulk insertion
+//?todo type dispatcher
+Database bulk insertion / multi insertion
 Ring support
+
+utils classes
 
 Advanced topic:
 Cyclic graph support
 ETL: Db Data joiner
 StatisticsRecorder
-//RegisterDependency?
-Performance considerations£º don't have too many blocks.
+
+Use linking stuff ([<i class="icon-upload"></i> Publish a document](#publish-a-document))
 
 any issue contact karldodd
-
-&lt;, and &amp;.
-
-Old words:
 
 Gridsum.DataflowEx
 ==========
