@@ -159,7 +159,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                this.m_outputBuffer.SendAsync(doneBatch);
+                await this.m_outputBuffer.SendAsync(doneBatch);
 
                 IsBusy = false;
             }
