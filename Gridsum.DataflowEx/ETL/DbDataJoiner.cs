@@ -58,7 +58,7 @@
                 this.m_host = host;
                 m_keyGetter = joinBy.Compile();
                 m_keyComparer = m_host.m_keyComparer;
-                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>(option.ToGroupingBlockOption()).ToDataflow();
+                m_outputBuffer = new BufferBlock<JoinBatch<TIn>>(option.ToGroupingBlockOption()).ToDataflow(option);
                 m_outputBuffer.Name = "OutputBuffer";
                 RegisterChild(m_outputBuffer);
                 m_outputBuffer.RegisterDependency(m_actionBlock);
@@ -217,7 +217,7 @@
             
             var transformer =
                 new TransformBlock<TIn[], JoinBatch<TIn>>(
-                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow();
+                    array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow(option);
             transformer.Name = "ArrayToJoinBatchConverter";
 
             transformer.LinkFromBlock(m_batchBlock);
