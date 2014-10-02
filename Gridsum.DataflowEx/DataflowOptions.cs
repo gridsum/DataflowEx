@@ -41,7 +41,7 @@ namespace Gridsum.DataflowEx
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Succinct,
             MonitorInterval = DefaultInterval,
-            RecommendedCapacity = 200000
+            RecommendedCapacity = 100000
         };
 
         private static DataflowOptions s_verboseOptions = new DataflowOptions()
@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Verbose,
             MonitorInterval = DefaultInterval,
-            RecommendedCapacity = 200000
+            RecommendedCapacity = 100000
         };
 
         public static DataflowOptions Default
