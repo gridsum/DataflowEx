@@ -322,6 +322,81 @@ namespace Gridsum.DataflowEx.Test
             Assert.AreEqual(10000 / 3, count2);
             Assert.AreEqual(10000 / 3, count3);
         }
+
+        [TestMethod]
+        public async Task TestLinkSubTypeTo()
+        {
+            int count2 = 0;
+            int count3 = 0;
+
+            var d1 = new BufferBlock<object>().ToDataflow();
+            var d2 = new ActionBlock<string>(i => { count2++; }).ToDataflow();
+            var d3 = new ActionBlock<int>(i => { count3++; }).ToDataflow();
+
+            d1.LinkSubTypeTo(d2);
+            d1.LinkSubTypeTo(d3);
+            d1.LinkLeftToNull();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    d1.Post(i);
+                }
+                else
+                {
+                    d1.Post(i.ToString());
+                }
+            }
+
+            d1.Post(Task.FromResult(0));
+
+            await d1.SignalAndWaitForCompletionAsync();
+            
+            await d2.CompletionTask;
+            await d3.CompletionTask;
+
+            Assert.AreEqual(5000, count2);
+            Assert.AreEqual(5000, count3);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(AggregateException))]
+        public async Task TestLinkSubTypeTo2()
+        {
+            int count2 = 0;
+            int count3 = 0;
+
+            var d1 = new BufferBlock<object>().ToDataflow();
+            var d2 = new ActionBlock<string>(i => { count2++; }).ToDataflow();
+            var d3 = new ActionBlock<int>(i => { count3++; }).ToDataflow();
+
+            d1.LinkSubTypeTo(d2);
+            d1.LinkSubTypeTo(d3);
+            d1.LinkLeftToError();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    d1.Post(i);
+                }
+                else
+                {
+                    d1.Post(i.ToString());
+                }
+            }
+
+            d1.Post(Task.FromResult(0));
+
+            await d1.SignalAndWaitForCompletionAsync();
+
+            await d2.CompletionTask;
+            await d3.CompletionTask;
+
+            Assert.AreEqual(5000, count2);
+            Assert.AreEqual(5000, count3);
+        }
     }
 
     class FaultyBlocks : Dataflow<string, string>
