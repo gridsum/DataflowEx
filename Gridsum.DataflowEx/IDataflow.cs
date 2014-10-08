@@ -18,6 +18,8 @@ namespace Gridsum.DataflowEx
         /// Signals to the IDataflow that it should not accept any more messages
         /// </summary>
         void Complete();
+
+        void RegisterDependency(IDataflow dependencyDataflow);
     }
 
     public interface IDataflow<in TIn> : IDataflow

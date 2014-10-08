@@ -11,6 +11,7 @@ using Gridsum.DataflowEx.Exceptions;
 namespace Gridsum.DataflowEx
 {
     using System.Collections.Immutable;
+    using Gridsum.DataflowEx.Blocks;
 
     public static class DataflowBlockExtensions
     {
@@ -73,6 +74,23 @@ namespace Gridsum.DataflowEx
 //            }
 
             throw new ArgumentException("Fail to auto-detect buffer count of block: " + Utils.GetFriendlyName(block.GetType()), "block");
+        }
+
+
+        public static IDisposable LinkTo<TOutput, TTarget>(this ISourceBlock<TOutput> source, ITargetBlock<TTarget> target, DataflowLinkOptions linkOptions, Predicate<TOutput> predicate, Func<TOutput, TTarget> transform)
+        {
+            if (source == null)
+                throw new ArgumentNullException("source");
+            if (target == null)
+                throw new ArgumentNullException("target");
+            if (linkOptions == null)
+                throw new ArgumentNullException("linkOptions");
+            if (predicate == null)
+                throw new ArgumentNullException("predicate");
+            if (transform == null)
+                throw new ArgumentNullException("transform");
+            var TransformAndLinkPropagator = new TransformAndLinkPropagator<TOutput, TTarget>(source, target, predicate, transform);
+            return source.LinkTo((ITargetBlock<TOutput>)TransformAndLinkPropagator, linkOptions);
         }
     }
 }

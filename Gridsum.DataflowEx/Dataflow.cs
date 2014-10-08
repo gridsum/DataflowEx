@@ -442,13 +442,10 @@ namespace Gridsum.DataflowEx
 
             block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
 
-            //todo: change API and get rid of the cast in v 1.1
-            var targetFlow = (Dataflow<T>)otherDataflow;
-
-            targetFlow.RegisterDependency(this);
+            otherDataflow.RegisterDependency(this);
 
             //Make sure other dataflow also fails me
-            targetFlow.CompletionTask.ContinueWith(otherTask =>
+            otherDataflow.CompletionTask.ContinueWith(otherTask =>
             {
                 if (this.CompletionTask.IsCompleted)
                 {
@@ -473,7 +470,7 @@ namespace Gridsum.DataflowEx
         /// if this dependencies finishes as the last amony all dependencies.
         /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
         /// </summary>
-        public void RegisterDependency(Dataflow dependencyDataflow)
+        public void RegisterDependency(IDataflow dependencyDataflow)
         {
             if (this.IsMyChild(dependencyDataflow))
             {
@@ -756,11 +753,10 @@ namespace Gridsum.DataflowEx
             }
 
             m_condBuilder.Add(predicate);
-            var converter = new TransformBlock<TOut, TTarget>(transform, m_dataflowOptions.ToExecutionBlockOption());
-            this.OutputBlock.LinkTo(converter, m_defaultLinkOption, predicate);
-            
-            RegisterChild(converter);
-            LinkBlockToFlow(converter, other);            
+
+            this.OutputBlock.LinkTo(other.InputBlock, new DataflowLinkOptions { PropagateCompletion = false }, predicate, transform);
+
+            other.RegisterDependency(this);
         }
 
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform)

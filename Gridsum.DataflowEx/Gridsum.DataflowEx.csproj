@@ -69,6 +69,7 @@
     <Compile Include="AutoCompletion\ITracableItem.cs" />
     <Compile Include="AutoCompletion\RingMonitor.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
+    <Compile Include="Blocks\TransformAndLinkPropagator.cs" />
     <Compile Include="Databases\TargetTable.cs" />
     <Compile Include="ETL\ByteArrayEqualityComparer.cs" />
     <Compile Include="ETL\DbDataJoiner.cs" />

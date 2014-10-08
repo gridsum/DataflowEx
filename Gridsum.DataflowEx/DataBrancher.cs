@@ -57,7 +57,7 @@ namespace Gridsum.DataflowEx
         public void LinkCopyTo(IDataflow<T> other)
         {
             //first, create a new copy block
-            Dataflow<T, T> copyBuffer = new BufferBlock<T>(m_dataflowOptions.ToGroupingBlockOption()).ToDataflow();
+            Dataflow<T, T> copyBuffer = new BufferBlock<T>(m_dataflowOptions.ToGroupingBlockOption()).ToDataflow(m_dataflowOptions);
 
             RegisterChild(copyBuffer);
             copyBuffer.RegisterDependency(m_transformBlock);
