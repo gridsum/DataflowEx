@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Gridsum.DataflowEx;
 using Gridsum.DataflowEx.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -145,6 +146,116 @@ namespace Gridsum.DataflowEx.Test
             Console.WriteLine(status);
             //await b.SafePost(999);
             
+        }
+
+        public async Task TestLinkTo()
+        {
+            var b1 = new BufferBlock<int>().ToDataflow();
+            var b2 = new BufferBlock<int>().ToDataflow();
+
+            b1.OutputBlock.LinkTo(b2.InputBlock);
+
+            //b1.TransformAndLink(b2, _ => _, _ => _ % 2 == 0);
+
+            //b1.Post(1);
+            //b1.Post(2);
+
+            await Task.Delay(3000);
+        }
+
+        public async Task TestLinkTo2()
+        {
+            var b1 = new BufferBlock<int>();
+            var b2 = new BufferBlock<int>();
+
+            //b1.TransformAndLink(b2, _ => _, _ => _ % 2 == 0);
+
+            b1.Post(1);
+            b1.Post(2);
+
+            await Task.Delay(3000);
+        }
+
+        public async Task TestLinkToBlocking()
+        {
+            BufferBlock<int> last = null;
+            BufferBlock<int> first =  null;
+            for (int i = 0; i < 500; i++)
+            {
+                var nb = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 200 });
+
+                if (last != null)
+                {
+                    last.LinkTo(nb);
+                }
+                else
+                {
+                    first = nb;
+                }
+
+                last = nb;
+            }
+
+            last.LinkTo(new ActionBlock<int>(_ => { Console.WriteLine(_); Thread.Sleep(500); },
+                new ExecutionDataflowBlockOptions { BoundedCapacity = 100 }));
+
+            for (int j = 0; j < 100000000; j++)
+            {
+                await first.SendAsync(j);
+                Console.WriteLine("Sent " + j);
+            }
+
+            first.Complete();
+            await first.Completion;
+        }
+
+        public async Task TestLinkToBlocking2()
+        {
+            ActionBlock<int> target = new ActionBlock<int>(_ => { 
+                Console.WriteLine(_); 
+                Thread.Sleep(100); 
+            },
+                new ExecutionDataflowBlockOptions { BoundedCapacity = 100 });
+
+            List<BufferBlock<int>> l = new List<BufferBlock<int>>();
+
+            for (int i = 0; i < 50; i++)
+            {
+                var nb = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 2 });
+                nb.LinkTo(target);
+                l.Add(nb);
+            }
+            
+            for (int j = 0; j < 100000000; j++)
+            {
+                foreach (var nb in l)
+                {
+                    await nb.SendAsync(j);
+                }
+                
+                Console.WriteLine("Sent " + j);
+            }
+
+        }
+
+        public async Task TestLinkToBlocking3()
+        {
+            ActionBlock<int> target = new ActionBlock<int>(_ =>
+            {
+                Console.WriteLine(_);
+                Thread.Sleep(100);
+            },
+                new ExecutionDataflowBlockOptions { BoundedCapacity = 10 });
+
+            var nb = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 50 });
+
+            nb.LinkTo(target, new DataflowLinkOptions(), _ => _ < 100, _ => _);
+
+            for (int j = 0; j < 100000; j++)
+            {
+                await nb.SendAsync(j);
+                Console.WriteLine("Sent " + j);
+            }
         }
     }
 }
