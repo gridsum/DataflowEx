@@ -177,9 +177,9 @@ namespace Gridsum.DataflowEx
         private readonly Dataflow m_dependentFlow;
         private readonly Task m_completion;
 
-        public DataflowDependency(Dataflow dependentFlow, Dataflow host, DependencyKind kind, Action<Task> completionCallback = null) : base(host, completionCallback, kind)
+        public DataflowDependency(IDataflow dependentFlow, Dataflow host, DependencyKind kind, Action<Task> completionCallback = null) : base(host, completionCallback, kind)
         {
-            this.m_dependentFlow = dependentFlow;
+            m_dependentFlow = (Dataflow)dependentFlow;
             m_completion = GetWrappedCompletion(this.m_dependentFlow.CompletionTask);
         }
 
