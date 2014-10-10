@@ -155,7 +155,7 @@ namespace Gridsum.DataflowEx
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static async Task SendAsync<TIn>(this Dataflow<TIn> dataflow, TIn item)
         {
-            bool success =  await dataflow.InputBlock.SendAsync(item);
+            bool success = await dataflow.InputBlock.SendAsync(item).ConfigureAwait(false);
 
             if (!success)
             {

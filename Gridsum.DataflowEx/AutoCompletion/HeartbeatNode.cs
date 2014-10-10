@@ -79,7 +79,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         public async Task<bool> NoHeartbeatDuring(Func<Task> action)
         {
             long before = m_beats;
-            await action();
+            await action().ConfigureAwait(false);
             long after = m_beats;
             return after == before;
         }

@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx
                 input =>
                     {
                         var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
-                        await childFlow.SendAsync(input);
+                        await childFlow.SendAsync(input).ConfigureAwait(false);
                     }, option.ToExecutionBlockOption());
 
             RegisterChild(m_dispatcherBlock);

@@ -51,7 +51,7 @@
         /// <returns>A task representing the state of the async operation which returns the total count of items processed in this method</returns>
         public virtual async Task<long> ProcessAsync(TextReader reader, bool completeLogReaderOnFinish = true)
         {
-            return await ProcessAsync(reader.ToEnumerable(), completeLogReaderOnFinish);
+            return await ProcessAsync(reader.ToEnumerable(), completeLogReaderOnFinish).ConfigureAwait(false);
         }
 
         /// <summary>

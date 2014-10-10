@@ -33,7 +33,7 @@ namespace Gridsum.DataflowEx
                         T copy = copyFunc == null ? arg : copyFunc(arg);
                         foreach (var buffer in m_copyBuffers)
                         {
-                            await buffer.SendAsync(copy);
+                            await buffer.SendAsync(copy).ConfigureAwait(false);
                         }
                         return arg;
                     }, dataflowOptions.ToExecutionBlockOption());

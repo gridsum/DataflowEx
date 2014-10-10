@@ -73,7 +73,7 @@ namespace Gridsum.DataflowEx.Databases
             {
                 using (var conn = new SqlConnection(targetTable.ConnectionString))
                 {
-                    await conn.OpenAsync();
+                    await conn.OpenAsync().ConfigureAwait(false);
 
                     var transaction = conn.BeginTransaction();
                     try
@@ -90,7 +90,7 @@ namespace Gridsum.DataflowEx.Databases
                             bulkCopy.BatchSize = m_bulkSize;
 
                             // Write from the source to the destination.
-                            await bulkCopy.WriteToServerAsync(bulkReader);
+                            await bulkCopy.WriteToServerAsync(bulkReader).ConfigureAwait(false);
                         }
                     }
                     catch (Exception e)
@@ -110,7 +110,7 @@ namespace Gridsum.DataflowEx.Databases
                     }
                     
                     transaction.Commit();
-                    await this.OnPostBulkInsert(conn, targetTable, data);
+                    await this.OnPostBulkInsert(conn, targetTable, data).ConfigureAwait(false);
                 }
             }
 
@@ -147,7 +147,7 @@ namespace Gridsum.DataflowEx.Databases
         {
             if (m_postBulkInsert != null)
             {
-                await m_postBulkInsert(sqlConnection, m_targetTable, insertedData);
+                await m_postBulkInsert(sqlConnection, m_targetTable, insertedData).ConfigureAwait(false);
             }
         }
 

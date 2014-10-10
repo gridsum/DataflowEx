@@ -108,7 +108,7 @@
                     command.ExecuteNonQuery();
                 }
 
-                await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable);
+                await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable).ConfigureAwait(false);
                 
                 m_host.m_logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, m_mergeTmpToDimTable);
 
@@ -159,7 +159,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                await this.m_outputBuffer.SendAsync(doneBatch);
+                await this.m_outputBuffer.SendAsync(doneBatch).ConfigureAwait(false);
 
                 IsBusy = false;
             }
@@ -307,7 +307,7 @@
             foreach (var cacheMiss in remoteLookupList)
             {
                 //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
-                await m_dimInserter.SendAsync(cacheMiss);
+                await m_dimInserter.SendAsync(cacheMiss).ConfigureAwait(false);
             }
 
             m_logger.DebugFormat("{0} {1} cache miss among {2} lookup in this round of JoinBatch()", FullName, missCount, batch.Data.Length);

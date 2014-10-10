@@ -289,7 +289,7 @@ namespace Gridsum.DataflowEx
 
                     CustomPerfMonBehavior();
 
-                    await Task.Delay(m_dataflowOptions.MonitorInterval);
+                    await Task.Delay(m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
                 }
             }
             catch (Exception e)
@@ -319,7 +319,7 @@ namespace Gridsum.DataflowEx
             if (m_children.Count == 0)
             {
                 LogHelper.Logger.WarnFormat("{0} still has no children. Will check again soon.", this.FullName);
-                await Task.Delay(m_dataflowOptions.MonitorInterval);
+                await Task.Delay(m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
 
                 if (m_children.Count == 0)
                 {
@@ -329,8 +329,8 @@ namespace Gridsum.DataflowEx
 
             try
             {
-                await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
-                await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
+                await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion).ConfigureAwait(false);
+                await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f()).ConfigureAwait(false);
                 
                 //todo: move it to finally
                 this.CleanUp();
@@ -551,7 +551,7 @@ namespace Gridsum.DataflowEx
                             foreach (var item in reader)
                             {
                                 ct.ThrowIfCancellationRequested();
-                                await this.SendAsync(item);
+                                await this.SendAsync(item).ConfigureAwait(false);
                                 count++;
                             }
                         }
@@ -618,7 +618,7 @@ namespace Gridsum.DataflowEx
             long count;
             try
             {
-                count = await readAndPostTask;
+                count = await readAndPostTask.ConfigureAwait(false);
                 LogHelper.Logger.InfoFormat("{0} Finished reading from enumerable and posting to the dataflow.", this.FullName);
             }
             catch (OperationCanceledException oce)
@@ -629,7 +629,7 @@ namespace Gridsum.DataflowEx
 
             if (completeFlowOnFinish)
             {
-                await this.SignalAndWaitForCompletionAsync();
+                await this.SignalAndWaitForCompletionAsync().ConfigureAwait(false);
             }
 
             return count;
@@ -639,7 +639,7 @@ namespace Gridsum.DataflowEx
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
             this.InputBlock.Complete(); //no more input
-            await this.CompletionTask;
+            await this.CompletionTask.ConfigureAwait(false);
         }
 
         /// <summary>
@@ -657,12 +657,12 @@ namespace Gridsum.DataflowEx
             long count = 0;
             foreach (var enumerable in enumerables)
             {
-                count += await ProcessAsync(enumerable, false);
+                count += await ProcessAsync(enumerable, false).ConfigureAwait(false);
             }
 
             if (completeLogReaderOnFinish)
             {
-                await this.SignalAndWaitForCompletionAsync();
+                await this.SignalAndWaitForCompletionAsync().ConfigureAwait(false);
             }
 
             return count;
