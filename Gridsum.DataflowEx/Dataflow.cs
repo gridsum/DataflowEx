@@ -433,14 +433,21 @@ namespace Gridsum.DataflowEx
         }
 
         //Linkd MY block to OHTER dataflow
-        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
+        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow, Predicate<T> predicate = null)
         {
             if (!IsMyChild(block))
             {
                 throw new InvalidOperationException(string.Format("{0} Cannot link block to flow as the output block is not my child.", this.FullName));
             }
 
-            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
+            if (predicate == null)
+            {
+                block.LinkTo(otherDataflow.InputBlock);
+            }
+            else
+            {
+                block.LinkTo(otherDataflow.InputBlock, predicate);
+            }
 
             otherDataflow.RegisterDependency(this);
 
@@ -784,7 +791,16 @@ namespace Gridsum.DataflowEx
             //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
-        
+
+        //
+        public void LinkLeftTo(IDataflow<TOut> target)
+        {
+            var frozenConds = m_frozenConditions.Value;
+            var left = new Predicate<TOut>(@out => frozenConds.All(condition => !condition(@out)));
+
+            this.LinkBlockToFlow(this.OutputBlock, target, left);
+        }
+
         /// <summary>
         /// After this dataflow has linked to some targets conditionally, it is possible that some output objects
         /// are 'left' (i.e. matches none of the conditions). This methods provides a way to easily dump these left objects
