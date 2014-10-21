@@ -532,8 +532,23 @@ To sum up, DataflowEx enables you to write reusable components along with TPL Da
 
 Simply download [Gridsum.DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) and have a try!
 
-Advanced DataflowEx
+DataflowEx In Depth
 -------------
+
+### 1. Advanced Linking
+
+LinkTo() is the most powerful mechanism TPL Dataflow provides to help intuitive and efficient dataflow graph construction. There is also an overload of LinkTo() that accepts a predicate as the filter for conditional linking.
+
+DataflowEx also provides similar LinkTo() at higher level (i.e. the Dataflow level), as you already see in previous demos. It uses block level LinkTo under the hood but you just easily operate on Dataflow nodes no matter how complex these node are. 
+
+
+
+
+Understanding Dataflow class
+-------------
+
+
+
 
 UNDER CONSTRUCTION..
 
