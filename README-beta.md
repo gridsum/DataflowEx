@@ -338,7 +338,7 @@ Meanwhile, set up NLog in you NLog.config:
 
 Then the logging infomation will be written to both the console and a log file. 
 
-> **Note:** Notice that "Gridsum.DataflowEx*" is used as the logger name in the rules section. This represents the logging categories used by DataflowEx. In fact, most logging of DataflowEx is recorded under category "Gridsum.DataflowEx" and a few uses subcategories with the prefix (e.g. "Gridsum.DataflowEx.Databases"). So an extra wildcard ¡®*¡¯ includes every message from the library.
+> **Note:** Notice that "Gridsum.DataflowEx*" is used as the logger name in the rules section. This represents the logging categories used by DataflowEx. In fact, most logging of DataflowEx is recorded under category "Gridsum.DataflowEx" and a few uses subcategories with the prefix (e.g. "Gridsum.DataflowEx.Databases"). So an extra wildcard â€˜*â€™ includes every message from the library.
 
 O.K. Let's take a look of the log file after executing the ComplexIntFlow demo:
 
@@ -539,9 +539,148 @@ DataflowEx In Depth
 
 LinkTo() is the most powerful mechanism TPL Dataflow provides to help intuitive and efficient dataflow graph construction. There is also an overload of LinkTo() that accepts a predicate as the filter for conditional linking.
 
-DataflowEx also provides similar LinkTo() at higher level (i.e. the Dataflow level), as you already see in previous demos. It uses block level LinkTo under the hood but you just easily operate on Dataflow nodes no matter how complex these node are. 
+DataflowEx also provides similar LinkTo() at higher level (i.e. the Dataflow level), as you already see in previous demos. It uses block level LinkTo under the hood but you just easily operate on Dataflow nodes no matter how complex these node are internally. As completion propagation is concerned, DataflowEx's LinkTo() ensures completion propagation by default and goes beyond that: if A->C and B->C, Dataflow C will complete after both A and B complete. This feature has been mentioned in the previous Graph construction section but I want to re-emphasize here.
 
+Anything more on linking? Yes. Let's consider how many times you have a dataflow generating a serious of base class objects and wants to redirect different child types to different specific components that only handles the child type? **LinkSubTypeTo()** is born for this:
 
+```C#
+//public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
+
+Dataflow<TIn, TOut> flow1;
+Dataflow<TOutSubType1> flow2;
+Dataflow<TOutSubType2> flow3;
+
+flow1.LinkSubTypeTo(flow2);
+flow1.LinkSubTypeTo(flow3);
+```
+LinkSubTypeTo() make our life so much easier :)
+
+Internally LinkSubTypeTo() uses a even more powerful linking mechanism called **TransformAndLink()** which allows you to indicate a transform function on output objects as well as a filtering predicate. The transform function is a perfect bridge between output flow and downstream flows. It can be as simple as a type cast (LinkSubTypeTo), or a complex mapping function that converts, for example, a weakly-typed json object to your strongly typed domain objects.
+
+> **Note:** Previously to implement TransformAndLink(), DataflowEx used an extra TransformBlock to achieve this. But starting from 1.0.9.6, we avoid the overhead of TransformBlock and push transform function down to the LinkPropagator level (a no-buffer block wrapper TPL dataflow uses to achieve link filtering), which brings better performance.
+
+Let's look at a demo for TransformAndLink():
+
+```C#
+public static async Task TransformAndLinkDemo()
+{
+    var d1 = new BufferBlock<int>().ToDataflow();
+    var d2 = new ActionBlock<string>(s => Console.WriteLine(s)).ToDataflow();
+    var d3 = new ActionBlock<string>(s => Console.WriteLine(s)).ToDataflow();
+
+    d1.TransformAndLink(d2, _ => "Odd: "+ _, _ => _ % 2 == 1);
+    d1.TransformAndLink(d3, _ => "Even: " + _, _ => _ % 2 == 0);
+
+    for (int i = 0; i < 10; i++)
+    {
+        d1.Post(i);
+    }
+
+    await d1.SignalAndWaitForCompletionAsync();
+    await d2.CompletionTask;
+    await d3.CompletionTask;
+}
+```
+
+By using TransformAndLink, we direct odd numbers to d1 and even numbers to d2, and at the same time converts integers to meaningful strings to be printed out:
+
+```
+Even: 0
+Even: 2
+Even: 4
+Even: 6
+Even: 8
+Odd: 1
+Odd: 3
+Odd: 5
+Odd: 7
+Odd: 9
+```
+
+The final linking helper in DataflowEx to introduce is **LinkLeftTo()**. When we use conditional linking extensively in our application, there is a common trap that if one output matches NONE of output linking predicates, it will remain forever in the upstream dataflow, and thus our dataflow graph never completes. To address the issue, DataflowEx trackes all predicates the dataflow used previously and allows you to redirect LEFT objects (i.e. output objects that match no predicates) to a given target:
+
+Demo time:
+
+```C#
+public static async Task LinkLeftToDemo()
+{
+    var d1 = new BufferBlock<int>().ToDataflow(name: "IntGenerator");
+    var d2 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+    var d3 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+    var d4 = new ActionBlock<int>(s => Console.WriteLine(s + "[Left]")).ToDataflow();
+
+    d1.LinkTo(d2, _ => _ % 3 == 0);
+    d1.LinkTo(d3, _ => _ % 3 == 1);
+    d1.LinkLeftTo(d4); // same as d1.LinkTo(d4, _ => _ % 3 == 2);
+
+    for (int i = 0; i < 10; i++)
+    {
+        d1.Post(i);
+    }
+
+    await d1.SignalAndWaitForCompletionAsync();
+    await d2.CompletionTask;
+    await d3.CompletionTask;
+}
+//output:
+//1
+//2[Left]
+//5[Left]
+//8[Left]
+//0
+//3
+//4
+//7
+//6
+//9
+```
+> **Tip:** In this demo, LinkLeftTo is based on the predicates previously used in LinkTo(). But to clarify, predicates used in TransformAndLink() will also be taken into account when DataflowEx calculates what stands for 'Left'.
+
+Besides LinkLeftTo(), you could also use the handy **LinkLeftToNull()** if you just want to silently ignore those unmatched objects (will be linked to DataflowBlock.NullTarget<T>()). Or, you can use **LinkLeftToError()** if it is a fatal error if there is an output object that matches none predicate conditions. This is a quite useful diagnosing tip to make sure your graph doesn't have a linking leak.
+
+> **Note:** When using LinkLeftToNull() there is an garbage **recorder** which counts different types of the ignored output. Override Dataflow.OnOutputToNull() to customize the behavior. Regarding recorders and the statistics you can get from recorder, we will dig into that later.
+  
+If we slightly modify the above demo to use LinkLeftToError():
+
+```C#
+public static async Task LinkLeftToDemo()
+{
+    var d1 = new BufferBlock<int>().ToDataflow(name: "IntGenerator");
+    var d2 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+    var d3 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+    var d4 = new ActionBlock<int>(s => Console.WriteLine(s + "[Left]")).ToDataflow();
+
+    d1.LinkTo(d2, _ => _ % 3 == 0);
+    d1.LinkTo(d3, _ => _ % 3 == 1);
+    d1.LinkLeftToError();//d1.LinkLeftTo(d4); 
+
+    for (int i = 0; i < 10; i++)
+    {
+        d1.Post(i);
+    }
+
+    await d1.SignalAndWaitForCompletionAsync();
+    await d2.CompletionTask;
+    await d3.CompletionTask;
+}
+```
+Exception will be thrown and d1 fails as expected:
+
+```
+14/10/22 12:28:39 [Gridsum.DataflowEx].[Error] [IntGenerator] This is my error destination. Data should not arrive here: 2
+
+Unhandled Exception: 14/10/22 12:28:39 [Gridsum.DataflowEx].[Error] [IntGenerator] Exception occur. Shutting down my chi
+ldren... System.IO.InvalidDataException: An object came to error region of [IntGenerator]: 2
+   at Gridsum.DataflowEx.Dataflow`2.<LinkLeftToError>b__5c(TOut survivor) in c:\Users\karld_000\Documents\SourceTree\Dat
+aflowEx\Gridsum.DataflowEx\Dataflow.cs:line 846
+   at System.Threading.Tasks.Dataflow.ActionBlock`1.ProcessMessageWithTask(Func`2 action, KeyValuePair`2 messageWithId)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Gridsum.DataflowEx.Exceptions.TaskEx.<AwaitableWhenAll>d__3`1.MoveNext() in c:\Users\karld_000\Documents\SourceTre
+e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
+...
+```
 
 
 Understanding Dataflow class
@@ -554,14 +693,14 @@ UNDER CONSTRUCTION..
 
 Tips Build your own dataflows / Design principle
 create, register and link
-**DataflowOptions** and how to respect it (pass it on)
+
 block or dataflow?
 
 todo: LinkSubTypeTo() & TransformAndLink()
 
 boundedcapacity on big load
 total parallelism / parallelism setting
-Performance considerations£º don't have too many blocks.
+Performance considerationsï¼š don't have too many blocks.
 
 UNDER CONSTRUCTION..
 
@@ -581,6 +720,10 @@ StatisticsRecorder
 Use linking stuff ([<i class="icon-upload"></i> Publish a document](#publish-a-document))
 
 any issue contact karldodd
+
+when should I use block level linking and when should I use flow level linking  
+
+**DataflowOptions** and how to respect it (pass it on)
 
 Gridsum.DataflowEx
 ==========

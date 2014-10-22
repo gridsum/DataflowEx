@@ -53,7 +53,8 @@
             //CalcAsync().Wait();
             //SlowFlowAsync().Wait();
             //FailDemoAsync().Wait();
-            TransformAndLinkDemo().Wait();
+            //TransformAndLinkDemo().Wait();
+            LinkLeftToDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -117,6 +118,27 @@
 
             d1.TransformAndLink(d2, _ => "Odd: "+ _, _ => _ % 2 == 1);
             d1.TransformAndLink(d3, _ => "Even: " + _, _ => _ % 2 == 0);
+
+            for (int i = 0; i < 10; i++)
+            {
+                d1.Post(i);
+            }
+
+            await d1.SignalAndWaitForCompletionAsync();
+            await d2.CompletionTask;
+            await d3.CompletionTask;
+        }
+
+        public static async Task LinkLeftToDemo()
+        {
+            var d1 = new BufferBlock<int>().ToDataflow(name: "IntGenerator");
+            var d2 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+            var d3 = new ActionBlock<int>(s => Console.WriteLine(s)).ToDataflow();
+            var d4 = new ActionBlock<int>(s => Console.WriteLine(s + "[Left]")).ToDataflow();
+
+            d1.LinkTo(d2, _ => _ % 3 == 0);
+            d1.LinkTo(d3, _ => _ % 3 == 1);
+            d1.LinkLeftToError();//d1.LinkLeftTo(d4);
 
             for (int i = 0; i < 10; i++)
             {

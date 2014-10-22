@@ -71,7 +71,7 @@ namespace Gridsum.DataflowEx
             return FromBlock(new TransformManyBlock<TIn, TOut>(transformMany));
         }
 
-        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, string name = null)
+        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block, string name = null)
         {
             var flow = new PropagatorDataflow<TIn, TOut>(block) { Name = name };
             return flow;
