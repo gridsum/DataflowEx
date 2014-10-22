@@ -6,6 +6,7 @@ using System.Threading.Tasks.Dataflow;
 namespace Gridsum.DataflowEx.Databases
 {
     using System;
+    using System.Threading;
 
     using Common.Logging;
 
@@ -23,6 +24,7 @@ namespace Gridsum.DataflowEx.Databases
         protected readonly BatchBlock<T> m_batchBlock;
         protected readonly ActionBlock<T[]> m_actionBlock;
         protected readonly ILog m_logger;
+        protected Timer m_timer;
 
         public DbBulkInserter(
             string connectionString,
@@ -49,7 +51,7 @@ namespace Gridsum.DataflowEx.Databases
             m_dbBulkInserterName = dbBulkInserterName;
             m_postBulkInsert = postBulkInsert;
             m_batchBlock = new BatchBlock<T>(bulkSize, options.ToGroupingBlockOption());
-
+            
             var bulkInsertOption = options.ToExecutionBlockOption();
             //Action block deal with array references
             if (bulkInsertOption.BoundedCapacity != DataflowBlockOptions.Unbounded)
@@ -63,6 +65,14 @@ namespace Gridsum.DataflowEx.Databases
 
             RegisterChild(m_batchBlock);
             RegisterChild(m_actionBlock);
+
+            m_timer = new Timer(
+                state =>
+                    {
+                        this.TriggerBatch();
+                    }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+
+            
         }
 
         protected async virtual Task DumpToDBAsync(T[] data, TargetTable targetTable)

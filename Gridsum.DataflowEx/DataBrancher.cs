@@ -67,8 +67,13 @@ namespace Gridsum.DataflowEx
             copyBuffer.LinkTo(other);
         }
 
-        public override IDataflow<T> GoTo(IDataflow<T> other)
+        public override IDataflow<T> GoTo(IDataflow<T> other, Predicate<T> predicate)
         {
+            if (predicate != null)
+            {
+                throw new ArgumentException("DataBrancher does not support predicate linking", "predicate");
+            }
+
             if (m_condBuilder.Count == 0) //not linked to any target yet
             {
                 //link first output as primary output

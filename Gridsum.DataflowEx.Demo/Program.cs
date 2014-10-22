@@ -50,9 +50,10 @@
             Console.WriteLine("sum(a) = {0}", dict["a"]); //prints sum(a) = 6
 
 
-            CalcAsync().Wait();
-            SlowFlowAsync().Wait();
-            FailDemoAsync().Wait();
+            //CalcAsync().Wait();
+            //SlowFlowAsync().Wait();
+            //FailDemoAsync().Wait();
+            TransformAndLinkDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -106,6 +107,25 @@
             aggregatorFlow.Post("a=badstring");
             aggregatorFlow.Complete();
             await aggregatorFlow.CompletionTask;
+        }
+
+        public static async Task TransformAndLinkDemo()
+        {
+            var d1 = new BufferBlock<int>().ToDataflow();
+            var d2 = new ActionBlock<string>(s => Console.WriteLine(s)).ToDataflow();
+            var d3 = new ActionBlock<string>(s => Console.WriteLine(s)).ToDataflow();
+
+            d1.TransformAndLink(d2, _ => "Odd: "+ _, _ => _ % 2 == 1);
+            d1.TransformAndLink(d3, _ => "Even: " + _, _ => _ % 2 == 0);
+
+            for (int i = 0; i < 10; i++)
+            {
+                d1.Post(i);
+            }
+
+            await d1.SignalAndWaitForCompletionAsync();
+            await d2.CompletionTask;
+            await d3.CompletionTask;
         }
     }
 }

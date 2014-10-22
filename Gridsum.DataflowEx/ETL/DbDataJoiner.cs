@@ -179,9 +179,9 @@
                 return m_outputBuffer.OutputBlock;
             } }
 
-            public void LinkTo(IDataflow<JoinBatch<TIn>> other)
+            public void LinkTo(IDataflow<JoinBatch<TIn>> other, Predicate<JoinBatch<TIn>> predicate = null)
             {
-                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other);
+                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other, predicate);
             }
 
             public bool IsBusy { get; private set; }

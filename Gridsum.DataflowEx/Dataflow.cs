@@ -642,6 +642,10 @@ namespace Gridsum.DataflowEx
             return count;
         }
 
+        /// <summary>
+        /// Send a complete signal to the dataflow and return a task representing the completion task
+        /// of the dataflow. The task will be completed when all queued jobs are done.
+        /// </summary>
         public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
@@ -717,14 +721,15 @@ namespace Gridsum.DataflowEx
         }
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
-        
+
         /// <summary>
         /// Link data stream to the given dataflow and propagates completion
         /// </summary>
         /// <param name="other">The dataflow to connect to</param>
-        public void LinkTo(IDataflow<TOut> other)
+        /// <param name="predicate">The filtering condition, if any</param>
+        public void LinkTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            this.GoTo(other);
+            this.GoTo(other, predicate);
         }
 
         /// <summary>
@@ -735,10 +740,10 @@ namespace Gridsum.DataflowEx
         /// </remarks>
         /// <param name="other">The dataflow to connect to</param>
         /// <returns>returns the dataflow to connect to</returns>
-        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other)
+        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            m_condBuilder.Add(new Predicate<TOut>(@out => true));
-            LinkBlockToFlow(this.OutputBlock, other);
+            m_condBuilder.Add(predicate ?? new Predicate<TOut>(@out => true));
+            LinkBlockToFlow(this.OutputBlock, other, predicate);
             return other;
         }
 
@@ -770,12 +775,7 @@ namespace Gridsum.DataflowEx
         {
             this.TransformAndLink(other, transform, @out => true);
         }
-
-        public void TransformAndLink<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
-        {
-            this.TransformAndLink(other, @out => { return ((TTarget)@out); }, @out => @out is TTarget);
-        }
-
+        
         public void TransformAndLink<TTarget, TOutSubType>(IDataflow<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
         {
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
@@ -788,7 +788,6 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
-            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
 
