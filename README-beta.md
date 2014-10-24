@@ -682,48 +682,58 @@ e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
 ...
 ```
 
+### 2. Cyclic graph and ring detection
 
-Understanding Dataflow class
+Ring support
+
+
+### 3. Introducing StatisticsRecorder
+
+
+
+Built-in Components
+-------------
+Here is another big reason why many project inside Gridsum use DataflowEx: its powerful built-in components. Provided as generic reusable Dataflow classes, you get the their power out of the box. Data bulk insertion, data branching, 
+
+### 1. Bulk insertion support
+
+### 2. DataBrancher
+
+### 3. DataDispatcher
+
+### 4. DbDataJoiner
+
+Cautions and Best Practices
 -------------
 
+### 1. Building your own Dataflow<>
 
-
-
-UNDER CONSTRUCTION..
-
+Don't forget to register child.
 Tips Build your own dataflows / Design principle
 create, register and link
+block or dataflow? （and their linking) when should I use block level linking and when should I use flow level linking  
 
-block or dataflow?
-
-todo: LinkSubTypeTo() & TransformAndLink()
+### 2. What you should know about DataflowOptions
 
 boundedcapacity on big load
 total parallelism / parallelism setting
-Performance considerations： don't have too many blocks.
-
-UNDER CONSTRUCTION..
-
-DataBrancher
-DataDispatcher
-//?todo type dispatcher
-Database bulk insertion / multi insertion
-Ring support
-
-utils classes
-
-Advanced topic:
-Cyclic graph support
-ETL: Db Data joiner
-StatisticsRecorder
-
-Use linking stuff ([<i class="icon-upload"></i> Publish a document](#publish-a-document))
-
-any issue contact karldodd
-
-when should I use block level linking and when should I use flow level linking  
 
 **DataflowOptions** and how to respect it (pass it on)
+
+### 3. Avoid too many blocks
+
+Performance considerations： don't have too many blocks.
+
+Have a try now!
+-------------
+any issue contact karldodd , or publish on github forum
+
+
+
+Still considering:
+utils classes
+Use linking stuff ([<i class="icon-upload"></i> Publish a document](#publish-a-document))
+misc faqs
 
 Gridsum.DataflowEx
 ==========
