@@ -684,12 +684,23 @@ e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
 
 ### 2. Cyclic graph and ring detection
 
-Ring support
+Your dataflow graph becomes really, really complicated when there is a circult after linking components properly according to your application logic. Consider a real world example, a web crawler, which has an http request maker component and a link analysis component: they consume messages from and provide resources to each other.
 
+A cyclic graph, or a ring, is well supported by the linking mechanism of TPL Dataflow, **as far as data propagation is concerned**. Messages do flow fluently along the linking arrows, even if there is a ring. But when it comes to graph **completion**, things become tricky: A depends on B's output, so probably A shouldn't end until B does. Well, B also depends on A... So now, the graph never has a chance to complete? Hmmm...
+
+You may want to shutdown one of the ring components manually and expect the completion propagates along the ring. But chances are that other components are still busy processing and producing new messages. When these new messages flow to the component that are already shut down, they cannot continue their trip and will stay in the buffer of working blocks. So some components never complete because of thier buffer status. So it is a dead lock.
+
+Clearly, a subtle mechanism is needed to **automatically** shutdown one **proper** component **at the right time**. The right time is, when there is nothing left in the ring and every node is idle; 'Automatcially' means you could hardly tell when to start the ring-completion domino safely so a smart background scheduler is needed to pull the trigger at 'the right time'; 'Proper' means we should choose properly which node is the first to complete in the ring and its completion can lead to the full completion of the ring.
+
+It is difficult that you implement this mechanism yourself. Luckily DataflowEx comes with a solution out of the box: **RegisterChildRing()**.
+
+As TPL Dataflow doesn't expose too much information of a running block ()
+
+// a + bcd
 
 ### 3. Introducing StatisticsRecorder
 
-
+fix wd return null problem using IDataflowEvent.
 
 Built-in Components
 -------------
@@ -721,6 +732,10 @@ total parallelism / parallelism setting
 **DataflowOptions** and how to respect it (pass it on)
 
 ### 3. Avoid too many blocks
+
+overhead: buffer, threading.
+
+try your best to avoid simple blocks
 
 Performance considerations： don't have too many blocks.
 
