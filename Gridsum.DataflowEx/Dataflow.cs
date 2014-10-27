@@ -585,12 +585,7 @@ namespace Gridsum.DataflowEx
                     },
                 ct);
         }
-
-        public void LinkFromBlock(ISourceBlock<TIn> block)
-        {
-            block.LinkTo(this.InputBlock, m_defaultLinkOption);
-        }
-
+        
         protected string ReceiverDisplayName
         {
             get

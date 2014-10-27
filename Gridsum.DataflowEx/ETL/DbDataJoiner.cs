@@ -189,7 +189,7 @@
         
         protected readonly TargetTable m_dimTableTarget;
         protected readonly int m_batchSize;
-        protected BatchBlock<TIn> m_batchBlock;
+        protected Dataflow<TIn, TIn[]> m_batcher;
         protected TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
         protected DBColumnMapping m_joinOnMapping;
         protected TypeAccessor<TIn> m_typeAccessor;
@@ -203,7 +203,8 @@
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
-            m_batchBlock = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption());
+            m_batcher = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption()).ToDataflow(option);
+            m_batcher.Name = "Batcher";
             m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch, option);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
@@ -220,10 +221,10 @@
                     array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow(option);
             transformer.Name = "ArrayToJoinBatchConverter";
 
-            transformer.LinkFromBlock(m_batchBlock);
+            m_batcher.LinkTo(transformer);
             transformer.LinkTo(m_lookupNode);
             
-            RegisterChild(m_batchBlock);
+            RegisterChild(m_batcher);
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
@@ -364,7 +365,7 @@
         {
             get
             {
-                return this.m_batchBlock;
+                return m_batcher.InputBlock;
             }
         }
 
