@@ -54,7 +54,8 @@
             //SlowFlowAsync().Wait();
             //FailDemoAsync().Wait();
             //TransformAndLinkDemo().Wait();
-            LinkLeftToDemo().Wait();
+            //LinkLeftToDemo().Wait();
+            CircularFlowAutoComplete().Wait();
         }
 
         public static async Task CalcAsync()
@@ -148,6 +149,13 @@
             await d1.SignalAndWaitForCompletionAsync();
             await d2.CompletionTask;
             await d3.CompletionTask;
+        }
+
+        public static async Task CircularFlowAutoComplete()
+        {
+            var f = new CircularFlow(DataflowOptions.Default);
+            f.Post(20);
+            await f.SignalAndWaitForCompletionAsync();
         }
     }
 }
