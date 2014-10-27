@@ -682,7 +682,7 @@ e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
 ...
 ```
 
-### 2. Cyclic graph and ring detection
+### 2. Cyclic graph and ring completion detection
 
 Your dataflow graph becomes really, really complicated when there is a circult after linking components properly according to your application logic. Consider a real world example, a web crawler, which has an http request maker component and a link analysis component: they consume messages from and provide resources to each other.
 
@@ -692,11 +692,137 @@ You may want to shutdown one of the ring components manually and expect the comp
 
 Clearly, a subtle mechanism is needed to **automatically** shutdown one **proper** component **at the right time**. The right time is, when there is nothing left in the ring and every node is idle; 'Automatcially' means you could hardly tell when to start the ring-completion domino safely so a smart background scheduler is needed to pull the trigger at 'the right time'; 'Proper' means we should choose properly which node is the first to complete in the ring and its completion can lead to the full completion of the ring.
 
-It is difficult that you implement this mechanism yourself. Luckily DataflowEx comes with a solution out of the box: **RegisterChildRing()**.
+It is difficult that you implement this mechanism yourself. Luckily DataflowEx comes with a solution out of the box: **RegisterChildRing()**. It tells the Dataflow that some children is forming a ring and should enable the automatic smart auto-complete mechanism for the ring. Take a look at the method signature:
 
-As TPL Dataflow doesn't expose too much information of a running block ()
+```C#
+/// <summary>
+/// Register a continuous ring completion check after the preTask ends.
+/// When the checker thinks the ring is O.K. to shut down, it will pull the trigger 
+/// of heartbeat node in the ring. Then nodes in the ring will shut down one by one
+/// </summary>
+/// <param name="preTask">The task after which ring check begins</param>
+/// <param name="ringNodes">Child dataflows that forms a ring</param>
+protected async void RegisterChildRing(Task preTask, params IRingNode[] ringNodes)
+```
 
-// a + bcd
+The preTask parameter gives you a way to delay the child ring monitoring loop until a pre-condition is satisfied. The ring nodes parameter array, as its name implies, is the child components that forms a ring. Notice that the required type of a ring node is IRingNode which inherits from IDataflow.
+
+> **Note:** IRingNode only add one property **IsBusy** to IDataflow. As TPL Dataflow doesn't expose too much information of a running block, this interface helps the ring monitor to tell whether the dataflow/block is working (e.g. executing an item transform in the TransformBlock). So a typical implementation is to set IsBusy to true in the first line of the transform method and set it back to false in the last line. We know this is a bit tedious but it's the best we can do at this moment without Microsoft TPL Dataflow improvement.
+
+O.K. Demo time again. Let's consider we have a heater and a more powerful cooler that changes the air temperature. At last, when the temperature drops below 0 degree the flow should quit.
+
+```C#
+public class CircularFlow : Dataflow<int>
+{
+    private Dataflow<int, int> _buffer;
+
+    public CircularFlow(DataflowOptions dataflowOptions) : base(dataflowOptions)
+    {
+        //a no-op node to demonstrate the usage of preTask param in RegisterChildRing
+        _buffer = new BufferBlock<int>().ToDataflow(name: "NoOpBuffer"); 
+
+        var heater = new TransformManyDataflow<int, int>(async i =>
+                {
+                    await Task.Delay(200); 
+                    Console.WriteLine("Heated to {0}", i + 1);
+                    return new [] {i + 1};
+                }, dataflowOptions);
+        heater.Name = "Heater";
+
+        var cooler = new TransformManyDataflow<int, int>(async i =>
+                {
+                    await Task.Delay(200);
+                    int cooled = i - 2;
+                    Console.WriteLine("Cooled to {0}", cooled);
+
+                    if (cooled < 0) //time to stop
+                    {
+                        return Enumerable.Empty<int>(); 
+                    }
+
+                    return new [] {cooled};
+                }, dataflowOptions);
+        cooler.Name = "Cooler";
+
+        var heartbeat = new HeartbeatNode<int>(dataflowOptions) {Name = "HeartBeat"};
+        
+        _buffer.LinkTo(heater);
+
+        //circular
+        heater.LinkTo(cooler);
+        cooler.LinkTo(heartbeat);
+        heartbeat.LinkTo(heater);
+
+        RegisterChildren(_buffer, heater, cooler, heartbeat);
+        
+        //ring registration
+        RegisterChildRing(_buffer.CompletionTask, heater, cooler, heartbeat);
+    }
+
+    public override ITargetBlock<int> InputBlock { get { return _buffer.InputBlock; } }
+}
+
+public static async Task CircularFlowAutoComplete()
+{
+    var f = new CircularFlow(DataflowOptions.Default);
+    f.Post(20);
+    await f.SignalAndWaitForCompletionAsync();
+}
+```
+
+As you can see, there is a circular dependency in the example graph which theoratically never ends. But RegisterChildRing() does some magic to ensure the flow will end after jobs are done.
+
+> **Note:** RegisterChildRing() requires a heartbeat node in the ring to function correctly. You can use the HeartbeatNode<T> class to initialize an instance like the example does. This heartbeat node, together with IsBusy property mentioned above, helps the ring monitor to correctly count the status of underlying blocks in case the flow is still running (internally ring monitor use a 2-round ring scan to ensure correctness of the ring status). The heartbeat node is also the first node to complete in the completion chain.  
+
+The output of the above code is listed below:
+
+```
+14/10/27 15:55:34 [Gridsum.DataflowEx].[Info] [Heater] now has 2 dependencies.
+14/10/27 15:55:34 [Gridsum.DataflowEx].[Info] [CircularFlow1] A ring is set up: (Heater=>Cooler=>HeartBeat)
+14/10/27 15:55:34 [Gridsum.DataflowEx].[Info] [CircularFlow1] Telling myself there is no more input and wait for childre
+n completion
+14/10/27 15:55:34 [Gridsum.DataflowEx].[Info] [CircularFlow1]->[NoOpBuffer] completed
+14/10/27 15:55:34 [Gridsum.DataflowEx].[Info] [CircularFlow1] Ring pretask done. Starting check loop for (Heater=>Cooler
+=>HeartBeat)
+Heated to 11
+Cooled to 9
+Heated to 10
+Cooled to 8
+Heated to 9
+Cooled to 7
+Heated to 8
+Cooled to 6
+Heated to 7
+Cooled to 5
+Heated to 6
+Cooled to 4
+Heated to 5
+Cooled to 3
+Heated to 4
+Cooled to 2
+Heated to 3
+Cooled to 1
+Heated to 2
+Cooled to 0
+Heated to 1
+Cooled to -1
+14/10/27 15:55:44 [Gridsum.DataflowEx].[Debug] [CircularFlow1] 1st level empty ring check passed for (Heater=>Cooler=>He
+artBeat)
+14/10/27 15:55:54 [Gridsum.DataflowEx].[Debug] [CircularFlow1] 2nd level empty ring check passed for (Heater=>Cooler=>He
+artBeat)
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1] Ring completion detected! Completion triggered on heartbea
+t node: (Heater=>Cooler=>HeartBeat)
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1]->[HeartBeat] completed
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1]->[Heater] All of my dependencies are done. Completing myse
+lf.
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1]->[Heater] completed
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1]->[Cooler] completed
+14/10/27 15:56:04 [Gridsum.DataflowEx].[Info] [CircularFlow1] completed
+```
+
+DataflowEx provides extensive logging on cyclic flow events. Please don't forget to turn them on to help debugging.  
+
+> **Note:** In this demo, the completion condition is relatively simple (temperature < 0) so yes it could be easily replaced by manual completion. But there are complex real world situations that are really hard to find an ending condition, especially when the count of output items of the transform-many function in some of the ring nodes is indeterministic. A spider is one of the complex examples. The DataflowEx built-in **DbDataJoiner** class is another one. These scenarios are where ring completion detection feature really shines.
 
 ### 3. Introducing StatisticsRecorder
 
@@ -731,9 +857,11 @@ total parallelism / parallelism setting
 
 **DataflowOptions** and how to respect it (pass it on)
 
+ToDataflow()
+
 ### 3. Avoid too many blocks
 
-overhead: buffer, threading.
+overhead: buffer, threading.  negligible
 
 try your best to avoid simple blocks
 

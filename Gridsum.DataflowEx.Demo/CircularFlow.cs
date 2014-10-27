@@ -14,14 +14,12 @@ namespace Gridsum.DataflowEx.Demo
     {
         private Dataflow<int, int> _buffer;
 
-        public CircularFlow(DataflowOptions dataflowOptions)
-            : base(dataflowOptions)
+        public CircularFlow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
             //a no-op node to demonstrate the usage of preTask param in RegisterChildRing
             _buffer = new BufferBlock<int>().ToDataflow(name: "NoOpBuffer"); 
 
-            var heater = new TransformManyDataflow<int, int>(
-                async i =>
+            var heater = new TransformManyDataflow<int, int>(async i =>
                     {
                         await Task.Delay(200); 
                         Console.WriteLine("Heated to {0}", i + 1);
@@ -29,23 +27,18 @@ namespace Gridsum.DataflowEx.Demo
                     }, dataflowOptions);
             heater.Name = "Heater";
 
-            var cooler = new TransformManyDataflow<int, int>(
-                async i =>
+            var cooler = new TransformManyDataflow<int, int>(async i =>
                     {
                         await Task.Delay(200);
                         int cooled = i - 2;
-
                         Console.WriteLine("Cooled to {0}", cooled);
 
-                        if (cooled < 0)
+                        if (cooled < 0) //time to stop
                         {
-                            //time to stop
-                            return Enumerable.Empty<int>();
+                            return Enumerable.Empty<int>(); 
                         }
-                        else
-                        {
-                            return new [] {cooled};
-                        }
+
+                        return new [] {cooled};
                     }, dataflowOptions);
             cooler.Name = "Cooler";
 
@@ -58,21 +51,12 @@ namespace Gridsum.DataflowEx.Demo
             cooler.LinkTo(heartbeat);
             heartbeat.LinkTo(heater);
 
-            RegisterChild(_buffer);
-            RegisterChild(heater);
-            RegisterChild(cooler);
-            RegisterChild(heartbeat);
-
+            RegisterChildren(_buffer, heater, cooler, heartbeat);
+            
             //ring registration
             RegisterChildRing(_buffer.CompletionTask, heater, cooler, heartbeat);
         }
 
-        public override ITargetBlock<int> InputBlock
-        {
-            get
-            {
-                return _buffer.InputBlock;
-            }
-        }
+        public override ITargetBlock<int> InputBlock { get { return _buffer.InputBlock; } }
     }
 }

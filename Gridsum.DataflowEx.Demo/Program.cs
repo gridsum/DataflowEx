@@ -154,7 +154,7 @@
         public static async Task CircularFlowAutoComplete()
         {
             var f = new CircularFlow(DataflowOptions.Default);
-            f.Post(20);
+            f.Post(10);
             await f.SignalAndWaitForCompletionAsync();
         }
     }
