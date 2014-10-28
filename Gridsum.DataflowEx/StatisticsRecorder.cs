@@ -22,6 +22,9 @@ namespace Gridsum.DataflowEx
         protected ConcurrentDictionary<Type, IntHolder> m_typeCounter = new ConcurrentDictionary<Type, IntHolder>();
         protected ConcurrentDictionary<DataflowEvent, IntHolder> m_eventCounter = new ConcurrentDictionary<DataflowEvent, IntHolder>(new DataflowEventComparer());
         
+        /// <summary>
+        /// Get the total count of the given type recorded
+        /// </summary>
         public int this[Type objectType]
         {
             get
@@ -43,6 +46,10 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the total count of the given event.
+        /// </summary>
+        /// <param name="fr">The event (level2 is optional)</param>
         public int this[DataflowEvent fr]
         {
             get
@@ -69,6 +76,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the total count of events with given level1 
+        /// </summary>
         public int this[string level1]
         {
             get

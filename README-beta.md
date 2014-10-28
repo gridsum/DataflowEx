@@ -826,17 +826,54 @@ DataflowEx provides extensive logging on cyclic flow events. Please don't forget
 
 ### 3. Introducing StatisticsRecorder
 
-fix wd return null problem using IDataflowEvent.
+Logging is our friend. It provides messages with detail to help diagnosing our applications. But sometimes we need **overviews** rather than detailed logging. This requirement is particularly important in a data flow because it might process billions of items per day and you don't want to drawn in the sea of details. For example, for a log parser program, you probably need an aggregater to sum up counts of error/warning messages in each category, rather than simply dumping everything into a single large log file.
+
+That is why StatisticsRecorder is introduced, to be the built-in event counter/aggregator in DataflowEx, where you get overviews of your interest on your running dataflow. You can choose to dump statistics from the class at the end of your program, or at any other checkpoints.
+
+StatisticsRecorder supports two kinds of recording: Type recording and event recording. Type recording is simply used to count the number of a particular type while event recording is an general-purpose extension feature where you can inject custom 'events' into the statistics recorder. 
+
+> **Note:** StatisticsRecorder uses DataflowEvent class to store event information, which is composed of two strings: Level1 and Level2. Level1 is the parent node and Level2 is the child node of the hierarchy. StatisticsRecorder will aggregate event count on both attributes and supports queries like count(L1 = level1) and count(L1 = level1 && L2 = level2).
+
+To record a type once, simply call StatisticsRecorder.RecordType(Type). To record an event, call RecordEvent(DataflowEvent) or its overloads. Both methods are thread-safe.
+
+Built on top of RecordType() and RecordEvent(), StatisticsRecorder provides a Record(object) method that accepts any object:
+
+```C#
+/// <summary>
+/// Records a processed object in dataflow pipeline
+/// </summary>
+/// <param name="instance">The object passing dataflow</param>
+public virtual void Record(object instance)
+{
+    this.RecordType(instance.GetType());
+
+    var eventProvider = instance as IEventProvider;
+    if (eventProvider != null)
+    {
+        this.RecordEvent(eventProvider.GetEvent());
+    }
+}
+```
+
+In most cases you simply use Record() to monitor the object stream in your flow. It records the object type and extracts valuable event information wherever applicable. If the default implementation needs some adjustment in your scenario, don't forget the method is virtual.   
+
+> **Note:** As shown, objects that carries event information should implement **IEventProvider** which allows *Record()* to get corresponding event information from the object. This is quite useful if you wish to include more information than just the type of the object in the statistics.
+
+
+> **Tip:** Although StatisticsRecorder allows you to access its data by a few indexers programatically, *DumpStatistics()* is the most convenient way to print out beautiful formatted overview gathered by StatisticsRecorder. Dump it to your log! 
+
+To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting purpose. Feel free to extend it and enable richer statistics about your dataflow.
 
 Built-in Components
 -------------
-Here is another big reason why many project inside Gridsum use DataflowEx: its powerful built-in components. Provided as generic reusable Dataflow classes, you get the their power out of the box. Data bulk insertion, data branching, 
+Here is another big reason why many projects inside Gridsum use DataflowEx: its powerful built-in components. Provided as generic reusable Dataflow classes, you get the their power out of the box. Data bulk insertion, data branching, 
 
 ### 1. Bulk insertion support
 
 ### 2. DataBrancher
 
 ### 3. DataDispatcher
+You can use LinkTo but what if dynamic, 
 
 ### 4. DbDataJoiner
 
@@ -864,7 +901,7 @@ ToDataflow()
 overhead: buffer, threading.  negligible
 
 try your best to avoid simple blocks
-
+fix wd return null problem using IDataflowEvent.
 Performance considerations： don't have too many blocks.
 
 Have a try now!
