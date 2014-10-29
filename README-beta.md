@@ -828,7 +828,7 @@ DataflowEx provides extensive logging on cyclic flow events. Please don't forget
 
 Logging is our friend. It provides messages with detail to help diagnosing our applications. But sometimes we need **overviews** rather than detailed logging. This requirement is particularly important in a data flow because it might process billions of items per day and you don't want to drawn in the sea of details. For example, for a log parser program, you probably need an aggregater to sum up counts of error/warning messages in each category, rather than simply dumping everything into a single large log file.
 
-That is why StatisticsRecorder is introduced, to be the built-in event counter/aggregator in DataflowEx, where you get overviews of your interest on your running dataflow. You can choose to dump statistics from the class at the end of your program, or at any other checkpoints.
+That is why StatisticsRecorder is introduced, to be the built-in event counter/aggregator in DataflowEx, where you get overviews of your interest on your running dataflow. You can choose to access and dump statistics from the class at the end of your program, or at any other checkpoints.
 
 StatisticsRecorder supports two kinds of recording: Type recording and event recording. Type recording is simply used to count the number of a particular type while event recording is an general-purpose extension feature where you can inject custom 'events' into the statistics recorder. 
 
@@ -859,10 +859,13 @@ In most cases you simply use Record() to monitor the object stream in your flow.
 
 > **Note:** As shown, objects that carries event information should implement **IEventProvider** which allows *Record()* to get corresponding event information from the object. This is quite useful if you wish to include more information than just the type of the object in the statistics.
 
+//demo:
 
-> **Tip:** Although StatisticsRecorder allows you to access its data by a few indexers programatically, *DumpStatistics()* is the most convenient way to print out beautiful formatted overview gathered by StatisticsRecorder. Dump it to your log! 
+> **Tip:** Although StatisticsRecorder allows you to access its data by indexers programatically, *DumpStatistics()* is the most convenient way to print out beautiful formatted overview gathered by StatisticsRecorder. 
 
-To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting purpose. Feel free to extend it and enable richer statistics about your dataflow.
+To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting purpose. Feel free to extend it and enrich your dataflow statistics.
+
+//todo: garbage collector
 
 Built-in Components
 -------------

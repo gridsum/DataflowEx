@@ -55,7 +55,8 @@
             //FailDemoAsync().Wait();
             //TransformAndLinkDemo().Wait();
             //LinkLeftToDemo().Wait();
-            CircularFlowAutoComplete().Wait();
+            //CircularFlowAutoComplete().Wait();
+            RecorderDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -156,6 +157,24 @@
             var f = new CircularFlow(DataflowOptions.Default);
             f.Post(10);
             await f.SignalAndWaitForCompletionAsync();
+        }
+
+        public static async Task RecorderDemo()
+        {
+            var f = new PeopleFlow(DataflowOptions.Default);
+            var sayHello = new ActionBlock<Person>(p => Console.WriteLine("Hello, I am {0}, {1}", p.Name, p.Age)).ToDataflow();
+            f.LinkTo(sayHello, p => p.Age > 0);
+            f.LinkLeftToNull(); //object flowing here will be recorded by GarbageRecorder
+            
+            f.Post("{Name: 'aaron', Age: 20}");
+            f.Post("{Name: 'bob', Age: 30}");
+            f.Post("{Name: 'carmen', Age: 80}");
+            f.Post("{Name: 'neo', Age: -1}");
+            await f.SignalAndWaitForCompletionAsync();
+            await sayHello.CompletionTask;
+
+            Console.WriteLine(f.PeopleRecorder.DumpStatistics());
+            Console.WriteLine(f.GarbageRecorder.DumpStatistics());
         }
     }
 }

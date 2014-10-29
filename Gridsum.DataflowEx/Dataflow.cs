@@ -707,7 +707,7 @@ namespace Gridsum.DataflowEx
 
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
-            this.GarbageRecorder = new StatisticsRecorder();
+            this.GarbageRecorder = new StatisticsRecorder(this) {Name = "GarbageRecorder"};
             m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
             m_frozenConditions = new Lazy<ImmutableList<Predicate<TOut>>>(() =>
             {
@@ -808,8 +808,8 @@ namespace Gridsum.DataflowEx
                 {
                     if (frozenConds.All(condition => !condition(@out)))
                     {
-                        OnOutputToNull(@out);
-                        return true;
+                        OnOutputToNull(@out); 
+                         return true;
                     }
                     else
                     {

@@ -89,7 +89,7 @@
                         return s.Split(Splitor);
                     });
 
-            this.m_recorder = new StatisticsRecorder();
+            this.m_recorder = new StatisticsRecorder(this);
             this.m_recordBlock = new ActionBlock<string>(
                 s =>
                     {
