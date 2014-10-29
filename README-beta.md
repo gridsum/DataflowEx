@@ -859,13 +859,96 @@ In most cases you simply use Record() to monitor the object stream in your flow.
 
 > **Note:** As shown, objects that carries event information should implement **IEventProvider** which allows *Record()* to get corresponding event information from the object. This is quite useful if you wish to include more information than just the type of the object in the statistics.
 
-//demo:
+Let's look at a demo which processes person information stream. In this demo StatisticsRecorder not only keeps track of people count processed but also treats old person as special event.  
 
+```C#
+public class Person : IEventProvider
+{
+    public string Name { get; set; }
+    public int Age { get; set; }
+
+    public DataflowEvent GetEvent()
+    {
+        if (Age > 70)
+        {
+            return new DataflowEvent("OldPerson");
+        }
+        else
+        {
+            //returning empty so it will not be recorded as an event
+            return DataflowEvent.Empty; 
+        }
+    }
+}
+
+public class PeopleFlow : Dataflow<string, Person>
+{
+    private TransformBlock<string, Person> m_converter;
+    private TransformBlock<Person, Person> m_recorder;
+    private StatisticsRecorder m_peopleRecorder;
+    
+    public PeopleFlow(DataflowOptions dataflowOptions)
+        : base(dataflowOptions)
+    {
+        m_peopleRecorder = new StatisticsRecorder(this) { Name = "PeopleRecorder"};
+
+        m_converter = new TransformBlock<string, Person>(s => JsonConvert.DeserializeObject<Person>(s));
+        m_recorder = new TransformBlock<Person, Person>(
+            p =>
+                {
+                    //record every person
+                    m_peopleRecorder.Record(p);
+                    return p;
+                });
+
+        m_converter.LinkTo(m_recorder, new DataflowLinkOptions() { PropagateCompletion = true});
+
+        RegisterChild(m_converter);
+        RegisterChild(m_recorder);
+    }
+
+    public override ITargetBlock<string> InputBlock { get { return m_converter; } }
+    public override ISourceBlock<Person> OutputBlock { get { return m_recorder; } }
+    public StatisticsRecorder PeopleRecorder { get { return m_peopleRecorder; } }
+}
+
+public static async Task RecorderDemo()
+{
+    var f = new PeopleFlow(DataflowOptions.Default);
+    var sayHello = new ActionBlock<Person>(p => Console.WriteLine("Hello, I am {0}, {1}", p.Name, p.Age)).ToDataflow(name: "sayHello");
+    f.LinkTo(sayHello, p => p.Age > 0);
+    f.LinkLeftToNull(); //object flowing here will be recorded by GarbageRecorder
+    
+    f.Post("{Name: 'aaron', Age: 20}");
+    f.Post("{Name: 'bob', Age: 30}");
+    f.Post("{Name: 'carmen', Age: 80}");
+    f.Post("{Name: 'neo', Age: -1}");
+    await f.SignalAndWaitForCompletionAsync();
+    await sayHello.CompletionTask;
+
+	Console.WriteLine("Total people count: " + f.PeopleRecorder[typeof(Person)]);
+    Console.WriteLine(f.PeopleRecorder.DumpStatistics());
+    Console.WriteLine(f.GarbageRecorder.DumpStatistics());
+}
+```
 > **Tip:** Although StatisticsRecorder allows you to access its data by indexers programatically, *DumpStatistics()* is the most convenient way to print out beautiful formatted overview gathered by StatisticsRecorder. 
 
-To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting purpose. Feel free to extend it and enrich your dataflow statistics.
+And its output:
+```
+Hello, I am aaron, 20
+Hello, I am bob, 30
+Hello, I am carmen, 80
+Total people count: 4
+[[PeopleFlow1]-PeopleRecorder] Entities: Person(4)
+[[PeopleFlow1]-PeopleRecorder] Events: OldPerson(1)
 
-//todo: garbage collector
+[[PeopleFlow1]-GarbageRecorder] Entities: Person(1)
+[[PeopleFlow1]-GarbageRecorder] Events:
+```
+
+As expected, people recorder captures the old person event as well as the total person object count. In addition, the *GarbageRecorder* is a handy statistics recorder embedded in the Dataflow class to monitor objects flowing to null target when using **LinkLeftToNull()**. It starts and functions implicitly. 
+
+To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting/monitoring purpose. Feel free to extend it and enrich your dataflow statistics.
 
 Built-in Components
 -------------
@@ -891,6 +974,8 @@ create, register and link
 block or dataflow? （and their linking) when should I use block level linking and when should I use flow level linking  
 
 ### 2. What you should know about DataflowOptions
+
+when to use Default and when not
 
 boundedcapacity on big load
 total parallelism / parallelism setting

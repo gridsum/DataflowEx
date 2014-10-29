@@ -61,3 +61,5 @@ namespace Gridsum.DataflowEx.Demo
         public StatisticsRecorder PeopleRecorder { get { return m_peopleRecorder; } }
     }
 }
+
+

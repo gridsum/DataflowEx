@@ -162,7 +162,7 @@
         public static async Task RecorderDemo()
         {
             var f = new PeopleFlow(DataflowOptions.Default);
-            var sayHello = new ActionBlock<Person>(p => Console.WriteLine("Hello, I am {0}, {1}", p.Name, p.Age)).ToDataflow();
+            var sayHello = new ActionBlock<Person>(p => Console.WriteLine("Hello, I am {0}, {1}", p.Name, p.Age)).ToDataflow(name: "sayHello");
             f.LinkTo(sayHello, p => p.Age > 0);
             f.LinkLeftToNull(); //object flowing here will be recorded by GarbageRecorder
             
@@ -173,6 +173,7 @@
             await f.SignalAndWaitForCompletionAsync();
             await sayHello.CompletionTask;
 
+            Console.WriteLine("Total people count: " + f.PeopleRecorder[typeof(Person)]);
             Console.WriteLine(f.PeopleRecorder.DumpStatistics());
             Console.WriteLine(f.GarbageRecorder.DumpStatistics());
         }
