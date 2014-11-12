@@ -956,7 +956,53 @@ Here is another big reason why many projects inside Gridsum use DataflowEx: its 
 
 ### 1. Bulk insertion support
 
+The very 1st feature/component in DataflowEx we strongly recommend is the **DbBulkInserter** which enables bulk insertion to SQL Server. Though there are many ORM solutions out there but when it comes to insertion, they are just not designed to use the most efficient way: bulk insert. Using *SqlBulkCopy* internally, DbBulkInserter is born to solve the problem in a speedy way. And it nicely fits in dataflow style programming.
+
+Inheriting from Dataflow<T>, DbBulkInserter is a generic class and accepts a generic parameter T, which is the type of your domain objects. Just connect your output flows to DbBulkInserter. Bulk insertion magic will then happen internally in DbBulkInserter. The only extra thing to do is to set up column mapping from your domain object properties to database table columns, taking advantage of C# attributes.
+
+In the last demo, we have a PeopleFlow that outputs Person objects. Let's dump those objects to SQL Server!
+
+```C#
+//Please note the added attributes to the person class
+public class Person : IEventProvider
+{
+    [DBColumnMapping("LocalDb", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
+    public string Name { get; set; }
+
+    [DBColumnMapping("LocalDb", "AgeCol", -1, ColumnMappingOption.Optional)]
+    public int? Age { get; set; }
+
+    public DataflowEvent GetEvent()
+    {
+        if (Age > 70)
+        {
+            return new DataflowEvent("OldPerson");
+        }
+        else
+        {
+            //returning empty so it will not be recorded as an event
+            return DataflowEvent.Empty; 
+        }
+    }
+}
+
+
+
+```
+
+todo: mandatory and optional
+
+SqlBulkCopy
+
+
+
 ### 2. DataBrancher
+When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due  to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBrancher** to make your life easier.
+
+DataBrancher acts simply like a copy machine. When it is linked to multiple targets, whenever an item flows in, it passes the reference of the same item to multiple targets. Optionally you can indicate a clone function to DataBrancher if you want to copy the item before handing to targets.
+
+Code talks: 
+
 
 ### 3. DataDispatcher
 You can use LinkTo but what if dynamic, 

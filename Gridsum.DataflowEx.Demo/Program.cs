@@ -2,11 +2,13 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.SqlClient;
     using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
 
+    using Gridsum.DataflowEx.Databases;
     using Gridsum.DataflowEx.Test;
     using Gridsum.DataflowEx.Test.DatabaseTests;
 
@@ -56,7 +58,8 @@
             //TransformAndLinkDemo().Wait();
             //LinkLeftToDemo().Wait();
             //CircularFlowAutoComplete().Wait();
-            RecorderDemo().Wait();
+            //RecorderDemo().Wait();
+            BulkInserterDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -176,6 +179,44 @@
             Console.WriteLine("Total people count: " + f.PeopleRecorder[typeof(Person)]);
             Console.WriteLine(f.PeopleRecorder.DumpStatistics());
             Console.WriteLine(f.GarbageRecorder.DumpStatistics());
+        }
+
+        public static async Task BulkInserterDemo()
+        {
+            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
+            string connStr = string.Format(
+@"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDB-{0}.mdf;Integrated Security=True;Connect Timeout=30",
+               "People" );
+
+            using (var conn = new SqlConnection(connStr))
+            {
+                conn.Open();
+
+                var cmd = new SqlCommand(@"
+IF OBJECT_id('dbo.People', 'U') IS NOT NULL
+    DROP TABLE dbo.People;
+
+CREATE TABLE dbo.People
+{
+    Id INT IDENTITY(1,1) NOT NULL,
+    NameCol nvarchar(50) NOT NULL,
+    AgeCol INT           NOT NULL
+}
+", conn);
+
+                cmd.ExecuteNonQuery();
+            }
+
+            var f = new PeopleFlow(DataflowOptions.Default);
+            var dbInserter = new DbBulkInserter<Person>(connStr, "dbo.People", DataflowOptions.Default, "LocalDbTarget");
+            f.LinkTo(dbInserter);
+
+            f.Post("{Name: 'aaron', Age: 20}");
+            f.Post("{Name: 'bob', Age: 30}");
+            f.Post("{Name: 'carmen', Age: 80}");
+            f.Post("{Name: 'neo', Age: -1}");
+            await f.SignalAndWaitForCompletionAsync();
+            await dbInserter.CompletionTask;
         }
     }
 }

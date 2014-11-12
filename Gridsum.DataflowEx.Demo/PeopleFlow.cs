@@ -9,11 +9,16 @@ namespace Gridsum.DataflowEx.Demo
     using System.Threading;
     using System.Threading.Tasks.Dataflow;
 
+    using Gridsum.DataflowEx.Databases;
+
     using Newtonsoft.Json;
 
     public class Person : IEventProvider
     {
+        [DBColumnMapping("LocalDbTarget", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
         public string Name { get; set; }
+
+        [DBColumnMapping("LocalDbTarget", "AgeCol", -1, ColumnMappingOption.Optional)]
         public int Age { get; set; }
 
         public DataflowEvent GetEvent()
