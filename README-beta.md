@@ -1021,9 +1021,26 @@ public static async Task BulkInserterDemo()
 }
 ```
 
+SqlBulkCopy used to be a very complex and heavyweight class to use. Now with DbBulkInserter, it's that easy!
+
+Take a glimpse of what's been put in the table, just as expected:
+
 //todo: insert picture
 
-As you can see,  
+If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
+
+```
+14/11/13 17:55:08 [Gridsum.DataflowEx.Databases.TypeAccessor<Person>].[Debug] Populated column offset for DBColumnMapping: [ColName:NameCol, ColOffset:1, DefaultValue:N/A] on property node: Person->Name by table dbo.People  
+14/11/13 17:55:08 [Gridsum.DataflowEx.Databases.TypeAccessor<Person>].[Debug] Populated column offset for DBColumnMapping: [ColName:AgeCol, ColOffset:2, DefaultValue:-1] on property node: Person->Age by table dbo.People  
+14/11/13 17:55:08 [Gridsum.DataflowEx].[Info] [PeopleFlow1] Telling myself there is no more input and wait for children completion  
+14/11/13 17:55:08 [Gridsum.DataflowEx].[Info] [PeopleFlow1] completed  
+14/11/13 17:55:08 [Gridsum.DataflowEx.Databases].[Debug] [DbBulkInserter<Person>1] starts bulk-inserting 4 Person to db table dbo.People  
+14/11/13 17:55:08 [Gridsum.DataflowEx.Databases].[Info] [DbBulkInserter<Person>1] bulk-inserted 4 Person to db table dbo.People  
+14/11/13 17:55:08 [Gridsum.DataflowEx].[Info] [DbBulkInserter<Person>1] completed  
+```
+
+Be sure to check the log to diagnose issues!
+
 
 todo: mandatory and optional
 

@@ -209,7 +209,7 @@
 
             f.Post("{Name: 'aaron', Age: 20}");
             f.Post("{Name: 'bob', Age: 30}");
-            f.Post("{Name: 'carmen', Age: 80}");
+            f.Post("{Age: 80}");
             f.Post("{Name: 'neo', Age: -1}");
             await f.SignalAndWaitForCompletionAsync();
             await dbInserter.CompletionTask;
