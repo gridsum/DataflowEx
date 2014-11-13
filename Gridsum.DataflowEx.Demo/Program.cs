@@ -183,28 +183,24 @@
 
         public static async Task BulkInserterDemo()
         {
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            string connStr = string.Format(
-@"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDB-{0}.mdf;Integrated Security=True;Connect Timeout=30",
-               "People" );
+            string connStr;
 
-            using (var conn = new SqlConnection(connStr))
+            //initialize table
+            using (var conn = LocalDB.GetLocalDB("People"))
             {
-                conn.Open();
-
                 var cmd = new SqlCommand(@"
-IF OBJECT_id('dbo.People', 'U') IS NOT NULL
-    DROP TABLE dbo.People;
-
-CREATE TABLE dbo.People
-{
-    Id INT IDENTITY(1,1) NOT NULL,
-    NameCol nvarchar(50) NOT NULL,
-    AgeCol INT           NOT NULL
-}
-", conn);
-
+                IF OBJECT_id('dbo.People', 'U') IS NOT NULL
+                    DROP TABLE dbo.People;
+                
+                CREATE TABLE dbo.People
+                (
+                    Id INT IDENTITY(1,1) NOT NULL,
+                    NameCol nvarchar(50) NOT NULL,
+                    AgeCol INT           NOT NULL
+                )
+                ", conn);
                 cmd.ExecuteNonQuery();
+                connStr = conn.ConnectionString;
             }
 
             var f = new PeopleFlow(DataflowOptions.Default);

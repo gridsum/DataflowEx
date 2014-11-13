@@ -986,9 +986,44 @@ public class Person : IEventProvider
     }
 }
 
+public static async Task BulkInserterDemo()
+{
+    string connStr;
 
+    //initialize table
+    using (var conn = LocalDB.GetLocalDB("People"))
+    {
+        var cmd = new SqlCommand(@"
+        IF OBJECT_id('dbo.People', 'U') IS NOT NULL
+            DROP TABLE dbo.People;
+        
+        CREATE TABLE dbo.People
+        (
+            Id INT IDENTITY(1,1) NOT NULL,
+            NameCol nvarchar(50) NOT NULL,
+            AgeCol INT           NOT NULL
+        )
+        ", conn);
+        cmd.ExecuteNonQuery();
+        connStr = conn.ConnectionString;
+    }
 
+    var f = new PeopleFlow(DataflowOptions.Default);
+    var dbInserter = new DbBulkInserter<Person>(connStr, "dbo.People", DataflowOptions.Default, "LocalDbTarget");
+    f.LinkTo(dbInserter);
+
+    f.Post("{Name: 'aaron', Age: 20}");
+    f.Post("{Name: 'bob', Age: 30}");
+    f.Post("{Name: 'carmen', Age: 80}");
+    f.Post("{Name: 'neo', Age: -1}");
+    await f.SignalAndWaitForCompletionAsync();
+    await dbInserter.CompletionTask;
+}
 ```
+
+//todo: insert picture
+
+As you can see,  
 
 todo: mandatory and optional
 

@@ -73,6 +73,7 @@
     <Compile Include="CircularFlow.cs" />
     <Compile Include="ComplexIntFlow.cs" />
     <Compile Include="LineAggregatorFlow.cs" />
+    <Compile Include="LocalDBUtil.cs" />
     <Compile Include="PeopleFlow.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

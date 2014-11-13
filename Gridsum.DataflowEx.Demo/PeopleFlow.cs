@@ -19,7 +19,7 @@ namespace Gridsum.DataflowEx.Demo
         public string Name { get; set; }
 
         [DBColumnMapping("LocalDbTarget", "AgeCol", -1, ColumnMappingOption.Optional)]
-        public int Age { get; set; }
+        public int? Age { get; set; }
 
         public DataflowEvent GetEvent()
         {
