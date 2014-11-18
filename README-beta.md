@@ -1034,7 +1034,7 @@ Let's put some words on the parameters of DBColumnMapping attribute constructor.
 
 Now take a glimpse of what's been put in the table, just as expected (Notice the default values are also taking effect):
 
-[[images/sqlserver_screenshot1.jpg]]
+[[images/dbbulkinserter_screenshot1.jpg]]
 
 If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
 
@@ -1052,15 +1052,95 @@ So, be sure to check the log to diagnose issues!
 
 One demo is not enough to show the real power of DbBulkInserter, which supports recursive property expansion for complex custom type. Look at an example of deep mapping searching: 
 
+```C#
+public class Order
+{
+    [DBColumnMapping("OrderTarget", "Date", null)]
+    public DateTime OrderDate { get; set; }
 
+    [DBColumnMapping("OrderTarget", "Value", 0.0f)]
+    public float? OrderValue { get; set; }
 
-In this case, type Order is the root type rather than Person. But it has a property whose type is Person. DbBulkInserter expands the property and grabs some mapping deep in the property tree.
+    public Person Customer { get; set; }
+}
+
+public class Person : IEventProvider
+{
+    [DBColumnMapping("PersonTarget", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
+    [DBColumnMapping("OrderTarget", "CustomerName", "Unknown Customer")]
+    public string Name { get; set; }
+
+    [DBColumnMapping("PersonTarget", "AgeCol", -1, ColumnMappingOption.Optional)]
+    [DBColumnMapping("OrderTarget", "CustomerAge", -1)]
+    public int? Age { get; set; }
+
+    public DataflowEvent GetEvent()
+    {
+        // omit some code here
+    }
+}
+
+public static async Task BulkInserterDemo2()
+{
+    string connStr;
+
+    //initialize table
+    using (var conn = LocalDB.GetLocalDB("BulkInserterDemo"))
+    {
+        var cmd = new SqlCommand(@"
+        IF OBJECT_id('dbo.Orders', 'U') IS NOT NULL
+            DROP TABLE dbo.Orders;
+        
+        CREATE TABLE dbo.Orders
+        (
+            Id INT IDENTITY(1,1) NOT NULL,
+            Date DATETIME NOT NULL,
+            Value FLOAT NOT NULL,
+            CustomerName NVARCHAR(50) NOT NULL,
+            CustomerAge INT NOT NULL
+        )
+        ", conn);
+        cmd.ExecuteNonQuery();
+        connStr = conn.ConnectionString;
+    }
+
+    var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget");
+
+    dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 15, Customer = new Person() {Name = "Aaron", Age = 38}}); 
+    dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 25, Customer = new Person() {Name = "Bob", Age = 30}}); 
+    dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 35, Customer = new Person() {Age = 48}}); 
+    dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 45, Customer = new Person() {Name = "Neo"}});
+
+    await dbInserter.SignalAndWaitForCompletionAsync();
+}
+
+```
+
+Whose result is:
+
+[[images/dbbulkinserter_screenshot2.jpg]]
+
+In this case, type Order is the root type and it has a property whose type is Person. DbBulkInserter expands the property in Order class and grabs some mapping down from the Person class.
+
+> **Tip:** Make sure the destination label is the same for different levels of properties. In this demo, Person class added two mappings for label "OrderTarget", same as the label used in Order class.
 
 One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?　D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[NoNullCheck]**, to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B and the null check is stripped out: only A.B.C ?? D is generated but you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
 
-In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **NoNullCheck** like this:
+In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **NoNullCheck** like this to get better performance:
 
- 
+```C#
+public class Order
+{
+    [DBColumnMapping("OrderTarget", "Date", null)]
+    public DateTime OrderDate { get; set; }
+
+    [DBColumnMapping("OrderTarget", "Value", 0.0f)]
+    public float? OrderValue { get; set; }
+
+    [NoNullCheck]
+    public Person Customer { get; set; }
+}
+```
 
 ### 2. DataBrancher
 When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due  to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBrancher** to make your life easier.

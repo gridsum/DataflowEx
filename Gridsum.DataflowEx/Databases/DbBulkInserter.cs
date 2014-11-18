@@ -116,7 +116,7 @@ namespace Gridsum.DataflowEx.Databases
                         m_logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
 
                         //As this is an unrecoverable exception, rethrow it
-                        throw;
+                        throw new AggregateException(e);
                     }
                     
                     transaction.Commit();

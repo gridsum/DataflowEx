@@ -59,7 +59,8 @@
             //LinkLeftToDemo().Wait();
             //CircularFlowAutoComplete().Wait();
             //RecorderDemo().Wait();
-            BulkInserterDemo().Wait();
+            //BulkInserterDemo().Wait();
+            BulkInserterDemo2().Wait();
         }
 
         public static async Task CalcAsync()
@@ -186,7 +187,7 @@
             string connStr;
 
             //initialize table
-            using (var conn = LocalDB.GetLocalDB("People"))
+            using (var conn = LocalDB.GetLocalDB("BulkInserterDemo"))
             {
                 var cmd = new SqlCommand(@"
                 IF OBJECT_id('dbo.People', 'U') IS NOT NULL
@@ -204,15 +205,49 @@
             }
 
             var f = new PeopleFlow(DataflowOptions.Default);
-            var dbInserter = new DbBulkInserter<Person>(connStr, "dbo.People", DataflowOptions.Default, "LocalDbTarget");
+            var dbInserter = new DbBulkInserter<Person>(connStr, "dbo.People", DataflowOptions.Default, "PersonTarget");
             f.LinkTo(dbInserter);
 
             f.Post("{Name: 'aaron', Age: 20}");
             f.Post("{Name: 'bob', Age: 30}");
-            f.Post("{Age: 80}");
-            f.Post("{Name: 'neo', Age: -1}");
+            f.Post("{Age: 80}"); //Name will be default value: "N/A"
+            f.Post("{Name: 'neo' }"); // Age will be default value: -1
             await f.SignalAndWaitForCompletionAsync();
             await dbInserter.CompletionTask;
+        }
+
+        public static async Task BulkInserterDemo2()
+        {
+            string connStr;
+
+            //initialize table
+            using (var conn = LocalDB.GetLocalDB("BulkInserterDemo"))
+            {
+                var cmd = new SqlCommand(@"
+                IF OBJECT_id('dbo.Orders', 'U') IS NOT NULL
+                    DROP TABLE dbo.Orders;
+                
+                CREATE TABLE dbo.Orders
+                (
+                    Id INT IDENTITY(1,1) NOT NULL,
+                    Date DATETIME NOT NULL,
+                    Value FLOAT NOT NULL,
+                    CustomerName NVARCHAR(50) NOT NULL,
+                    CustomerAge INT NOT NULL
+                )
+                ", conn);
+                cmd.ExecuteNonQuery();
+                connStr = conn.ConnectionString;
+            }
+
+            var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget");
+
+            dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 15, Customer = new Person() {Name = "Aaron", Age = 38}}); 
+            dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 25, Customer = new Person() {Name = "Bob", Age = 30}}); 
+            dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 35, Customer = new Person() {Age = 48}}); 
+            dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 45, Customer = new Person() {Name = "Neo"}});
+
+            await dbInserter.SignalAndWaitForCompletionAsync();
         }
     }
 }

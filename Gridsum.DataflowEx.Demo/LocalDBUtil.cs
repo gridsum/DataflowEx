@@ -10,6 +10,7 @@ namespace Gridsum.DataflowEx.Demo
     using System.IO;
     using System.Reflection;
 
+    //Borrowed from https://social.msdn.microsoft.com/Forums/sqlserver/en-US/268c3411-102a-4272-b305-b14e29604313/localdb-create-connect-to-database-programmatically-?forum=sqlsetupandupgrade
     internal static class LocalDB
     {
         public const string DB_DIRECTORY = "Data";
