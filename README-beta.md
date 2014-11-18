@@ -1,6 +1,6 @@
 Welcome to DataflowEx
 ===================
-DataflowEx is a collection of extensions to TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides abstraction/management on top of dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
+DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management for underlying dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
 
@@ -966,10 +966,10 @@ In the last demo, we have a PeopleFlow that outputs Person objects. Let's dump t
 //Please note the added attributes to the person class
 public class Person : IEventProvider
 {
-    [DBColumnMapping("LocalDb", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
+    [DBColumnMapping("LocalDbTarget", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
     public string Name { get; set; }
 
-    [DBColumnMapping("LocalDb", "AgeCol", -1, ColumnMappingOption.Optional)]
+    [DBColumnMapping("LocalDbTarget", "AgeCol", -1, ColumnMappingOption.Optional)]
     public int? Age { get; set; }
 
     public DataflowEvent GetEvent()
@@ -1014,18 +1014,27 @@ public static async Task BulkInserterDemo()
 
     f.Post("{Name: 'aaron', Age: 20}");
     f.Post("{Name: 'bob', Age: 30}");
-    f.Post("{Name: 'carmen', Age: 80}");
-    f.Post("{Name: 'neo', Age: -1}");
+    f.Post("{Age: 80}"); //Name will be default value: "N/A"
+    f.Post("{Name: 'neo' }"); // Age will be default value: -1
     await f.SignalAndWaitForCompletionAsync();
     await dbInserter.CompletionTask;
 }
 ```
 
-SqlBulkCopy used to be a very complex and heavyweight class to use. Now with DbBulkInserter, it's that easy!
+Bulk insertion in .Net (namely SqlBulkCopy) used to be a very complex and heavyweight component to use. Now with DbBulkInserter, it's that easy! DbBulkInserter uses SqlBulkCopy internally and auto-generates the underlying property accessors to be used by SqlBulkCopy. 
 
-Take a glimpse of what's been put in the table, just as expected:
+Let's put some words on the parameters of DBColumnMapping attribute constructor.
 
-//todo: insert picture
+* The 1st parameter is a string of your choice called 'destLabel' that defines a db target (i.e. your destination table). Mappings under same dest label form a group which defines a specific object relational mapper. Using different dest labels enables a type to be mapped to multiple table schemas: simply tag the attributes with multiple DBColumnMapping.
+* The 2nd parameter is the column name of your destination table. That's it.
+* The 3rd parameter is the default value to output instead if the property's value happen to be null. This works for reference types and nullable value types. 
+* The last parameter of DBColumnMapping attribute constructor is a ColumnMappingOption, where you can indicate the mapping to be mandatory or optional. In the case of 'Optional', DataflowEx will simply ignore the given mapping (and warn you in the log) when a corresponding DB column is not found for the mapping. In the case of 'Mandatory', exception will be thrown. 
+ 
+> **Tip:** The 'Optional' option could be quite useful when you want to maintain only one set of mappings (i.e. mappings with same destlabel) to match multiple tables that share a great part of their columns in common but has some minor schema difference.  
+
+Now take a glimpse of what's been put in the table, just as expected (Notice the default values are also taking effect):
+
+[[images/sqlserver_screenshot1.jpg]]
 
 If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
 
@@ -1039,14 +1048,19 @@ If you want more insights of how DbBulkInserter works, check the log where you g
 14/11/13 17:55:08 [Gridsum.DataflowEx].[Info] [DbBulkInserter<Person>1] completed  
 ```
 
-Be sure to check the log to diagnose issues!
+So, be sure to check the log to diagnose issues!
+
+One demo is not enough to show the real power of DbBulkInserter, which supports recursive property expansion for complex custom type. Look at an example of deep mapping searching: 
 
 
-todo: mandatory and optional
 
-SqlBulkCopy
+In this case, type Order is the root type rather than Person. But it has a property whose type is Person. DbBulkInserter expands the property and grabs some mapping deep in the property tree.
 
+One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?　D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[NoNullCheck]**, to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B and the null check is stripped out: only A.B.C ?? D is generated but you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
 
+In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **NoNullCheck** like this:
+
+ 
 
 ### 2. DataBrancher
 When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due  to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBrancher** to make your life easier.
@@ -1055,9 +1069,16 @@ DataBrancher acts simply like a copy machine. When it is linked to multiple targ
 
 Code talks: 
 
-
 ### 3. DataDispatcher
+DataDispatcher also falls into the 'one source multi targets' category. But it is different from DataBrancher in several aspects:
+>1. One input item only goes to one target
+>2. Target dataflow nodes are created dynamically on demand, depending on the input items and the dispatch function.
+
 You can use LinkTo but what if dynamic, 
+
+demo
+
+MultiDbBulkInserter
 
 ### 4. DbDataJoiner
 
@@ -1072,6 +1093,8 @@ create, register and link
 block or dataflow? （and their linking) when should I use block level linking and when should I use flow level linking  
 
 ### 2. What you should know about DataflowOptions
+
+One thing that we touched but haven't yet explored is the option class of DataflowEx.
 
 when to use Default and when not
 
