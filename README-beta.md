@@ -1034,7 +1034,7 @@ Let's put some words on the parameters of DBColumnMapping attribute constructor.
 
 Now take a glimpse of what's been put in the table, just as expected (Notice the default values are also taking effect):
 
-[[images/dbbulkinserter_screenshot1.jpg]]
+[[images/dbbulkinserter_screenshot1.png]]
 
 If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
 
@@ -1118,7 +1118,7 @@ public static async Task BulkInserterDemo2()
 
 Whose result is:
 
-[[images/dbbulkinserter_screenshot2.jpg]]
+[[images/dbbulkinserter_screenshot2.png]]
 
 In this case, type Order is the root type and it has a property whose type is Person. DbBulkInserter expands the property in Order class and grabs some mapping down from the Person class.
 
@@ -1187,7 +1187,9 @@ ToDataflow()
 
 ### 3. Avoid too many blocks
 
-overhead: buffer, threading.  negligible
+overhead: buffer, threading.  negligible, task granularity  (overhead of data travelling: OfferMessage) locality
+
++1, +2, +3
 
 try your best to avoid simple blocks
 fix wd return null problem using IDataflowEvent.
