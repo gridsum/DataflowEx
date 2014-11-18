@@ -54,13 +54,13 @@
 
             //CalcAsync().Wait();
             //SlowFlowAsync().Wait();
-            //FailDemoAsync().Wait();
+            FailDemoAsync().Wait();
             //TransformAndLinkDemo().Wait();
             //LinkLeftToDemo().Wait();
             //CircularFlowAutoComplete().Wait();
             //RecorderDemo().Wait();
             //BulkInserterDemo().Wait();
-            BulkInserterDemo2().Wait();
+            //BulkInserterDemo2().Wait();
         }
 
         public static async Task CalcAsync()

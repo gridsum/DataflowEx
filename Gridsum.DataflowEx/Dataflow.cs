@@ -327,22 +327,32 @@ namespace Gridsum.DataflowEx
                 }
             }
 
+            Exception exception = null;
             try
             {
                 await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion).ConfigureAwait(false);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f()).ConfigureAwait(false);
-                
-                //todo: move it to finally
-                this.CleanUp();
-                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
-            catch (AggregateException e)
+            catch (Exception e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw; //TaskEx.UnwrapWithPriority(e);
+                exception = e;
+            }
+            finally
+            {
+                this.CleanUp();
+
+                if (exception == null)
+                {
+                    LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));    
+                }
+                else
+                {
+                    throw new AggregateException(exception);
+                }
             }
         }
 
@@ -562,7 +572,7 @@ namespace Gridsum.DataflowEx
                                 count++;
                             }
                         }
-                        catch (Exception)
+                        catch (Exception e)
                         {
                             LogHelper.Logger.WarnFormat(
                                 "{0} Pulled and posted {1} {2}s to {3} before an exception",
@@ -571,7 +581,7 @@ namespace Gridsum.DataflowEx
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
 
-                            throw;
+                            throw new AggregateException(e);
                         }
 
                         LogHelper.Logger.InfoFormat(
@@ -626,7 +636,7 @@ namespace Gridsum.DataflowEx
             catch (OperationCanceledException oce)
             {
                 LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
-                throw;
+                throw new AggregateException(oce);
             }
 
             if (completeFlowOnFinish)
