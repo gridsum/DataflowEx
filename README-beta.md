@@ -1034,7 +1034,7 @@ Let's put some words on the parameters of DBColumnMapping attribute constructor.
 
 Now take a glimpse of what's been put in the table, just as expected (Notice the default values are also taking effect):
 
-[[images/dbbulkinserter_screenshot1.png]]
+![ScreenShot](/images/dbbulkinserter_screenshot1.png)
 
 If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
 
@@ -1118,7 +1118,7 @@ public static async Task BulkInserterDemo2()
 
 Whose result is:
 
-[[images/dbbulkinserter_screenshot2.png]]
+![ScreenShot](/images/dbbulkinserter_screenshot2.png)
 
 In this case, type Order is the root type and it has a property whose type is Person. DbBulkInserter expands the property in Order class and grabs some mapping down from the Person class.
 
@@ -1212,8 +1212,8 @@ Gridsum.DataflowEx
 Gridsum.DataflowEx is Gridsum's Object-Oriented extensions to TPL Dataflow library.
 
 TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
-1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
-2. Blocks need to interop with each other (e.g. should be linked carefully) and you get a chain/graph. In many times the chain need to be treated as a single processing unit but you have to construct it tediously from ground up here and there, whereever you need it. These boilerplate codes are far from graceful due to the non-OO design.
+>1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
+>2. Blocks need to interop with each other (e.g. should be linked carefully) and you get a chain/graph. In many times the chain need to be treated as a single processing unit but you have to construct it tediously from ground up here and there, whereever you need it. These boilerplate codes are far from graceful due to the non-OO design.
 
 By introducing the core concept of IDataflow, Gridsum.DataflowEx is born to solve all this with an OO design on top of TPL Dataflow. You can now easily write reusable components with extension points along with TPL Dataflow! Cool features include:
 
