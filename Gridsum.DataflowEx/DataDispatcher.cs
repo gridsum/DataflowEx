@@ -19,7 +19,7 @@ namespace Gridsum.DataflowEx
     /// <typeparam name="TIn">Type of input items of this dispatcher flow</typeparam>
     /// <typeparam name="TKey">Type of the dispatch key to group input items</typeparam>
     /// <remarks>
-    /// This flow guarantees an input goes to only ONE of the child flows. Notice the difference comparing to DataBrancher, which 
+    /// This flow guarantees an input goes to only ONE of the child flows. Notice the difference comparing to DataBroadcaster, which 
     /// gives the input to EVERY flow it is linked to.
     /// </remarks>
     public abstract class DataDispatcher<TIn, TKey> : Dataflow<TIn>
@@ -33,25 +33,30 @@ namespace Gridsum.DataflowEx
         }
 
         public DataDispatcher(Func<TIn, TKey> dispatcherFunc, DataflowOptions option)
+            : this(dispatcherFunc, EqualityComparer<TKey>.Default, option)
+        {
+        }
+
+        public DataDispatcher(Func<TIn, TKey> dispatcherFunc, EqualityComparer<TKey> keyComparer, DataflowOptions option)
             : base(option)
         {
-            m_destinations = new ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>>();
+            m_destinations = new ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>>(keyComparer);
 
             m_initer = key => new Lazy<Dataflow<TIn>>(
                                   () =>
-                                      {
-                                          var child = this.CreateChildFlow(key);
-                                          RegisterChild(child);
-                                          child.RegisterDependency(m_dispatcherBlock);
-                                          return child;
-                                      });
+                                  {
+                                      var child = this.CreateChildFlow(key);
+                                      RegisterChild(child);
+                                      child.RegisterDependency(m_dispatcherBlock);
+                                      return child;
+                                  });
 
             m_dispatcherBlock = new ActionBlock<TIn>(async
                 input =>
-                    {
-                        var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
-                        await childFlow.SendAsync(input).ConfigureAwait(false);
-                    }, option.ToExecutionBlockOption());
+            {
+                var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
+                await childFlow.SendAsync(input).ConfigureAwait(false);
+            }, option.ToExecutionBlockOption());
 
             RegisterChild(m_dispatcherBlock);
         }
