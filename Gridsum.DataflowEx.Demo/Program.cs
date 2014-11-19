@@ -8,6 +8,8 @@
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
 
+    using Common.Logging;
+
     using Gridsum.DataflowEx.Databases;
     using Gridsum.DataflowEx.Test;
     using Gridsum.DataflowEx.Test.DatabaseTests;
@@ -54,13 +56,15 @@
 
             //CalcAsync().Wait();
             //SlowFlowAsync().Wait();
-            FailDemoAsync().Wait();
+            //FailDemoAsync().Wait();
             //TransformAndLinkDemo().Wait();
             //LinkLeftToDemo().Wait();
             //CircularFlowAutoComplete().Wait();
             //RecorderDemo().Wait();
             //BulkInserterDemo().Wait();
             //BulkInserterDemo2().Wait();
+            //BroadcasterDemo().Wait();
+            MyLoggerDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -248,6 +252,41 @@
             dbInserter.Post(new Order {OrderDate = DateTime.Now, OrderValue = 45, Customer = new Person() {Name = "Neo"}});
 
             await dbInserter.SignalAndWaitForCompletionAsync();
+        }
+
+        public static async Task BroadcasterDemo()
+        {
+            var broadcaster = new DataBroadcaster<string>();
+
+            var printer1 = new ActionBlock<string>(s => Console.WriteLine("Printer1: {0}", s)).ToDataflow();
+            var printer2 = new ActionBlock<string>(s => Console.WriteLine("Printer2: {0}", s)).ToDataflow();
+            var printer3 = new ActionBlock<string>(s => Console.WriteLine("Printer3: {0}", s)).ToDataflow();
+
+            broadcaster.LinkTo(printer1);
+            broadcaster.LinkTo(printer2);
+            broadcaster.LinkTo(printer3);
+
+            broadcaster.Post("first message");
+            broadcaster.Post("second message");
+            broadcaster.Post("third message");
+
+            await broadcaster.SignalAndWaitForCompletionAsync();
+            await printer1.CompletionTask;
+            await printer2.CompletionTask;
+            await printer3.CompletionTask;
+        }
+
+        public static async Task MyLoggerDemo()
+        {
+            var mylogger = new MyLogger();
+
+            mylogger.Post(new MyLog { Level = LogLevel.Error, Message = "I am Error!" });
+            mylogger.Post(new MyLog { Level = LogLevel.Warn, Message = "I am Warn!" });
+            mylogger.Post(new MyLog { Level = LogLevel.Error, Message = "I am Error2!" });
+            mylogger.Post(new MyLog { Level = LogLevel.Warn, Message = "I am Warn2!" });
+            mylogger.Post(new MyLog { Level = LogLevel.Info, Message = "I am Info!" });
+
+            await mylogger.SignalAndWaitForCompletionAsync();
         }
     }
 }

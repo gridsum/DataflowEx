@@ -1142,25 +1142,155 @@ public class Order
 }
 ```
 
-### 2. DataBrancher
-When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due  to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBrancher** to make your life easier.
+### 2. DataBroadcaster
+When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBroadcaster** to make your life easier.
 
-DataBrancher acts simply like a copy machine. When it is linked to multiple targets, whenever an item flows in, it passes the reference of the same item to multiple targets. Optionally you can indicate a clone function to DataBrancher if you want to copy the item before handing to targets.
+DataBroadcaster acts simply like a copy machine. When it is linked to multiple targets, whenever an item flows in, it passes the reference of the same item to multiple targets. Optionally you can indicate a clone function to DataBroadcaster if you want to copy the item before handing to targets.
 
 Code talks: 
 
+```C#
+public static async Task BroadcasterDemo()
+{
+    var broadcaster = new DataBroadcaster<string>();
+
+    var printer1 = new ActionBlock<string>(s => Console.WriteLine("Printer1: {0}", s)).ToDataflow();
+    var printer2 = new ActionBlock<string>(s => Console.WriteLine("Printer2: {0}", s)).ToDataflow();
+    var printer3 = new ActionBlock<string>(s => Console.WriteLine("Printer3: {0}", s)).ToDataflow();
+
+    broadcaster.LinkTo(printer1);
+    broadcaster.LinkTo(printer2);
+    broadcaster.LinkTo(printer3);
+
+    broadcaster.Post("first message");
+    broadcaster.Post("second message");
+    broadcaster.Post("third message");
+
+    await broadcaster.SignalAndWaitForCompletionAsync();
+    await printer1.CompletionTask;
+    await printer2.CompletionTask;
+    await printer3.CompletionTask;
+}
+```
+Logs and outputs will be: 
+
+```
+14/11/19 11:23:32 [Gridsum.DataflowEx].[Info] [DataBroadcaster<String>1] now links to its 1th target (TargetDataflow<String>1)
+14/11/19 11:23:32 [Gridsum.DataflowEx].[Info] [DataBroadcaster<String>1] now links to its 2th target (TargetDataflow<String>2)
+14/11/19 11:23:32 [Gridsum.DataflowEx].[Info] [DataBroadcaster<String>1] now links to its 3th target (TargetDataflow<String>3)
+14/11/19 11:23:32 [Gridsum.DataflowEx].[Info] [DataBroadcaster<String>1] Telling myself there is no more input and wait for children completion
+Printer2: first message
+Printer1: first message
+Printer1: second message
+Printer1: third message
+Printer3: first message
+Printer3: second message
+Printer3: third message
+Printer2: second message
+Printer2: third message
+```
+
+> **Tip:** TPL Dataflow also has a BroadcastBlock<T> but it *provides a buffer for storing at most one element at time, overwriting each message with the next as it arrives*, which is very different from DataflowEx's DataBroadcaster that guarantees no data loss. IMHO, in most cases DataBroadcaster rather than BroadcastBlock is what you want. 
+
 ### 3. DataDispatcher
-DataDispatcher also falls into the 'one source multi targets' category. But it is different from DataBrancher in several aspects:
->1. One input item only goes to one target
+DataDispatcher also falls into the 'one source multi targets' category. But it is different from DataBroadcaster in several aspects:
+>1. It ensures one input item only goes to one target.
 >2. Target dataflow nodes are created dynamically on demand, depending on the input items and the dispatch function.
+>3. It is an abstract class that you should inherit from and add your logic
 
-You can use LinkTo but what if dynamic, 
+The second point is the core design of DataDispatcher. In many cases you can just use multiple conditional LinkTo() to dispatch object to where they should go, but DataDispatcher allows you to create targets **on-the-fly** according to the input.   
 
-demo
+Consider you are writing a file logging system which will allow logs to be distributed to different text files according to their logging level. DataDispatcher is the perfect place to start:
+
+```C#
+public class MyLog
+{
+    public LogLevel Level { get; set; }
+    public string Message { get; set; }
+}
+
+/// <summary>
+/// Logger that accepts logs and dispatch them to appropriate dynamically created log writer
+/// </summary>
+public class MyLogger : DataDispatcher<MyLog, LogLevel>
+{
+    public MyLogger() : base(log => log.Level)
+    {
+    }
+    
+    /// <summary>
+    /// This function will only be called once for each distinct dispatchKey (the first time)
+    /// </summary>
+    protected override Dataflow<MyLog> CreateChildFlow(LogLevel dispatchKey)
+    {
+        //dynamically create a log writer by the dispatchKey (i.e. the log level)
+        var writer = new LogWriter(string.Format(@".\MyLogger-{0}.log", dispatchKey));
+
+        //no need to call RegisterChild(writer) here as DataDispatcher will call automatically
+        return writer;
+    }
+}
+
+/// <summary>
+/// Log writer node for a single destination file
+/// </summary>
+internal class LogWriter : Dataflow<MyLog>
+{
+    private readonly ActionBlock<MyLog> m_writerBlock;
+    private readonly StreamWriter m_writer;
+
+    public LogWriter(string fileName) : base(DataflowOptions.Default)
+    {
+        this.m_writer = new StreamWriter(new FileStream(fileName, FileMode.Append));
+
+        m_writerBlock = new ActionBlock<MyLog>(log => m_writer.WriteLine("[{0}] {1}", log.Level, log.Message));
+
+        RegisterChild(m_writerBlock);
+    }
+
+    public override ITargetBlock<MyLog> InputBlock { get { return m_writerBlock; } }
+
+    protected override void CleanUp()
+    {
+        base.CleanUp();
+        m_writer.Flush();
+    }
+}
+```
+
+Guess what? This sophisticated logging framwork is implemented in about 5 minutes :), with the help of DataDispatcher. 
+
+Cannot wait to invoke the wonderful 'logging library':
+
+```C#
+public static async Task MyLoggerDemo()
+{
+    var mylogger = new MyLogger();
+
+    mylogger.Post(new MyLog { Level = LogLevel.Error, Message = "I am Error!" });
+    mylogger.Post(new MyLog { Level = LogLevel.Warn, Message = "I am Warn!" });
+    mylogger.Post(new MyLog { Level = LogLevel.Error, Message = "I am Error2!" });
+    mylogger.Post(new MyLog { Level = LogLevel.Warn, Message = "I am Warn2!" });
+    mylogger.Post(new MyLog { Level = LogLevel.Info, Message = "I am Info!" });
+
+    await mylogger.SignalAndWaitForCompletionAsync();
+}
+```
+
+Worked like a magic:
+
+![ScreenShot](/images/MyLoggerDemo.png)
+
+There are  (multi-tenant)
+
 
 MultiDbBulkInserter
 
 ### 4. DbDataJoiner
+
+If you have experience with SSIS, or ETL, a 'LookUp Component' should sound famaliar to you.
+
+
 
 Cautions and Best Practices
 -------------

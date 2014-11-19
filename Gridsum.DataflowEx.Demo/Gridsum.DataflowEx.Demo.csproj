@@ -74,6 +74,7 @@
     <Compile Include="ComplexIntFlow.cs" />
     <Compile Include="LineAggregatorFlow.cs" />
     <Compile Include="LocalDBUtil.cs" />
+    <Compile Include="MyLogger.cs" />
     <Compile Include="Order.cs" />
     <Compile Include="PeopleFlow.cs" />
     <Compile Include="Program.cs" />
