@@ -111,7 +111,7 @@ namespace Gridsum.DataflowEx
                 
         public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, IDataflow<TOut> out1, IDataflow<TOut> out2, Func<TOut, TOut> copyFunc = null)
         {
-            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            var brancher = new DataBroadcaster<TOut>(copyFunc, DataflowOptions.Default);
             dataflow.GoTo(brancher);
             brancher.LinkTo(out1);
             brancher.LinkTo(out2);
@@ -119,7 +119,7 @@ namespace Gridsum.DataflowEx
 
         public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, Func<TOut, TOut> copyFunc, params IDataflow<TOut>[] outs)
         {
-            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            var brancher = new DataBroadcaster<TOut>(copyFunc, DataflowOptions.Default);
             dataflow.GoTo(brancher);
 
             foreach (var output in outs)
