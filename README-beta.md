@@ -1281,30 +1281,164 @@ Worked like a magic:
 
 ![ScreenShot](/images/MyLoggerDemo.png)
 
-There are  (multi-tenant)
+There are many real world scenarios where DataDispatcher really shines. We hope you can find your own case. But apart from the abstract DataDispatcher, it's worth mentioning DataflowEx comes with an implementation of DataDispatcher called **MultiDbBulkInserter**, which combines the power of DataDispatcher and DbBulkInserter to support dumping data to multi-tenant databases that share the same schema. We will not prepare a separate demo here but if you are interested please check out the test code for how to use the class (see method TestMultiDbBulkInserter()):
 
-
-MultiDbBulkInserter
+https://github.com/gridsum/DataflowEx/blob/master/Gridsum.DataflowEx.Test/DatabaseTests/BulkInserterTest.cs
 
 ### 4. DbDataJoiner
 
-If you have experience with SSIS, or ETL, a 'LookUp Component' should sound famaliar to you.
+If you have experience with SSIS, or ETL, a 'LookUp Component' should sound famaliar to you. The component normally searches a column of a dimension table and returns the relative dimension key. It will also insert to the dimension table if the lookup fails. Normally there is also a cache inside the component to improve performance.  
 
+Now instead of involving a heavy-weight enterprise ETL system, a fully-functional lookup component is available in a lightweight form, provided by DataflowEx out of the box as the **DbDataJoiner** class. As its name implies, the class needs to join the remote table in the database and pull out the keys matched. And yes, don't worry, DbDataJoiner also has a cache built-in.
 
+To demonstrate the usage of DbDataJoiner, look at the following demo:
 
-Cautions and Best Practices
+```C#
+//extend the Order class in the last demo
+public class OrderEx : Order
+{
+    public OrderEx()
+    {
+        this.OrderDate = DateTime.Now;
+    }
+
+    // This is the field we want to populate
+    [DBColumnMapping("LookupDemo", "ProductKey")]
+    public long? ProductKey { get; set; }
+
+    public Product Product { get; set; }
+}
+
+//This is the 'Dimension' class for OrderEx
+public class Product
+{
+    public Product(string category, string name)
+    {
+        this.Category = category;
+        this.Name = name;
+    }
+
+    [DBColumnMapping("LookupDemo", "Category")]
+    public string Category { get; private set; }
+
+    [DBColumnMapping("LookupDemo", "ProductName")]
+    public string Name { get; private set; }
+
+    [DBColumnMapping("LookupDemo", "ProductFullName")]
+    public string FullName { get { return string.Format("{0}-{1}", Category, Name); } }
+}
+
+public class ProductLookupFlow : DbDataJoiner<OrderEx, string>
+{
+    public ProductLookupFlow(TargetTable dimTableTarget, int batchSize = 8192, int cacheSize = 1048576)
+        : base(
+        //Tells DbDataJoiner the join condition is 'OrderEx.Product.FullName = TABLE.ProductFullName'
+        o => o.Product.FullName, 
+        dimTableTarget, DataflowOptions.Default, batchSize, cacheSize)
+    {
+    }
+
+    protected override void OnSuccessfulLookup(OrderEx input, IDimRow<string> rowInDimTable)
+    {
+		//what we want is just the key column of the dimension row
+        input.ProductKey = rowInDimTable.AutoIncrementKey;
+    }
+}
+```
+
+Simple code for a complex job, right? Three things to pay attention here:
+
+>1. Appropriately tag DBColumnMapping for columns of the dimension table. (Don't mess them up with fact table mappings. They are independent.)
+>2. In constructor, tell DbDataJoiner which property of your domain object to join with a column in the dimension table.
+>3. Override OnSuccessfulLookup() to control the behavior when the dimension is looked up. Normally you just want the key column as the demo shows.
+ 
+Now let's see how to use ProductLookupFlow and make our example complete. We will inherit from the Order class in previous demo *BulkInserterDemo2* but this time extends it and mapps it to a fact table: *dbo.FactOrders*, which contains a 'ProductKey' column and this is the column we want to populate using ProductLookupFlow.
+
+```C#
+public static async Task ETLLookupDemo()
+{
+    string connStr;
+
+    //initialize table
+    using (var conn = LocalDB.GetLocalDB("ETLLookupDemo"))
+    {
+        //We will create a dimension table and a fact table
+        //We also populate the dimension table with some pre-defined rows
+        var cmd = new SqlCommand(@"
+        IF OBJECT_id('dbo.Product', 'U') IS NOT NULL
+            DROP TABLE dbo.Product;
+        
+        CREATE TABLE dbo.Product
+        (
+            ProductKey INT IDENTITY(1,1) NOT NULL,
+            Category nvarchar(50) NOT NULL,
+            ProductName nvarchar(50) NOT NULL,
+            ProductFullName nvarchar(100) NOT NULL                    
+        )
+
+        INSERT INTO dbo.Product VALUES ('Books', 'The Great Gatsby', 'Books-The Great Gatsby');
+        INSERT INTO dbo.Product VALUES ('Games', 'Call of Duty', 'Games-Call of Duty');
+
+        IF OBJECT_id('dbo.FactOrders', 'U') IS NOT NULL
+            DROP TABLE dbo.FactOrders;
+        
+        CREATE TABLE dbo.FactOrders
+        (
+            Id INT IDENTITY(1,1) NOT NULL,
+            Date DATETIME NOT NULL,
+            Value FLOAT NOT NULL,
+            ProductKey INT NULL,
+        )
+        ", conn);
+        cmd.ExecuteNonQuery();
+        connStr = conn.ConnectionString;
+    }
+
+    var lookupNode = new ProductLookupFlow(new TargetTable("LookupDemo", connStr, "dbo.Product"));
+
+    lookupNode.Post(new OrderEx { OrderValue = 10, Product = new Product("Books", "The Call of the Wild") });
+    lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Games", "Call of Duty") });
+    lookupNode.Post(new OrderEx { OrderValue = 30, Product = new Product("Games", "Call of Duty") });
+    lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Books", "The Call of the Wild") });
+    lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Books", "The Great Gatsby") });
+
+    var factInserter = new DbBulkInserter<OrderEx>(connStr, "dbo.FactOrders", DataflowOptions.Default, "OrderTarget");
+    lookupNode.LinkTo(factInserter);
+
+    await lookupNode.SignalAndWaitForCompletionAsync();
+    await factInserter.CompletionTask;
+}
+```
+
+After running the demo, ProductLookupFlow did two things for us. First, it populated the dimension table if a match row is not found:
+
+![ScreenShot](/images/lookupDemo1.png)
+
+Secondly, of course, it did a good job setting the ProductKey column for the fact table:
+
+![ScreenShot](/images/lookupDemo2.png)
+
+> **Tip:** More about how DbDataJoiner works internally: basically it has a cache to do client-side look up. If that fails, it will send distinct dimension rows as a batch to a temp dimension table which will then be merged to dimension table as an server side lookup. Row matching information is returned by an output clause of the MERGE statement. Find more detail in the source code of DbDataJoiner. 
+
+We build DbDataJoiner not only because we need the functionality in production but also we want to show the potential of DataflowEx framework as well: it is the most complex Dataflow<T> implementation in DataflowEx. Feel free to use it or extend it to meet your need. If you wish, pull requests are always welcome.
+
+DataflowEx Best Practices
 -------------
 
-### 1. Building your own Dataflow<>
+### 1. Building your own Dataflow<TIn, TOut>
+
+In above demos, we already 
 
 Don't forget to register child.
 Tips Build your own dataflows / Design principle
 create, register and link
 block or dataflow? （and their linking) when should I use block level linking and when should I use flow level linking  
 
+Once a developer told me his Dataflow never completes.
+
 ### 2. What you should know about DataflowOptions
 
-One thing that we touched but haven't yet explored is the option class of DataflowEx.
+One thing that we touched but haven't yet explored is the option class of DataflowEx: **DataflowOptions**. 
 
 when to use Default and when not
 
@@ -1314,6 +1448,8 @@ total parallelism / parallelism setting
 **DataflowOptions** and how to respect it (pass it on)
 
 ToDataflow()
+
+As dataflow consumer, As dataflow builder
 
 ### 3. Avoid too many blocks
 
@@ -1327,19 +1463,17 @@ Performance considerations： don't have too many blocks.
 
 Have a try now!
 -------------
-any issue contact karldodd , or publish on github forum
+Wish you enjoy using DataflowEx. For any issue or feedback please start a thread on github issue forum.
 
 
 
 Still considering:
-utils classes
-Use linking stuff ([<i class="icon-upload"></i> Publish a document](#publish-a-document))
 misc faqs
 
 Gridsum.DataflowEx
 ==========
 
-Gridsum.DataflowEx is Gridsum's Object-Oriented extensions to TPL Dataflow library.
+Gridsum.DataflowEx is Gridsum's Object-Oriented dataflow framework built upon TPL Dataflow library.
 
 TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
 >1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
