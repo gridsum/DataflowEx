@@ -64,7 +64,8 @@
             //BulkInserterDemo().Wait();
             //BulkInserterDemo2().Wait();
             //BroadcasterDemo().Wait();
-            MyLoggerDemo().Wait();
+            //MyLoggerDemo().Wait();
+            ETLLookupDemo().Wait();
         }
 
         public static async Task CalcAsync()
@@ -287,6 +288,60 @@
             mylogger.Post(new MyLog { Level = LogLevel.Info, Message = "I am Info!" });
 
             await mylogger.SignalAndWaitForCompletionAsync();
+        }
+
+        public static async Task ETLLookupDemo()
+        {
+            string connStr;
+
+            //initialize table
+            using (var conn = LocalDB.GetLocalDB("ETLLookupDemo"))
+            {
+                //We will create a dimension table and a fact table
+                //We also populate the dimension table with some pre-defined rows
+                var cmd = new SqlCommand(@"
+                IF OBJECT_id('dbo.Product', 'U') IS NOT NULL
+                    DROP TABLE dbo.Product;
+                
+                CREATE TABLE dbo.Product
+                (
+                    ProductKey INT IDENTITY(1,1) NOT NULL,
+                    Category nvarchar(50) NOT NULL,
+                    ProductName nvarchar(50) NOT NULL,
+                    ProductFullName nvarchar(100) NOT NULL                    
+                )
+
+                INSERT INTO dbo.Product VALUES ('Books', 'The Great Gatsby', 'Books-The Great Gatsby');
+                INSERT INTO dbo.Product VALUES ('Games', 'Call of Duty', 'Games-Call of Duty');
+
+                IF OBJECT_id('dbo.FactOrders', 'U') IS NOT NULL
+                    DROP TABLE dbo.FactOrders;
+                
+                CREATE TABLE dbo.FactOrders
+                (
+                    Id INT IDENTITY(1,1) NOT NULL,
+                    Date DATETIME NOT NULL,
+                    Value FLOAT NOT NULL,
+                    ProductKey INT NULL,
+                )
+                ", conn);
+                cmd.ExecuteNonQuery();
+                connStr = conn.ConnectionString;
+            }
+
+            var lookupNode = new ProductLookupFlow(new TargetTable("LookupDemo", connStr, "dbo.Product"));
+
+            lookupNode.Post(new OrderEx { OrderValue = 10, Product = new Product("Books", "The Call of the Wild") });
+            lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Games", "Call of Duty") });
+            lookupNode.Post(new OrderEx { OrderValue = 30, Product = new Product("Games", "Call of Duty") });
+            lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Books", "The Call of the Wild") });
+            lookupNode.Post(new OrderEx { OrderValue = 20, Product = new Product("Books", "The Great Gatsby") });
+
+            var factInserter = new DbBulkInserter<OrderEx>(connStr, "dbo.FactOrders", DataflowOptions.Default, "OrderTarget");
+            lookupNode.LinkTo(factInserter);
+
+            await lookupNode.SignalAndWaitForCompletionAsync();
+            await factInserter.CompletionTask;
         }
     }
 }

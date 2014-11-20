@@ -16,11 +16,11 @@ namespace Gridsum.DataflowEx.Demo
     public class Person : IEventProvider
     {
         [DBColumnMapping("PersonTarget", "NameCol", "N/A", ColumnMappingOption.Mandatory)]
-        [DBColumnMapping("OrderTarget", "CustomerName", "Unknown Customer")]
+        [DBColumnMapping("OrderTarget", "CustomerName", "Unknown Customer", ColumnMappingOption.Optional)]
         public string Name { get; set; }
 
         [DBColumnMapping("PersonTarget", "AgeCol", -1, ColumnMappingOption.Optional)]
-        [DBColumnMapping("OrderTarget", "CustomerAge", -1)]
+        [DBColumnMapping("OrderTarget", "CustomerAge", -1, ColumnMappingOption.Optional)]
         public int? Age { get; set; }
 
         public DataflowEvent GetEvent()
