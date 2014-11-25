@@ -94,7 +94,7 @@ public class AggregatorFlow : Dataflow<string>
     public IDictionary<string, int> Result { get { return _dict; } }
 }
 ```
-Though there seems to be more code, it is quite clear. We have a class AggregatorFlow representing our flow finally, which inherits from Dataflow&lt;TIn&gt; with type parameter **string**. This means the AggregatorFlow class reprensents a dataflow graph itself and accepts strings as input. 
+Though there seems to be more code, it is quite clear. We have a *class* AggregatorFlow representing our flow finally, which inherits from Dataflow&lt;TIn&gt; with type parameter **string**. This means the AggregatorFlow class reprensents a dataflow graph itself and accepts strings as input. 
 
 In this form, dataflow blocks and data become class members. Block behaviors become class methods (which allows the outside to override!). We also implemented the abstract <kbd>InputBlock</kbd> property of Dataflow&lt;TIn&gt; and exposes our internal data as an extra Result property. 
 
@@ -163,9 +163,9 @@ A key role of the Dataflow base class is to monitor the health of its children a
 
 So first things first, we need a way to tell the dataflow who is its child. That is done through the **Dataflow.RegisterChild** method (you have seen it in the last example). Dataflow class will now keep the reference of the child in its internal data structure and the lifecycle of child will start to affect its parent.
 
-> **Note:** RegisterChild() method is not restricted to be called inside dataflow constructor. In fact, it can be used wherever necessary. Dataflow class uses a smart mechanism here to ensure dynamically registered child will affect the Dataflow's CompletionTask, even if you acquire the CompletionTask reference beforehand. This feature empowers the scenario that your dataflow is changing its shape at runtime. Just don't forget to call RegisterChild() when new child is created on demand.
+> **Note:** RegisterChild() method is not restricted to be called inside dataflow constructor. In fact, it can be called by outside invokers and used wherever necessary. Dataflow class uses a smart mechanism here to ensure dynamically registered child will affect the Dataflow's CompletionTask, even if you acquire the CompletionTask reference beforehand. This feature empowers the scenario that your dataflow is changing its shape at runtime. Just don't forget to call RegisterChild() when new child is created on demand.
 
-There are 2 kinds of child that you can register, a dataflow block or a sub dataflow. The latter means Dataflow nesting is supported! Feel free to build different levels of dataflow components to provide even better modularity and encapsulation. Let's look at an example:
+There are 2 kinds of child that you can register, a dataflow block or *a sub dataflow*. The latter means **Dataflow nesting** is supported! Feel free to build different levels of dataflow components to provide even better modularity and encapsulation. Let's look at an example:
 ```C#
 using System.Threading.Tasks.Dataflow;
 using Gridsum.DataflowEx;
@@ -220,7 +220,8 @@ As you can see, previous examples all follows the same pattern.
 
 The 2nd step is worth digging into here. If you are dealing with raw blocks, ISourceBlock.LinkTo is your friend. And probably you want to set DataflowLinkOptions.PropagateCompletion to true if you want completion to be passed down automatically. This is traditional TPL Dataflow linking, as demonstrated by class <kbd>AggregatorFlow</kbd>.
 
-> **Tip:** When programming TPL Dataflow, how many times do you find your blocks never complete? And how many times do you find out the reason to be forgetting to set PropagateCompletion? :) 
+> **Tip:** When programming TPL Dataflow, how many times do you find your blocks never complete? And how many times do you find out the reason to be forgetting to set 
+> ? :) 
 
 But the real connecting power resides in the dataflow level connecting. DataflowEx put some effort here to provide a number of utilites and best practices to help graph construction: Dataflow classes have rich linking APIs. So you don't bother call block-level linking any more.
 
@@ -1427,48 +1428,72 @@ DataflowEx Best Practices
 
 ### 1. Building your own Dataflow<TIn, TOut>
 
-In above demos, we already 
+DataflowEx shows its real power with real-world custom Dataflow<T> implementations. In above demos, we already demonstrate some common patterns but here is a bit more helpful tips. 
 
-Don't forget to register child.
-Tips Build your own dataflows / Design principle
-create, register and link
-block or dataflow? （and their linking) when should I use block level linking and when should I use flow level linking  
+First reminder: never ever forget to register each of the children. If you create a dataflow graph without registering all the nodes as children, the CompletionTask of your dataflow is simply incorrent: your dataflow will complete before some inner components do. (e.g. let's say the child you forget to register is a DbBulkInserter then probably you will lose some data when your application quits. ) 
 
-Once a developer told me his Dataflow never completes.
+Second tip is about a design choice: since Dataflow support both raw block and sub Dataflow as children, which one should we use? How to properly handle linking when I have a mixed kind of children (i.e. have some blocks as well as some sub dataflow)? Well, the best practice we recommend here is:
+
+>1. If your dataflow only involves low-level raw TPL blocks, stay with blocks as your children and use traditional TPL Dataflow linking. But just don't forget to set PropagateCompletion to true in the DataflowBlockOptions parameter.
+>2. If your dataflow involves raw blocks as well as sub dataflows, escalate all blocks to sub dataflows (you may use ToDataflow() extension method) and link them together using **flow level** LinkTo() API in DataflowEx.
+>3. When multiple blocks points to the same destination and the target should complete when all predecessors finish, alway escalate to flow level and use DataflowEx's LinkTo().
+
+Last but not least, bear in mind the basic 3 steps to build your own Dataflow<T>: **create**, **register** and **link**.
 
 ### 2. What you should know about DataflowOptions
 
-One thing that we touched but haven't yet explored is the option class of DataflowEx: **DataflowOptions**. 
+One thing that we touched but haven't yet explored is the option class of DataflowEx: **DataflowOptions**. We simply used DataflowOptions.Default. This is OK for demo purpose but you may want to adjust some options of this class seriously in the tough real world. 
 
-when to use Default and when not
+Let's look at the default property values in DataflowOptions.Default:
 
-boundedcapacity on big load
-total parallelism / parallelism setting
+```C#
+private static DataflowOptions s_defaultOptions = new DataflowOptions()
+{
+    BlockMonitorEnabled = false,
+    FlowMonitorEnabled = true,
+    PerformanceMonitorMode = PerformanceLogMode.Succinct,
+    MonitorInterval = DefaultInterval,
+    RecommendedCapacity = 100000,
+    RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
+};
+```
 
-**DataflowOptions** and how to respect it (pass it on)
+Basically the settings fall into two categories: monitoring/logging control and block construction hint. The former category controls the dataflow logging loop behavior (e.g. logging interval, logging mode, etc. Check property comments for more explanation) while the latter category gives hints to the options that raw blocks should adopt (e.g. the buffer size and parallelism for multi-threaded blocks). 
 
-ToDataflow()
+As a dataflow consumer, you should know what the properties mean and set them properly. A common case, for example, is that you want to set block capacity to a larger value for your flow to fully utilize your hardware. The same applies to RecommendedParallelismIfMultiThreaded which helps you to precisely allocate CPU resources for parallel processing nodes in your dataflow. 
 
-As dataflow consumer, As dataflow builder
+As a dataflow builder, or library provider, you should always **respect the DataflowOptions passed in**. That is to say, when constructing raw blocks in your dataflow, please extract relative properties from DataflowOptions and put that into corresponding field in the DataflowBlockOptions instance, which will then be passed to the block constructor. In addition, for Dataflow inheritance and child dataflows you normally pass the same DataflowOptions object down to their constructor. These are the  DataflowOptions rules DataflowEx components obey and so should your Dataflow implementations.
 
-### 3. Avoid too many blocks
+> **Tip:** DataflowEx provides ToExecutionBlockOption() method and ToGroupingBlockOption() method to help you migrate settings from the given flow option to a new block option instance, on which you could make further modification.
 
-overhead: buffer, threading.  negligible, task granularity  (overhead of data travelling: OfferMessage) locality
+### 3. Performance Considerations 
+
+One of the most asked questions about DataflowEx is: does the framework affect TPL Dataflow performance?
+
+The answer is simple: No, it doesn't. 
+
+trivial state maintenence periodic status checking
+
+Avoid too many blocks
+
+When the pipeline is created and starts running, it is just raw TPL Dataflow stuff.
+
+Dataflows and blocks are powerful. But everything comes with cost, especially from the performance perspective.
+
+overhead: buffer, threading.  negligible, task granularity (which is another topic of parallel computing)  (overhead of data travelling: OfferMessage) locality
 
 +1, +2, +3
 
 try your best to avoid simple blocks
-fix wd return null problem using IDataflowEvent.
-Performance considerations： don't have too many blocks.
+
+not only applies to DataflowEx but raw TPL Dataflow programming as well.
+Comes down to one sentence： don't have too many dataflows or blocks.
+
+for performance, for clean code/design,
 
 Have a try now!
 -------------
 Wish you enjoy using DataflowEx. For any issue or feedback please start a thread on github issue forum.
-
-
-
-Still considering:
-misc faqs
 
 Gridsum.DataflowEx
 ==========
