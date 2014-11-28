@@ -1470,11 +1470,15 @@ As a dataflow builder, or library provider, you should always **respect the Data
 
 One of the most asked questions about DataflowEx is: does the framework affect TPL Dataflow performance?
 
-The answer is simple: No, it doesn't. 
+The short answer is: Relax. No, it doesn't.
+
+The longer answer: DataflowEx and particularly the Dataflow class is a thin wrapper over underlying blocks from the perspective of performance. Yes, it maintains some internal states and does some periodic status checking per dataflow but these effects are trivial from a performance perspective considering the typical amount of blocks in a Dataflow application. The real hot path is the data processsing part and data travelling between the nodes but this is where DataflowEx has clearly no side effects because the underlying mechanism is just TPL Dataflow. 
+
+To sum up, DataflowEx introduces very little overhead. 
 
 trivial state maintenence periodic status checking
 
-Avoid too many blocks
+//tip  design principle Avoid too many blocks
 
 When the pipeline is created and starts running, it is just raw TPL Dataflow stuff.
 
@@ -1493,7 +1497,8 @@ for performance, for clean code/design,
 
 Have a try now!
 -------------
-Wish you enjoy using DataflowEx. For any issue or feedback please start a thread on github issue forum.
+
+O.K. Thanks for reading such a long tutorial. Wish you enjoy using DataflowEx and try it in your application. For any issue or feedback please start a thread on github issue forum.
 
 Gridsum.DataflowEx
 ==========
