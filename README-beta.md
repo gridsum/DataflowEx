@@ -2,6 +2,24 @@ Welcome to DataflowEx
 ===================
 DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management for underlying dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
+Here is a list of DataflowEx cool features:
+
+* Block chain/graph encapsulation as a reusable component
+* Inheritance and polymorphism for dataflows and their hehaviors
+* Sophisticated dataflow lifecycle management (e.g. Failure propagation, dynamic flow expansion) 
+* Advanced dataflow chaining/linking 
+* Extensive logging and built-in dataflow health monitor
+* Dataflow event counting and aggregation
+* Auto completion support for circular dataflow graph
+* Dataflow-friendly sql bulk inserter
+* Dataflow-friendly ETL dimension lookup component 
+* Compatibility and integration with TPL Dataflow
+
+Interested? O.K. Let's start the DataflowEx tour.
+
+Prerequisites
+-------------
+
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
 
 Beginner (15min):
@@ -13,7 +31,7 @@ http://channel9.msdn.com/posts/TPL-Dataflow-Tour
 Background
 -------------
 
-So, what's wrong with TPL Dataflow? Nothing. The library from Microsoft library looks simply great. However, in the tough real world there are some obstacles when we apply **RAW** TPL Dataflow. Let's look at an example:
+The very first question you may ask: what's wrong with TPL Dataflow? Nothing. The library from Microsoft library looks simply great. However, in the tough real world there are some obstacles when we apply **RAW** TPL Dataflow. Let's look at an example:
 ```c#
 var splitter = new TransformBlock<string, KeyValuePair<string, int>>(
     input =>
