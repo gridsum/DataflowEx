@@ -61,11 +61,11 @@
             //LinkLeftToDemo().Wait();
             //CircularFlowAutoComplete().Wait();
             //RecorderDemo().Wait();
-            //BulkInserterDemo().Wait();
+            BulkInserterDemo().Wait();
             //BulkInserterDemo2().Wait();
             //BroadcasterDemo().Wait();
             //MyLoggerDemo().Wait();
-            ETLLookupDemo().Wait();
+            //ETLLookupDemo().Wait();
         }
 
         public static async Task CalcAsync()

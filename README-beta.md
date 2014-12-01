@@ -1472,38 +1472,21 @@ One of the most asked questions about DataflowEx is: does the framework affect T
 
 The short answer is: Relax. No, it doesn't.
 
-The longer answer: DataflowEx and particularly the Dataflow class is a thin wrapper over underlying blocks from the perspective of performance. Yes, it maintains some internal states and does some periodic status checking per dataflow but these effects are trivial from a performance perspective considering the typical amount of blocks in a Dataflow application. The real hot path is the data processsing part and data travelling between the nodes but this is where DataflowEx has clearly no side effects because the underlying mechanism is just TPL Dataflow. 
+The longer answer: DataflowEx and particularly the Dataflow class is a thin wrapper over underlying blocks from the perspective of performance. Yes, it maintains some internal states and does some periodic status checking per dataflow but these effects are *trivial from a performance perspective* considering the typical amount of blocks in a Dataflow application. The real hot path is the data processsing part and data travelling between the nodes but this is where DataflowEx has clearly no side effects because the underlying mechanism is just TPL Dataflow. 
 
-To sum up, DataflowEx introduces very little overhead. 
+To sum up, DataflowEx introduces very little overhead. When the pipeline is created and starts running, it is just raw TPL Dataflow stuff.
 
-trivial state maintenence periodic status checking
-
-//tip  design principle Avoid too many blocks
-
-When the pipeline is created and starts running, it is just raw TPL Dataflow stuff.
-
-Dataflows and blocks are powerful. But everything comes with cost, especially from the performance perspective.
-
-overhead: buffer, threading.  negligible, task granularity (which is another topic of parallel computing)  (overhead of data travelling: OfferMessage) locality
-
-+1, +2, +3
-
-try your best to avoid simple blocks
-
-not only applies to DataflowEx but raw TPL Dataflow programming as well.
-Comes down to one sentence： don't have too many dataflows or blocks.
-
-for performance, for clean code/design,
+> **Tip:** Using DataflowEx doesn't cause performance problems. But you still need to properly design your dataflow at the level of TPL Dataflow blocks. One simple design rule is to *'avoid too many blocks'*. If one simple task could be implemented within a block, don't split it into two linked blocks: this hurts performance. Bear in mind that every single TPL block comes with a cost like buffering, threading and additional data travelling. Balancing between proper task granularity and component modularity/reusability is a key part in Dataflow/DataflowEx performance tuning. Again, don't have too many dataflows or blocks.
 
 Have a try now!
 -------------
 
-O.K. Thanks for reading such a long tutorial. Wish you enjoy using DataflowEx and try it in your application. For any issue or feedback please start a thread on github issue forum.
+Thanks for reading such a long tutorial. Wish you try DataflowEx in your application and enjoy using it. For any issue or feedback please start a thread on github issue forum.
 
 Gridsum.DataflowEx
 ==========
 
-Gridsum.DataflowEx is Gridsum's Object-Oriented dataflow framework built upon TPL Dataflow library.
+Gridsum.DataflowEx is Gridsum's Object-Oriented dataflow framework built upon Microsoft TPL Dataflow library.
 
 TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
 >1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
