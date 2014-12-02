@@ -439,7 +439,8 @@ namespace Gridsum.DataflowEx
 
         public virtual void Complete()
         {
-            throw new NotSupportedException(string.Format("{0} doesn't know how to explicitly complete.", this.FullName));
+            //inheritors should override this method 
+            LogHelper.Logger.WarnFormat("{0} doesn't know how to explicitly complete. Perform a no-op instead.", this.FullName);
         }
 
         //Linkd MY block to OHTER dataflow
