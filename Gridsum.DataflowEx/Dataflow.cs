@@ -542,7 +542,7 @@ namespace Gridsum.DataflowEx
             }
             else
             {
-                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies.", this.FullName, m_dependencies.Count);
+                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies. (Added {2})", this.FullName, m_dependencies.Count, dependency.DisplayName);
             }
         }
     }
