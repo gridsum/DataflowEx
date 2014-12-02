@@ -14,16 +14,16 @@ namespace Gridsum.DataflowEx
     /// That's why we need DataCopier which preserves a 100% same copy of the data stream through CopiedOutputBlock
     /// </summary>
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
-    public class DataBrancher<T> : Dataflow<T, T>
+    public class DataBroadcaster<T> : Dataflow<T, T>
     {
         private ImmutableList<Dataflow<T, T>> m_copyBuffers;
         private readonly TransformBlock<T, T> m_transformBlock;
 
-        public DataBrancher() : this(DataflowOptions.Default) {}
+        public DataBroadcaster() : this(DataflowOptions.Default) {}
 
-        public DataBrancher(DataflowOptions dataflowOptions) : this(null, dataflowOptions) {}
+        public DataBroadcaster(DataflowOptions dataflowOptions) : this(null, dataflowOptions) {}
 
-        public DataBrancher(Func<T,T> copyFunc, DataflowOptions dataflowOptions) : base(dataflowOptions)
+        public DataBroadcaster(Func<T,T> copyFunc, DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
             m_copyBuffers = ImmutableList<Dataflow<T, T>>.Empty;
 
@@ -54,7 +54,7 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Link the copied data stream to another block
         /// </summary>
-        public void LinkCopyTo(IDataflow<T> other)
+        private void LinkCopyTo(IDataflow<T> other)
         {
             //first, create a new copy block
             Dataflow<T, T> copyBuffer = new BufferBlock<T>(m_dataflowOptions.ToGroupingBlockOption()).ToDataflow(m_dataflowOptions);
@@ -67,8 +67,13 @@ namespace Gridsum.DataflowEx
             copyBuffer.LinkTo(other);
         }
 
-        public override IDataflow<T> GoTo(IDataflow<T> other)
+        public override IDataflow<T> GoTo(IDataflow<T> other, Predicate<T> predicate)
         {
+            if (predicate != null)
+            {
+                throw new ArgumentException("DataBroadcaster does not support predicate linking", "predicate");
+            }
+
             if (m_condBuilder.Count == 0) //not linked to any target yet
             {
                 //link first output as primary output

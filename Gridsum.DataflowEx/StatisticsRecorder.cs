@@ -19,9 +19,22 @@ namespace Gridsum.DataflowEx
     /// </remarks>
     public class StatisticsRecorder
     {
+        protected readonly IDataflow m_parent;
         protected ConcurrentDictionary<Type, IntHolder> m_typeCounter = new ConcurrentDictionary<Type, IntHolder>();
         protected ConcurrentDictionary<DataflowEvent, IntHolder> m_eventCounter = new ConcurrentDictionary<DataflowEvent, IntHolder>(new DataflowEventComparer());
-        
+
+        public StatisticsRecorder() : this(null)
+        {
+        }
+
+        public StatisticsRecorder(IDataflow parent)
+        {
+            this.m_parent = parent;
+        }
+
+        /// <summary>
+        /// Get the total count of the given type recorded
+        /// </summary>
         public int this[Type objectType]
         {
             get
@@ -43,6 +56,10 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the total count of the given event.
+        /// </summary>
+        /// <param name="fr">The event (level2 is optional)</param>
         public int this[DataflowEvent fr]
         {
             get
@@ -69,6 +86,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the total count of events with given level1 
+        /// </summary>
         public int this[string level1]
         {
             get
@@ -106,6 +126,8 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        public string Name { get; set; }
+
         /// <summary>
         /// Records a processed object in dataflow pipeline
         /// </summary>
@@ -138,6 +160,8 @@ namespace Gridsum.DataflowEx
 
         public void RecordEvent(DataflowEvent eventToAggregate)
         {
+            if (DataflowEvent.IsEmpty(eventToAggregate)) return; //ignore empty event
+
             IntHolder intHolder;
             if (!m_eventCounter.TryGetValue(eventToAggregate, out intHolder))
             {
@@ -158,7 +182,12 @@ namespace Gridsum.DataflowEx
 
         public virtual string DumpStatistics()
         {
-            string recorderName = this.GetType().GetFriendlyName();
+            string recorderName = this.Name ?? this.GetType().GetFriendlyName();
+
+            if (m_parent != null)
+            {
+                recorderName = string.Format("{0}-{1}", m_parent.FullName, recorderName);
+            }
 
             StringBuilder sb = new StringBuilder();
 
@@ -222,6 +251,13 @@ namespace Gridsum.DataflowEx
         public override string ToString()
         {
             return m_level2 == null ? m_level1 : string.Concat(m_level1, "-", m_level2);
+        }
+
+        public static DataflowEvent Empty = new DataflowEvent(null, null);
+
+        public static bool IsEmpty(DataflowEvent flowEvent)
+        {
+            return flowEvent.Level1 == null && flowEvent.Level2 == null;
         }
     }
 

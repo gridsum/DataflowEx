@@ -71,7 +71,7 @@ namespace Gridsum.DataflowEx
             return FromBlock(new TransformManyBlock<TIn, TOut>(transformMany));
         }
 
-        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(IPropagatorBlock<TIn, TOut> block, string name = null)
+        public static Dataflow<TIn, TOut> FromBlock<TIn, TOut>(this IPropagatorBlock<TIn, TOut> block, string name = null)
         {
             var flow = new PropagatorDataflow<TIn, TOut>(block) { Name = name };
             return flow;
@@ -111,20 +111,20 @@ namespace Gridsum.DataflowEx
                 
         public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, IDataflow<TOut> out1, IDataflow<TOut> out2, Func<TOut, TOut> copyFunc = null)
         {
-            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            var brancher = new DataBroadcaster<TOut>(copyFunc, DataflowOptions.Default);
             dataflow.GoTo(brancher);
-            brancher.GoTo(out1);
-            brancher.GoTo(out2);
+            brancher.LinkTo(out1);
+            brancher.LinkTo(out2);
         }
 
         public static void LinkToMultiple<TIn, TOut>(this Dataflow<TIn, TOut> dataflow, Func<TOut, TOut> copyFunc, params IDataflow<TOut>[] outs)
         {
-            var brancher = new DataBrancher<TOut>(copyFunc, DataflowOptions.Default);
+            var brancher = new DataBroadcaster<TOut>(copyFunc, DataflowOptions.Default);
             dataflow.GoTo(brancher);
 
             foreach (var output in outs)
             {
-                brancher.GoTo(output);
+                brancher.LinkTo(output);
             }
         }
 

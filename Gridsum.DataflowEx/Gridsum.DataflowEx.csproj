@@ -82,7 +82,7 @@
     <Compile Include="DataflowUtils.cs" />
     <Compile Include="Databases\BulkDataReader.cs" />
     <Compile Include="Databases\DBColumnMapping.cs" />
-    <Compile Include="DataBrancher.cs" />
+    <Compile Include="DataBroadcaster.cs" />
     <Compile Include="DataflowBlockExtensions.cs" />
     <Compile Include="ETL\PartialDimRow.cs" />
     <Compile Include="ETL\IDimRow.cs" />

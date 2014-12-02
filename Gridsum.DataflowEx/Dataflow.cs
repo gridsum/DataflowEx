@@ -327,22 +327,32 @@ namespace Gridsum.DataflowEx
                 }
             }
 
+            Exception exception = null;
             try
             {
                 await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion).ConfigureAwait(false);
                 await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f()).ConfigureAwait(false);
-                
-                //todo: move it to finally
-                this.CleanUp();
-                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
             }
-            catch (AggregateException e)
+            catch (Exception e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw; //TaskEx.UnwrapWithPriority(e);
+                exception = e;
+            }
+            finally
+            {
+                this.CleanUp();
+
+                if (exception == null)
+                {
+                    LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));    
+                }
+                else
+                {
+                    throw new AggregateException(exception);
+                }
             }
         }
 
@@ -562,7 +572,7 @@ namespace Gridsum.DataflowEx
                                 count++;
                             }
                         }
-                        catch (Exception)
+                        catch (Exception e)
                         {
                             LogHelper.Logger.WarnFormat(
                                 "{0} Pulled and posted {1} {2}s to {3} before an exception",
@@ -571,7 +581,7 @@ namespace Gridsum.DataflowEx
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
 
-                            throw;
+                            throw new AggregateException(e);
                         }
 
                         LogHelper.Logger.InfoFormat(
@@ -585,12 +595,7 @@ namespace Gridsum.DataflowEx
                     },
                 ct);
         }
-
-        public void LinkFromBlock(ISourceBlock<TIn> block)
-        {
-            block.LinkTo(this.InputBlock, m_defaultLinkOption);
-        }
-
+        
         protected string ReceiverDisplayName
         {
             get
@@ -631,7 +636,7 @@ namespace Gridsum.DataflowEx
             catch (OperationCanceledException oce)
             {
                 LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
-                throw;
+                throw new AggregateException(oce);
             }
 
             if (completeFlowOnFinish)
@@ -642,6 +647,10 @@ namespace Gridsum.DataflowEx
             return count;
         }
 
+        /// <summary>
+        /// Send a complete signal to the dataflow and return a task representing the completion task
+        /// of the dataflow. The task will be completed when all queued jobs are done.
+        /// </summary>
         public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
@@ -708,7 +717,7 @@ namespace Gridsum.DataflowEx
 
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
-            this.GarbageRecorder = new StatisticsRecorder();
+            this.GarbageRecorder = new StatisticsRecorder(this) {Name = "GarbageRecorder"};
             m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
             m_frozenConditions = new Lazy<ImmutableList<Predicate<TOut>>>(() =>
             {
@@ -717,14 +726,15 @@ namespace Gridsum.DataflowEx
         }
 
         public abstract ISourceBlock<TOut> OutputBlock { get; }
-        
+
         /// <summary>
         /// Link data stream to the given dataflow and propagates completion
         /// </summary>
         /// <param name="other">The dataflow to connect to</param>
-        public void LinkTo(IDataflow<TOut> other)
+        /// <param name="predicate">The filtering condition, if any</param>
+        public void LinkTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            this.GoTo(other);
+            this.GoTo(other, predicate);
         }
 
         /// <summary>
@@ -735,10 +745,10 @@ namespace Gridsum.DataflowEx
         /// </remarks>
         /// <param name="other">The dataflow to connect to</param>
         /// <returns>returns the dataflow to connect to</returns>
-        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other)
+        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            m_condBuilder.Add(new Predicate<TOut>(@out => true));
-            LinkBlockToFlow(this.OutputBlock, other);
+            m_condBuilder.Add(predicate ?? new Predicate<TOut>(@out => true));
+            LinkBlockToFlow(this.OutputBlock, other, predicate);
             return other;
         }
 
@@ -770,12 +780,7 @@ namespace Gridsum.DataflowEx
         {
             this.TransformAndLink(other, transform, @out => true);
         }
-
-        public void TransformAndLink<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
-        {
-            this.TransformAndLink(other, @out => { return ((TTarget)@out); }, @out => @out is TTarget);
-        }
-
+        
         public void TransformAndLink<TTarget, TOutSubType>(IDataflow<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
         {
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
@@ -788,7 +793,6 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
-            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
 
@@ -814,8 +818,8 @@ namespace Gridsum.DataflowEx
                 {
                     if (frozenConds.All(condition => !condition(@out)))
                     {
-                        OnOutputToNull(@out);
-                        return true;
+                        OnOutputToNull(@out); 
+                         return true;
                     }
                     else
                     {

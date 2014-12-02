@@ -124,9 +124,8 @@ namespace Gridsum.DataflowEx.Test
         {
             var faultyContainer = new FaultyBlocks();
             var involvedContainer = new InnocentBlocks();
-            faultyContainer.TransformAndLink(involvedContainer);
-            faultyContainer.LinkLeftToNull();
-
+            faultyContainer.LinkTo(involvedContainer);
+            
             var cts = new CancellationTokenSource();
             faultyContainer.RegisterCancellationTokenSource(cts);
             faultyContainer.InputBlock.Post("test");
@@ -145,9 +144,9 @@ namespace Gridsum.DataflowEx.Test
         {
             var faultyContainer = new FaultyBlocks();
             var involvedContainer = new InnocentBlocks();
-            faultyContainer.TransformAndLink(involvedContainer);
+            faultyContainer.LinkSubTypeTo(involvedContainer);
             faultyContainer.LinkLeftToNull();
-            faultyContainer.TransformAndLink(involvedContainer);
+            faultyContainer.LinkSubTypeTo(involvedContainer);
         }
 
         [TestMethod]
@@ -157,7 +156,7 @@ namespace Gridsum.DataflowEx.Test
             var faultyContainer = new FaultyBlocks();
             var involvedContainer = new InnocentBlocks();
             faultyContainer.LinkLeftToNull();
-            faultyContainer.TransformAndLink(involvedContainer);
+            faultyContainer.LinkSubTypeTo(involvedContainer);
         }
 
         [TestMethod]

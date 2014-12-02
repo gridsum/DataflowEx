@@ -46,6 +46,10 @@
     <Reference Include="Common.Logging.NLog20">
       <HintPath>..\packages\Common.Logging.NLog20.2.2.0\lib\net40\Common.Logging.NLog20.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Newtonsoft.Json.6.0.6\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="NLog">
       <HintPath>..\packages\NLog.3.1.0.0\lib\net45\NLog.dll</HintPath>
     </Reference>
@@ -66,8 +70,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AggregatorFlow.cs" />
+    <Compile Include="CircularFlow.cs" />
     <Compile Include="ComplexIntFlow.cs" />
     <Compile Include="LineAggregatorFlow.cs" />
+    <Compile Include="LocalDBUtil.cs" />
+    <Compile Include="MyLogger.cs" />
+    <Compile Include="Order.cs" />
+    <Compile Include="PeopleFlow.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

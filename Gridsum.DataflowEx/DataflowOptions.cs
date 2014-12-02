@@ -12,9 +12,15 @@ namespace Gridsum.DataflowEx
     /// </remarks>
     public class DataflowOptions
     {
+        /// <summary>
+        /// A hint to the dataflow implementation about the in-memory buffer size of underlying blocks
+        /// </summary>
         public int? RecommendedCapacity { get; set; }
+
         public bool FlowMonitorEnabled { get; set; }
+
         public bool BlockMonitorEnabled { get; set; }
+        
         public PerformanceLogMode PerformanceMonitorMode { get; set; }
 
         /// <summary>
@@ -41,7 +47,8 @@ namespace Gridsum.DataflowEx
             FlowMonitorEnabled = true,
             PerformanceMonitorMode = PerformanceLogMode.Succinct,
             MonitorInterval = DefaultInterval,
-            RecommendedCapacity = 100000
+            RecommendedCapacity = 100000,
+            RecommendedParallelismIfMultiThreaded = Environment.ProcessorCount
         };
 
         private static DataflowOptions s_verboseOptions = new DataflowOptions()

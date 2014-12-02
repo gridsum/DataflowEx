@@ -63,7 +63,7 @@ namespace Gridsum.DataflowEx.Databases
             m_schemaTable = new Lazy<DataTable>(this.GetSchemaTable);
             m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();
-            m_classLogger = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name + "." + this.GetType().GetFriendlyName()); 
+            m_classLogger = LogManager.GetLogger(this.GetType().Namespace + "." + this.GetType().GetFriendlyName()); 
             CreateTypeVisitor();
         }
 
