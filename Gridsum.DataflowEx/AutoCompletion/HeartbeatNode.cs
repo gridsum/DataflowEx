@@ -12,8 +12,6 @@ namespace Gridsum.DataflowEx.AutoCompletion
     {
         long ProcessedItemCount { get; }
 
-        void Complete();
-
         bool NoHeartbeatDuring(Action action);
         Task<bool> NoHeartbeatDuring(Func<Task> action);
     }
@@ -63,7 +61,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
             }
         }
 
-        public void Complete()
+        public override void Complete()
         {
             this.InputBlock.Complete();
         }
