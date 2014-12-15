@@ -12,6 +12,8 @@ namespace Gridsum.DataflowEx.Databases
     using System.Collections;
     using System.Collections.Immutable;
     using System.Diagnostics;
+    using System.IO;
+
     using Common.Logging;
 
     public class TypeAccessorManager<T> where T : class
@@ -760,6 +762,26 @@ namespace Gridsum.DataflowEx.Databases
                 return Expression.Property(this.Parent.RawExpression, this.PropertyInfo);
             }
         }
+
+        public override bool IsExpandable
+        {
+            get
+            {
+                if (typeof(IEnumerable).IsAssignableFrom(this.ResultType))
+                {
+                    return false;
+                }
+
+                var paths = (DBColumnPath[])PropertyInfo.GetCustomAttributes(typeof(DBColumnPath), true);
+
+                if (paths.Any(p => p.HasOption(DBColumnPathOptions.DoNotExpand)))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+        }
     }
 
     /// <summary>
@@ -778,17 +800,11 @@ namespace Gridsum.DataflowEx.Databases
             : base(propertyInfo, parent)
         {
             this.m_exprIniter = new Lazy<Expression>(this.CreatePropertyAccessorExpression);
-            m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any();
+            m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any()
+                | propertyInfo.GetCustomAttributes(typeof(DBColumnPath), true).Cast<DBColumnPath>()
+                .Any(p => p.HasOption(DBColumnPathOptions.DoNotGenerateNullCheck));
         }
-
-        public override bool IsExpandable
-        {
-            get
-            {
-                return !typeof(IEnumerable).IsAssignableFrom(this.ResultType);
-            }
-        }
-
+        
         public override Expression Expression
         {
             get
