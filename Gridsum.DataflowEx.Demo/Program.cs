@@ -11,8 +11,6 @@
     using Common.Logging;
 
     using Gridsum.DataflowEx.Databases;
-    using Gridsum.DataflowEx.Test;
-    using Gridsum.DataflowEx.Test.DatabaseTests;
 
     class Program
     {

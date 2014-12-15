@@ -53,13 +53,13 @@ namespace Gridsum.DataflowEx.Databases
             s_externalMappings.Add(Tuple.Create(propertyPath, mapping));
         }
 
-        public static void RegisterMapping<TValue, T>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping) where T : class
+        public static void RegisterMapping<T, TValue>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping) where T : class
         {
             //todo: add check
             RegisterMapping(propertyPath.Body, mapping);
         }
 
-        public static bool ExpressionPathEquals(Expression e1, Expression e2)
+        internal static bool ExpressionPathEquals(Expression e1, Expression e2)
         {
             if (e1 is ParameterExpression && e2 is ParameterExpression)
             {
@@ -887,13 +887,18 @@ namespace Gridsum.DataflowEx.Databases
         public LeafPropertyNode(PropertyInfo propertyInfo, ExpressionTreeNode parent, string destLabel)
             : base(propertyInfo, parent)
         {
-            this.DbColumnMappings =
-                this.DbColumnMappings.Where(m => m.DestLabel == destLabel)
-                    .Union(TypeAccessorConfig.s_externalMappings
-                            .Where(pair => pair.Item2.DestLabel == destLabel)
-                            .Where(pair => TypeAccessorConfig.ExpressionPathEquals(pair.Item1, this.RawExpression))
-                            .Select(pair => pair.Item2))
+            var externalMappings =
+                TypeAccessorConfig.s_externalMappings.Where(pair => pair.Item2.DestLabel == destLabel)
+                    .Where(pair => TypeAccessorConfig.ExpressionPathEquals(pair.Item1, this.RawExpression))
+                    .Select(pair => pair.Item2)
                     .ToList();
+
+            foreach (var externalMapping in externalMappings)
+            {
+                externalMapping.Host = this;
+            }
+
+            DbColumnMappings = DbColumnMappings.Where(m => m.DestLabel == destLabel).Union(externalMappings).ToList();
 
             //type safety check for db column mappings in order to fail early rather than insertion time
             foreach (var dbColumnMapping in DbColumnMappings)

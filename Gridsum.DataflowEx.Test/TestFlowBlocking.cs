@@ -3,6 +3,8 @@
     using System;
     using System.Threading.Tasks;
 
+    using Gridsum.DataflowEx.Demo;
+
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     [TestClass]

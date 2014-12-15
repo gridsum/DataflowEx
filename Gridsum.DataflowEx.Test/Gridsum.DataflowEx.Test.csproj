@@ -44,12 +44,16 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Common.Logging.Core.2.2.0\lib\net40\Common.Logging.Core.dll</HintPath>
     </Reference>
+    <Reference Include="Dapper">
+      <HintPath>..\packages\Dapper.1.38\lib\net45\Dapper.dll</HintPath>
+    </Reference>
     <Reference Include="EntityFramework">
       <HintPath>..\packages\EntityFramework.6.1.0\lib\net45\EntityFramework.dll</HintPath>
     </Reference>
     <Reference Include="EntityFramework.SqlServer">
       <HintPath>..\packages\EntityFramework.6.1.0\lib\net45\EntityFramework.SqlServer.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Collections.Immutable, Version=1.0.34.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -76,6 +80,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="DatabaseTests\ExternalMappingTest.cs" />
     <Compile Include="DataflowTest.cs" />
     <Compile Include="DatabaseTests\BulkInserterTest.cs" />
     <Compile Include="DatabaseTests\GSProduct.cs" />
@@ -95,9 +100,12 @@
     <Compile Include="TestStringCondition.cs" />
     <Compile Include="TestImmutable.cs" />
     <Compile Include="TestStatisticsRecorder.cs" />
-    <Compile Include="SlowFlow.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Gridsum.DataflowEx.Demo\Gridsum.DataflowEx.Demo.csproj">
+      <Project>{6de0770b-8795-4f64-9aee-4bd2550009fb}</Project>
+      <Name>Gridsum.DataflowEx.Demo</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj">
       <Project>{a4fd6288-ae2e-4c28-b7d4-d317d1601e86}</Project>
       <Name>Gridsum.DataflowEx</Name>
