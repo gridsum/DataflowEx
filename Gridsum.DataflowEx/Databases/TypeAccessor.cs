@@ -450,7 +450,7 @@ namespace Gridsum.DataflowEx.Databases
                     {
                         if (!object.ReferenceEquals(mapping, selected))
                         {
-                            m_classLogger.WarnFormat("Column mapping {0} on {1} abandoned as its offset {2} is already used", mapping, mapping.Host, mapping.DestColumnOffset);
+                            m_classLogger.WarnFormat("Column mapping {0} on {1} abandoned as its offset {2} is already used by {3}", mapping, mapping.Host, mapping.DestColumnOffset, selected);
                         }
                     }
                 }

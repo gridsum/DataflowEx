@@ -20,25 +20,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public async Task TestPersonInsertion()
         {
-            string connStr;
-
-            //initialize table
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
-            {
-                var cmd = new SqlCommand(@"
-                IF OBJECT_id('dbo.People', 'U') IS NOT NULL
-                    DROP TABLE dbo.People;
-                
-                CREATE TABLE dbo.People
-                (
-                    Id INT IDENTITY(1,1) NOT NULL,
-                    NameCol nvarchar(50) NOT NULL,
-                    AgeCol INT           NOT NULL
-                )
-                ", conn);
-                cmd.ExecuteNonQuery();
-                connStr = conn.ConnectionString;
-            }
+            string connStr = this.CreatePeopleTable(1);
 
             var f = new PeopleFlow(DataflowOptions.Default);
 
@@ -50,12 +32,12 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 
             f.Post("{Name: 'aaron', Age: 20}");
             f.Post("{Name: 'bob', Age: 30}");
-            f.Post("{Age: 80}"); //Name will be default value: "N/A"
+            f.Post("{Age: 80}"); //Name will be default value: "N/A2"
             f.Post("{Name: 'neo' }"); // Age will be default value: -2
             await f.SignalAndWaitForCompletionAsync();
             await dbInserter.CompletionTask;
 
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest1"))
             {
                 Assert.AreEqual(4, conn.ExecuteScalar<int>("select count(*) from dbo.People"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'N/A2'"));
@@ -63,34 +45,17 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             }
         }
 
+        
+
         [TestMethod]
         public async Task TestPersonInsertion2()
         {
-            string connStr;
-
-            //initialize table
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
-            {
-                var cmd = new SqlCommand(@"
-                IF OBJECT_id('dbo.People', 'U') IS NOT NULL
-                    DROP TABLE dbo.People;
-                
-                CREATE TABLE dbo.People
-                (
-                    Id INT IDENTITY(1,1) NOT NULL,
-                    NameCol nvarchar(50) NOT NULL,
-                    AgeCol INT           NOT NULL
-                )
-                ", conn);
-                cmd.ExecuteNonQuery();
-                connStr = conn.ConnectionString;
-            }
-
+            string connStr = this.CreatePeopleTable(2);
+            
             var f = new PeopleFlow(DataflowOptions.Default);
 
-            //will not take effect
+            //will NOT take effect
             TypeAccessorConfig.RegisterMapping<Person, string>(p => p.Name, new DBColumnMapping("PersonTarget", "NameCol", "N/A2"));
-
             //will take effect
             TypeAccessorConfig.RegisterMapping<Person, int?>(p => p.Age, new DBColumnMapping("PersonTarget", "AgeCol", -2));
 
@@ -104,11 +69,42 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             await f.SignalAndWaitForCompletionAsync();
             await dbInserter.CompletionTask;
 
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest2"))
             {
                 Assert.AreEqual(4, conn.ExecuteScalar<int>("select count(*) from dbo.People"));
                 Assert.AreEqual(0, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'N/A2'"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'N/A'"));
+                Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where AgeCol = -2"));
+            }
+        }
+
+        [TestMethod]
+        public async Task TestPersonInsertion3()
+        {
+            string connStr = this.CreatePeopleTable(3);
+
+            var f = new PeopleFlow(DataflowOptions.Default);
+
+            //will take effect
+            TypeAccessorConfig.RegisterMapping<Person, string>(p => p.Name, new DBColumnMapping("PersonTarget", "NameCol", "N/A2", ColumnMappingOption.Overwrite));
+            //will take effect
+            TypeAccessorConfig.RegisterMapping<Person, int?>(p => p.Age, new DBColumnMapping("PersonTarget", "AgeCol", -2));
+
+            var dbInserter = new DbBulkInserter<Person>(connStr, "dbo.People", DataflowOptions.Default, "PersonTarget");
+            f.LinkTo(dbInserter);
+
+            f.Post("{Name: 'aaron', Age: 20}");
+            f.Post("{Name: 'bob', Age: 30}");
+            f.Post("{Age: 80}"); //Name will be default value: "N/A"
+            f.Post("{Name: 'neo' }"); // Age will be default value: -2
+            await f.SignalAndWaitForCompletionAsync();
+            await dbInserter.CompletionTask;
+
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest3"))
+            {
+                Assert.AreEqual(4, conn.ExecuteScalar<int>("select count(*) from dbo.People"));
+                Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'N/A2'"));
+                Assert.AreEqual(0, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'N/A'"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where AgeCol = -2"));
             }
         }
@@ -159,6 +155,29 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 Assert.AreEqual(0, conn.ExecuteScalar<int>("select count(*) from dbo.Orders where CustomerName = 'N/A'"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.Orders where CustomerName = 'Neo' and CustomerAge = -99"));
             }
+        }
+
+        private string CreatePeopleTable(int i)
+        {
+            string connStr;
+            //initialize table
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest" + i))
+            {
+                var cmd = new SqlCommand(@"
+                IF OBJECT_id('dbo.People', 'U') IS NOT NULL
+                    DROP TABLE dbo.People;
+                
+                CREATE TABLE dbo.People
+                (
+                    Id INT IDENTITY(1,1) NOT NULL,
+                    NameCol nvarchar(50) NOT NULL,
+                    AgeCol INT           NOT NULL
+                )
+                ", conn);
+                cmd.ExecuteNonQuery();
+                connStr = conn.ConnectionString;
+            }
+            return connStr;
         }
     }
 }

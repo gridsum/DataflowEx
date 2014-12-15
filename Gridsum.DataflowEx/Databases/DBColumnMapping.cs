@@ -101,10 +101,11 @@ namespace Gridsum.DataflowEx.Databases
         public override string ToString()
         {
             return string.Format(
-                "[ColName:{0}, ColOffset:{1}, DefaultValue:{2}]",
+                "[ColName:{0}, ColOffset:{1}, DefaultValue:{2}, Option: {3}]",
                 this.DestColumnName,
                 this.DestColumnOffset,
-                this.DefaultValue);
+                this.DefaultValue,
+                this.Option);
         }
     }
 
@@ -114,14 +115,19 @@ namespace Gridsum.DataflowEx.Databases
     public enum ColumnMappingOption
     {
         /// <summary>
+        /// Used typically by external mappings to overwrite Mandatory option on tagged attribute. The column must exist in the destination table.
+        /// </summary>
+        Overwrite = short.MinValue,
+
+        /// <summary>
         /// The column must exist in the destination table
         /// </summary>
-        Mandatory = 0,
+        Mandatory = 1,
 
         /// <summary>
         /// The column mapping can be ignored if the column is not found in the destination table
         /// This option is useful when you have one dest label for multiple different tables
         /// </summary>
-        Optional = 1
+        Optional = 2
     }
 }
