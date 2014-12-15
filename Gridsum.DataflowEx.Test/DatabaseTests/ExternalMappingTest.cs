@@ -112,5 +112,53 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where AgeCol = -2"));
             }
         }
+
+        [TestMethod]
+        public async Task TestOrderInsertion()
+        {
+            string connStr;
+
+            //initialize table
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
+            {
+                var cmd = new SqlCommand(@"
+                IF OBJECT_id('dbo.Orders', 'U') IS NOT NULL
+                    DROP TABLE dbo.Orders;
+                
+                CREATE TABLE dbo.Orders
+                (
+                    Id INT IDENTITY(1,1) NOT NULL,
+                    Date DATETIME NOT NULL,
+                    Value FLOAT NOT NULL,
+                    CustomerName NVARCHAR(50) NOT NULL,
+                    CustomerAge INT NOT NULL
+                )
+                ", conn);
+                cmd.ExecuteNonQuery();
+                connStr = conn.ConnectionString;
+            }
+
+            //will take effect
+            TypeAccessorConfig.RegisterMapping<Order, string>(p => p.Customer.Name, new DBColumnMapping("OrderTarget", "CustomerName", "N/A2"));
+            //will take effect
+            TypeAccessorConfig.RegisterMapping<Order, int?>(p => p.Customer.Age, new DBColumnMapping("OrderTarget", "CustomerAge", -99));
+
+            var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget");
+
+            dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 15, Customer = new Person() { Name = "Aaron", Age = 38 } });
+            dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 25, Customer = new Person() { Name = "Bob", Age = 30 } });
+            dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 35, Customer = new Person() { Age = 48 } });
+            dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 45, Customer = new Person() { Name = "Neo" } });
+
+            await dbInserter.SignalAndWaitForCompletionAsync();
+
+            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest"))
+            {
+                Assert.AreEqual(4, conn.ExecuteScalar<int>("select count(*) from dbo.Orders"));
+                Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.Orders where CustomerAge = 48 and CustomerName = 'N/A2'"));
+                Assert.AreEqual(0, conn.ExecuteScalar<int>("select count(*) from dbo.Orders where CustomerName = 'N/A'"));
+                Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.Orders where CustomerName = 'Neo' and CustomerAge = -99"));
+            }
+        }
     }
 }
