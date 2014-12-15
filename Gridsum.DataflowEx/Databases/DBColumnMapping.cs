@@ -116,12 +116,12 @@ namespace Gridsum.DataflowEx.Databases
         /// <summary>
         /// The column must exist in the destination table
         /// </summary>
-        Mandatory,
+        Mandatory = 0,
 
         /// <summary>
         /// The column mapping can be ignored if the column is not found in the destination table
         /// This option is useful when you have one dest label for multiple different tables
         /// </summary>
-        Optional
+        Optional = 1
     }
 }

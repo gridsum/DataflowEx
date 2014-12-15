@@ -16,11 +16,11 @@ namespace Gridsum.DataflowEx.Databases
 
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> m_accessors;
+        private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> s_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>>();
+            s_accessors = new ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>>();
         }
 
         private TypeAccessorManager()
@@ -37,7 +37,51 @@ namespace Gridsum.DataflowEx.Databases
         /// <returns></returns>
         public static TypeAccessor<T> GetAccessorForTable(TargetTable target)
         {
-            return m_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
+            return s_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
+        }
+    }
+
+    /// <summary>
+    /// Allows external configs to be registered and used by TypeAccessors.
+    /// </summary>
+    public class TypeAccessorConfig
+    {
+        internal static List<Tuple<Expression, DBColumnMapping>> s_externalMappings = new List<Tuple<Expression, DBColumnMapping>>();
+
+        public static void RegisterMapping(Expression propertyPath, DBColumnMapping mapping)
+        {
+            s_externalMappings.Add(Tuple.Create(propertyPath, mapping));
+        }
+
+        public static void RegisterMapping<TValue, T>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping) where T : class
+        {
+            //todo: add check
+            RegisterMapping(propertyPath.Body, mapping);
+        }
+
+        public static bool ExpressionPathEquals(Expression e1, Expression e2)
+        {
+            if (e1 is ParameterExpression && e2 is ParameterExpression)
+            {
+                return e1.Type == e2.Type;
+            }
+
+            if (e1 is MemberExpression && e2 is MemberExpression)
+            {
+                MemberExpression m1 = e1 as MemberExpression;
+                MemberExpression m2 = e2 as MemberExpression;
+                
+                if (m1.Member.Equals(m2.Member))
+                {
+                    return ExpressionPathEquals(m1.Expression, m2.Expression);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -50,17 +94,6 @@ namespace Gridsum.DataflowEx.Databases
         private readonly Dictionary<int, Func<T, object>> m_properties;
         private readonly ILog m_classLogger;
         private Lazy<DataTable> m_schemaTable;
-        private static List<Tuple<Expression, DBColumnMapping>> m_externalMappings = new List<Tuple<Expression, DBColumnMapping>>();
-
-        public static void RegisterMapping(Expression propertyPath, DBColumnMapping mapping)
-        {
-            m_externalMappings.Add(Tuple.Create(propertyPath, mapping));
-        }
-
-        public static void RegisterMapping<TValue>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping)
-        {
-            RegisterMapping(propertyPath.Body, mapping);
-        }
 
         #region ctor and init
 
@@ -410,8 +443,7 @@ namespace Gridsum.DataflowEx.Databases
                 else
                 {
                     //规则二、三
-                    int minDepth = group.Min(t => t.Host.Depth);
-                    DBColumnMapping selected = group.First(t => t.Host.Depth == minDepth);
+                    DBColumnMapping selected = group.OrderBy(t => t.Host.Depth * 10 + (int)t.Option).First();
                     filtered.Add(selected);
 
                     foreach (var mapping in group)
@@ -543,6 +575,9 @@ namespace Gridsum.DataflowEx.Databases
         public abstract bool IsExpandable { get; }
         public abstract Expression Expression { get; }
         public abstract bool NoNullCheck { get; }
+
+        //Expression without null check and default value involvement
+        public abstract Expression RawExpression { get; }
     }
 
     public abstract class PropertyTreeNode : ExpressionTreeNode
@@ -717,20 +752,13 @@ namespace Gridsum.DataflowEx.Databases
         {
             get { return m_resultType; }
         }
-
-        public override bool IsExpandable
+        
+        public override Expression RawExpression
         {
-            get { throw new NotImplementedException(); }
-        }
-
-        public override Expression Expression
-        {
-            get { throw new NotImplementedException(); }
-        }
-
-        public override bool NoNullCheck
-        {
-            get { throw new NotImplementedException(); }
+            get
+            {
+                return Expression.Property(this.Parent.RawExpression, this.PropertyInfo);
+            }
         }
     }
 
@@ -818,6 +846,14 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
+        public override Expression RawExpression
+        {
+            get
+            {
+                return m_param;
+            }
+        }
+
         public PropertyTreeNode Parent
         {
             get
@@ -851,7 +887,13 @@ namespace Gridsum.DataflowEx.Databases
         public LeafPropertyNode(PropertyInfo propertyInfo, ExpressionTreeNode parent, string destLabel)
             : base(propertyInfo, parent)
         {
-            this.DbColumnMappings = this.DbColumnMappings.Where(m => m.DestLabel == destLabel).ToList();
+            this.DbColumnMappings =
+                this.DbColumnMappings.Where(m => m.DestLabel == destLabel)
+                    .Union(TypeAccessorConfig.s_externalMappings
+                            .Where(pair => pair.Item2.DestLabel == destLabel)
+                            .Where(pair => TypeAccessorConfig.ExpressionPathEquals(pair.Item1, this.RawExpression))
+                            .Select(pair => pair.Item2))
+                    .ToList();
 
             //type safety check for db column mappings in order to fail early rather than insertion time
             foreach (var dbColumnMapping in DbColumnMappings)
