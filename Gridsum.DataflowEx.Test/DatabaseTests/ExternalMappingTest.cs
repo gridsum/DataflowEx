@@ -20,7 +20,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public async Task TestPersonInsertion()
         {
-            string connStr = this.CreatePeopleTable(1);
+            string connStr = CreatePeopleTable(1);
 
             var f = new PeopleFlow(DataflowOptions.Default);
 
@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public async Task TestPersonInsertion2()
         {
-            string connStr = this.CreatePeopleTable(2);
+            string connStr = CreatePeopleTable(2);
             
             var f = new PeopleFlow(DataflowOptions.Default);
 
@@ -81,7 +81,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public async Task TestPersonInsertion3()
         {
-            string connStr = this.CreatePeopleTable(3);
+            string connStr = CreatePeopleTable(3);
 
             var f = new PeopleFlow(DataflowOptions.Default);
 
@@ -157,7 +157,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             }
         }
 
-        private string CreatePeopleTable(int i)
+        public static string CreatePeopleTable(int i)
         {
             string connStr;
             //initialize table

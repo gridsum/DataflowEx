@@ -2,6 +2,9 @@
 {
     using System;
 
+    /// <summary>
+    /// Represents a node in the middle of a column property path, tagged on a expandable property
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public class DBColumnPath : Attribute
     {

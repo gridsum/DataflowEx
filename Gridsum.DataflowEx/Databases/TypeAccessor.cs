@@ -793,8 +793,8 @@ namespace Gridsum.DataflowEx.Databases
     public class NonLeafPropertyNode : PropertyTreeNode
     {
         private readonly Lazy<Expression> m_exprIniter;
-
-        private bool m_noNullCheck;
+        private readonly bool m_noNullCheck;
+        private static ILog s_logger = LogManager.GetLogger(typeof(NonLeafPropertyNode).Namespace);
 
         public NonLeafPropertyNode(PropertyInfo propertyInfo, ExpressionTreeNode parent)
             : base(propertyInfo, parent)
@@ -803,6 +803,11 @@ namespace Gridsum.DataflowEx.Databases
             m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any()
                 | propertyInfo.GetCustomAttributes(typeof(DBColumnPath), true).Cast<DBColumnPath>()
                 .Any(p => p.HasOption(DBColumnPathOptions.DoNotGenerateNullCheck));
+
+            if (m_noNullCheck && s_logger.IsTraceEnabled)
+            {
+                s_logger.TraceFormat("No null check is enabled on {0}", this);
+            }
         }
         
         public override Expression Expression

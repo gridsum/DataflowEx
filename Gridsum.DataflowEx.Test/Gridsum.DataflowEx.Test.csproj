@@ -80,6 +80,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="DatabaseTests\DbColumnPathTest.cs" />
     <Compile Include="DatabaseTests\ExternalMappingTest.cs" />
     <Compile Include="DataflowTest.cs" />
     <Compile Include="DatabaseTests\BulkInserterTest.cs" />

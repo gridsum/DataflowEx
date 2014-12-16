@@ -5,22 +5,6 @@ namespace Gridsum.DataflowEx.Databases
     /// <summary>
     /// Represents a mapping from C# property to a DB column
     /// </summary> 
-    /// <remarks>
-    /// 采用尽可能匹配的原则，即如果发现用户设置的参数与数据库的不匹配，一般情况下打印Warn级别的日志，不会直接报错退出。
-    /// Warn:由于C#里的继承的属性的Attribute是不继承的，因此，想要添加DBColumnMapping，必须添加到子类中。示例：
-    /// public abstract class Base{
-    ///     public abstract int Data{get;set;}
-    /// 
-    ///     [DBColumnMapping()]
-    ///     public float Price{get;set;}
-    /// }
-    /// 
-    /// public class Drived: Base{
-    ///     [DBColumnMapping()]
-    ///     public override int Data{get;set;}
-    /// }
-    /// 如果将DBColumnMapping标签在Base类的Data中，则不能实现匹配。必须 标记在Drived的Data属性中
-    /// </remarks>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public class DBColumnMapping : Attribute
     {
