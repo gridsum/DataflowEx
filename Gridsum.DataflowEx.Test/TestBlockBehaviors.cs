@@ -130,6 +130,18 @@ namespace Gridsum.DataflowEx.Test
         }
 
         [TestMethod]
+        public void TestEncapsulateBlockBuffer()
+        {
+            var b1 = new ActionBlock<int>(i => Console.WriteLine(i));
+            var b2 = new BufferBlock<int>();
+
+            IPropagatorBlock<int, int> b3 = DataflowBlock.Encapsulate(b1, b2);
+
+            
+            Assert.AreEqual(0, b3.GetBufferCount().Total());
+        }
+
+        [TestMethod]
         public async Task TestBoundedCapacity()
         {
             //var b = new BatchBlock<int>(2, new GroupingDataflowBlockOptions() { BoundedCapacity = 10 });
