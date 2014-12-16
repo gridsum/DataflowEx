@@ -275,13 +275,19 @@ namespace Gridsum.DataflowEx
 
                     if (m_dataflowOptions.BlockMonitorEnabled)
                     {
+                        bool verboseMode = m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose;
+
                         foreach(IDataflowDependency child in m_children)
                         {
-                            var bufferStatus = child.BufferStatus;
-
-                            if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                            IDataflowDependency c = child;
+                            Tuple<int, int> bufferStatus = c.BufferStatus;
+                            
+                            if (child.Completion.IsCompleted && verboseMode)
                             {
-                                IDataflowDependency c = child;
+                                LogHelper.PerfMon.DebugFormat("{0} is completed");
+                            }
+                            else if (bufferStatus.Total() != 0 || verboseMode)
+                            {
                                 LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                             }
                         }
