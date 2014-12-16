@@ -19,7 +19,7 @@ namespace Gridsum.DataflowEx.Demo
         [DBColumnMapping("OrderTarget", "Value", 0.0f)]
         public float? OrderValue { get; set; }
 
-        [NoNullCheck]
+        [DBColumnPath(DBColumnPathOptions.DoNotGenerateNullCheck)]
         public Person Customer { get; set; }
     }
 

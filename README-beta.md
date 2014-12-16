@@ -1143,9 +1143,9 @@ In this case, type Order is the root type and it has a property whose type is Pe
 
 > **Tip:** Make sure the destination label is the same for different levels of properties. In this demo, Person class added two mappings for label "OrderTarget", same as the label used in Order class.
 
-One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?　D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[NoNullCheck]**, to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B and the null check is stripped out: only A.B.C ?? D is generated but you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
+One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?　D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[DBColumnPath]**, to allow you to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B with option *DBColumnPathOptions.DoNotGenerateNullCheck* and the null check will be stripped out: only A.B.C ?? D is generated. But remember you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
 
-In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **NoNullCheck** like this to get better performance:
+In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **DBColumnPath** like this to get better performance:
 
 ```C#
 public class Order
@@ -1156,10 +1156,12 @@ public class Order
     [DBColumnMapping("OrderTarget", "Value", 0.0f)]
     public float? OrderValue { get; set; }
 
-    [NoNullCheck]
+    [DBColumnPath(DBColumnPathOptions.DoNotGenerateNullCheck)]
     public Person Customer { get; set; }
 }
 ```
+
+> **Tip:** Another option you may use when constructing a DBColumnPath attribute is *DBColumnPathOptions.DoNotExpand*, which disables the expansion of a certain property. This means this property path will be totally ignored when generating a mapping from your object model to the database table. 
 
 ### 2. DataBroadcaster
 When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBroadcaster** to make your life easier.
