@@ -1,6 +1,6 @@
 Welcome to DataflowEx
 ===================
-DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management for underlying dataflow blocks to make your life easier. You can get it on [Nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
+DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management for underlying dataflow blocks to make your life easier. You can get it on [nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 Here is a list of DataflowEx cool features:
 
@@ -17,7 +17,7 @@ Here is a list of DataflowEx cool features:
 
 Interested? O.K. Let's start the DataflowEx tour.
 
-Prerequisites
+1. Prerequisites
 -------------
 
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
@@ -28,7 +28,7 @@ http://channel9.msdn.com/posts/TPL-Dataflow-Tour
 Advanced (63min):
 http://channel9.msdn.com/posts/TPL-Dataflow-Tour
 
-Background
+2. Background
 -------------
 
 The very first question you may ask: what's wrong with TPL Dataflow? Nothing. The library from Microsoft library looks simply great. However, in the tough real world there are some obstacles when we apply **RAW** TPL Dataflow. Let's look at an example:
@@ -64,7 +64,7 @@ Things are getting complicated. Obviously Copy&Paste is not an acceptable choice
 
 Clearly we need a **class** representing the graph and being the handle of all the stakeholders. Object oriented design is a perfect fit here to solve all problems mentioned above. That is why we gave birth to Gridsum.DataflowEx.
 
-Introduction to DataflowEx
+3. Introduction to DataflowEx
 -------------
 Code tells a lot. Let's migrate the above example to DataflowEx and see what it looks like:
 
@@ -142,7 +142,7 @@ It is now that easy with <kbd>ProcessAsync</kbd> as DataflowEx handles the tedio
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
-Understanding Dataflow class
+4. Understanding Dataflow class
 -------------
 Just like IDataflowBlock is the fundamental piece in TPL Dataflow, IDataflow is the counterpart in DataflowEx library. Take a look at the IDataflow design:
 ```c#
@@ -175,7 +175,7 @@ IDataflow looks like IDataflowBlock, doesn't it? Well, remember IDataflow now re
 
 So on top of IDataflow there is an implementation called **Dataflow**, which should be the base class for all DataflowEx flows. Besides acting as the handle of the graph, it has many useful functionalities built-in. Let's explore them one by one.
 
-### 1. Lifecycle management
+### 4.1 Lifecycle management
 
 A key role of the Dataflow base class is to monitor the health of its children and provides a single completion state to the outside, namely the CompletionTask property.
 
@@ -226,7 +226,7 @@ So, in this form, the parent takes care of each child to guarantee nothing is wr
 
 This is all about the lifecyle management. A parent keeps his child under umbrella and never leaves any baby behind. 
 
-### 2. Graph construction
+### 4.2 Graph construction
 
 Normally you construct your graph in the constructor of your own dataflow class which inherits from Dataflow. There are typically 3 steps to construct a dataflow graph:
 
@@ -309,7 +309,7 @@ await intFlow.ProcessAsync(new[] { 1, 2, 3});
 
 Code tells :) In this example (1) Node1, Node2 and Node3 all flow to the printer node. (2) Node2's life cycle depends on Node1. (3) Node3 depends on Node1 and Node2. So when the graph comes to it completion, the order will be Node1 -> Node2 -> Node3 -> Printer. This is powered by linking and dependency registration built-in in DataflowEx. 
 
-### 3. Logging is your friend
+### 4.3 Logging is your friend
 
 To help you better understand how DataflowEx works and sometimes diagnose your application, DataflowEx provides extensive logging where we think necessary. So you get insights of the blocks/dataflows managed by DataflowEx without tedious debugging. Please just check the log, which is always our first advice.
 
@@ -476,7 +476,7 @@ The evil block has nowhere to escape :)
 
 > **Note:** DataflowEx provides a default DataflowOptions instance: DataflowOptions.Default. It has FlowMonitorEnabled set to true, BlockMonitorEnabled set to false, MonitorInterval as 10 seconds and PerformanceMonitorMode being Succint.
 
-### 4. Error handling
+### 4.4 Error handling
 
 If we look back to the very first Dataflow implementation, the AggregatorFlow class, there is a couple of conditions required for the input, in a silent way. For example, in the Split method:
 ```
@@ -536,25 +536,10 @@ DataflowEx.Demo\Program.cs:line 50
 
 Hence, if you think the exception is expected or tolerable, please catch it in the very beginning in the delegate passed to the low level block. Otherwise, the domino effect will spread and fail the whole dataflow graph. 
 
-Summary
--------------
-To sum up, DataflowEx enables you to write reusable components along with TPL Dataflow. Cool features include:
-
-* Inheritance and polymorphism for dataflows and their hehaviors
-* Block chain encapsulation as a reusable unit
-* Easy conditional chaining 
-* Automatic failure propagation within dataflow
-* Built-in performance metrics monitor
-* Auto complete support for circular dataflow graph
-* Dataflow friendly sql bulk inserter
-* Helper methods to convert raw blocks to dataflows
-
-Simply download [Gridsum.DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) and have a try!
-
-DataflowEx In Depth
+5. DataflowEx In Depth
 -------------
 
-### 1. Advanced Linking
+### 5.1 Advanced Linking
 
 LinkTo() is the most powerful mechanism TPL Dataflow provides to help intuitive and efficient dataflow graph construction. There is also an overload of LinkTo() that accepts a predicate as the filter for conditional linking.
 
@@ -701,7 +686,7 @@ e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
 ...
 ```
 
-### 2. Cyclic graph and ring completion detection
+### 5.2 Cyclic graph and ring completion detection
 
 Your dataflow graph becomes really, really complicated when there is a circult after linking components properly according to your application logic. Consider a real world example, a web crawler, which has an http request maker component and a link analysis component: they consume messages from and provide resources to each other.
 
@@ -843,7 +828,7 @@ DataflowEx provides extensive logging on cyclic flow events. Please don't forget
 
 > **Note:** In this demo, the completion condition is relatively simple (temperature < 0) so yes it could be easily replaced by manual completion. But there are complex real world situations that are really hard to find an ending condition, especially when the count of output items of the transform-many function in some of the ring nodes is indeterministic. A spider is one of the complex examples. The DataflowEx built-in **DbDataJoiner** class is another one. These scenarios are where ring completion detection feature really shines.
 
-### 3. Introducing StatisticsRecorder
+### 5.3 Introducing StatisticsRecorder
 
 Logging is our friend. It provides messages with detail to help diagnosing our applications. But sometimes we need **overviews** rather than detailed logging. This requirement is particularly important in a data flow because it might process billions of items per day and you don't want to drawn in the sea of details. For example, for a log parser program, you probably need an aggregater to sum up counts of error/warning messages in each category, rather than simply dumping everything into a single large log file.
 
@@ -969,11 +954,11 @@ As expected, people recorder captures the old person event as well as the total 
 
 To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting/monitoring purpose. Feel free to extend it and enrich your dataflow statistics.
 
-Built-in Components
+6. Built-in Components
 -------------
 Here is another big reason why many projects inside Gridsum use DataflowEx: its powerful built-in components. Provided as generic reusable Dataflow classes, you get the their power out of the box. Data bulk insertion, data branching, 
 
-### 1. Bulk insertion support
+### 6.1 Bulk insertion support
 
 The very 1st feature/component in DataflowEx we strongly recommend is the **DbBulkInserter** which enables bulk insertion to SQL Server. Though there are many ORM solutions out there but when it comes to insertion, they are just not designed to use the most efficient way: bulk insert. Using *SqlBulkCopy* internally, DbBulkInserter is born to solve the problem in a speedy way. And it nicely fits in dataflow style programming.
 
@@ -1163,7 +1148,7 @@ public class Order
 
 > **Tip:** Another option you may use when constructing a DBColumnPath attribute is *DBColumnPathOptions.DoNotExpand*, which disables the expansion of a certain property. This means this property path will be totally ignored when generating a mapping from your object model to the database table. 
 
-### 2. DataBroadcaster
+### 6.2 DataBroadcaster
 When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBroadcaster** to make your life easier.
 
 DataBroadcaster acts simply like a copy machine. When it is linked to multiple targets, whenever an item flows in, it passes the reference of the same item to multiple targets. Optionally you can indicate a clone function to DataBroadcaster if you want to copy the item before handing to targets.
@@ -1213,7 +1198,7 @@ Printer2: third message
 
 > **Tip:** TPL Dataflow also has a BroadcastBlock<T> but it *provides a buffer for storing at most one element at time, overwriting each message with the next as it arrives*, which is very different from DataflowEx's DataBroadcaster that guarantees no data loss. IMHO, in most cases DataBroadcaster rather than BroadcastBlock is what you want. 
 
-### 3. DataDispatcher
+### 6.3 DataDispatcher
 DataDispatcher also falls into the 'one source multi targets' category. But it is different from DataBroadcaster in several aspects:
 >1. It ensures one input item only goes to one target.
 >2. Target dataflow nodes are created dynamically on demand, depending on the input items and the dispatch function.
@@ -1306,7 +1291,7 @@ There are many real world scenarios where DataDispatcher really shines. We hope 
 
 https://github.com/gridsum/DataflowEx/blob/master/Gridsum.DataflowEx.Test/DatabaseTests/BulkInserterTest.cs
 
-### 4. DbDataJoiner
+### 6.4 DbDataJoiner
 
 If you have experience with SSIS, or ETL, a 'LookUp Component' should sound famaliar to you. The component normally searches a column of a dimension table and returns the relative dimension key. It will also insert to the dimension table if the lookup fails. Normally there is also a cache inside the component to improve performance.  
 
@@ -1443,10 +1428,10 @@ Secondly, of course, it did a good job setting the ProductKey column for the fac
 
 We build DbDataJoiner not only because we need the functionality in production but also we want to show the potential of DataflowEx framework as well: it is the most complex Dataflow<T> implementation in DataflowEx. Feel free to use it or extend it to meet your need. If you wish, pull requests are always welcome.
 
-DataflowEx Best Practices
+7. DataflowEx Best Practices
 -------------
 
-### 1. Building your own Dataflow<TIn, TOut>
+### 7.1 Building your own Dataflow<TIn, TOut>
 
 DataflowEx shows its real power with real-world custom Dataflow<T> implementations. In above demos, we already demonstrate some common patterns but here is a bit more helpful tips. 
 
@@ -1460,7 +1445,7 @@ Second tip is about a design choice: since Dataflow support both raw block and s
 
 Last but not least, bear in mind the basic 3 steps to build your own Dataflow<T>: **create**, **register** and **link**.
 
-### 2. What you should know about DataflowOptions
+### 7.2 What you should know about DataflowOptions
 
 One thing that we touched but haven't yet explored is the option class of DataflowEx: **DataflowOptions**. We simply used DataflowOptions.Default. This is OK for demo purpose but you may want to adjust some options of this class seriously in the tough real world. 
 
@@ -1486,7 +1471,7 @@ As a dataflow builder, or library provider, you should always **respect the Data
 
 > **Tip:** DataflowEx provides ToExecutionBlockOption() method and ToGroupingBlockOption() method to help you migrate settings from the given flow option to a new block option instance, on which you could make further modification.
 
-### 3. Performance Considerations 
+### 7.3 Performance Considerations 
 
 One of the most asked questions about DataflowEx is: does the framework affect TPL Dataflow performance?
 
@@ -1498,29 +1483,9 @@ To sum up, DataflowEx introduces very little overhead. When the pipeline is crea
 
 > **Tip:** Using DataflowEx doesn't cause performance problems. But you still need to properly design your dataflow at the level of TPL Dataflow blocks. One simple design rule is to *'avoid too many blocks'*. If one simple task could be implemented within a block, don't split it into two linked blocks: this hurts performance. Bear in mind that every single TPL block comes with a cost like buffering, threading and additional data travelling. Balancing between proper task granularity and component modularity/reusability is a key part in Dataflow/DataflowEx performance tuning. Again, don't have too many dataflows or blocks.
 
-Have a try now!
+8. Have a try now!
 -------------
 
-Thanks for reading such a long tutorial. Wish you try DataflowEx in your application and enjoy using it. For any issue or feedback please start a thread on github issue forum.
+Thanks for reading such a long tutorial. Congratulations that you've reached the end.
 
-Gridsum.DataflowEx
-==========
-
-Gridsum.DataflowEx is Gridsum's Object-Oriented dataflow framework built upon Microsoft TPL Dataflow library.
-
-TPL Dataflow is simply great. But the low-level fundamental blocks are a bit tedious to use in real world scenarioes because 
->1. Blocks are sealed and only accept delegates, which looks awkward in the Object-Oriented world where we need to maintain mutable states and reuse our data processing logic. Ever found it difficult to build a reusable library upon TPL Dataflow? 
->2. Blocks need to interop with each other (e.g. should be linked carefully) and you get a chain/graph. In many times the chain need to be treated as a single processing unit but you have to construct it tediously from ground up here and there, whereever you need it. These boilerplate codes are far from graceful due to the non-OO design.
-
-By introducing the core concept of IDataflow, Gridsum.DataflowEx is born to solve all this with an OO design on top of TPL Dataflow. You can now easily write reusable components with extension points along with TPL Dataflow! Cool features include:
-
-* Inheritance and polymorphism for dataflows and their hehaviors
-* Block chain encapsulation as a reusable unit
-* Easy conditional chaining 
-* Upstream failure propagation within dataflow
-* Built-in performance metrics monitor
-* Auto complete support for circular dataflow graph (NEW!)
-* Dataflow friendly sql bulk inserter (NEW!)
-* Helper methods to convert raw blocks to dataflows
-
-Simply download Gridsum.DataflowEx and have a try!
+We wish you try [DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) in your application and enjoy it. For any issue or feedback please start a thread on github issue forum.
