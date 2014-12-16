@@ -57,9 +57,9 @@ namespace Gridsum.DataflowEx.Demo
 
         public override ITargetBlock<MyLog> InputBlock { get { return m_writerBlock; } }
 
-        protected override void CleanUp()
+        protected override void CleanUp(Exception e)
         {
-            base.CleanUp();
+            base.CleanUp(e);
             m_writer.Flush();
         }
     }

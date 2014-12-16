@@ -349,7 +349,7 @@ namespace Gridsum.DataflowEx
             }
             finally
             {
-                this.CleanUp();
+                this.CleanUp(exception);
 
                 if (exception == null)
                 {
@@ -362,9 +362,13 @@ namespace Gridsum.DataflowEx
             }
         }
 
-        protected virtual void CleanUp()
+        /// <summary>
+        /// A method which allows you to do some clean up job when the dataflow finishes normally or bump into error.
+        /// </summary>
+        /// <param name="dataflowException">Exception thrown during dataflow execution. Null if dataflow completes succesfully.</param>
+        protected virtual void CleanUp(Exception dataflowException)
         {
-            //
+            
         }
 
         /// <summary>
