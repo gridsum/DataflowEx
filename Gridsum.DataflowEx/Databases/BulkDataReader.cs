@@ -13,7 +13,7 @@ namespace Gridsum.DataflowEx.Databases
     /// This class was initially inspired by https://github.com/WimAtIHomer/SqlBulkCopyListReader
     /// and then we took further steps to improve it.
     /// </remarks>
-    /// <typeparam name="T">The type to dissect and auto-generate delegate visitors</typeparam>
+    /// <typeparam name="T">The type to dissect and auto-generate column visitors</typeparam>
     public class BulkDataReader<T> : IDataReader where T:class
     {
         #region private fields (instance and static)

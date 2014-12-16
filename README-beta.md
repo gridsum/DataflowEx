@@ -142,7 +142,7 @@ It is now that easy with <kbd>ProcessAsync</kbd> as DataflowEx handles the tedio
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
-4. Understanding Dataflow class
+4. Understanding DataflowEx design
 -------------
 Just like IDataflowBlock is the fundamental piece in TPL Dataflow, IDataflow is the counterpart in DataflowEx library. Take a look at the IDataflow design:
 ```c#
@@ -169,7 +169,7 @@ public interface IDataflow<in TIn, out TOut> : IDataflow<TIn>, IOutputDataflow<T
 {
 }
 ```
-IDataflow looks like IDataflowBlock, doesn't it? Well, remember IDataflow now represents a dataflow graph which may contain one or more low-level blocks. We think a graph may have inputs and outputs so those strongly-typed generic IDataflows are designed. 
+IDataflow looks like IDataflowBlock, doesn't it? Well, remember IDataflow now represents a dataflow **graph** which may contain one or more low-level blocks. Since a graph may have inputs and outputs, those strongly-typed generic IDataflow interfaces are designed. 
 
 > **Note:** If you see IOutputDataflow&lt;TOut&gt;.**LinkTo**(IDataflow&lt;TOut&gt; other), congratulations to you as you find out the API supports (and encourages) graph level data linking.
 
@@ -212,19 +212,19 @@ Console.WriteLine("sum(a) = {0}", lineAggregator["a"]); //prints sum(a) = 6
 ```
 The example builds a LineAggregatorFlow on top of the existing AggregatorFlow to provide further functionalities. You get the idea how existing modules can be reused and seamlessly integrated to build a clearly-designed sophisticated dataflow graph.
 
-> **Tip:** Notice that instead of creating a Dataflow class for <kbd>_lineProcessor</kbd>, IPropagatorBlock&lt;TIn, TOut&gt;.ToDataflow() is used to avoid class creation as we just want a trivial wrapper over the delegate. This extension method is defined in DataflowUtils.cs where there are more helpers to convert from blocks and delegates to Dataflows.
+> **Tip:** Notice that instead of creating a Dataflow class for <kbd>_lineProcessor</kbd>, IPropagatorBlock&lt;TIn, TOut&gt;.ToDataflow() is used to avoid class creation as we just want a trivial wrapper over the delegate. This extension method is defined in DataflowUtils.cs where there are more helpers to convert from blocks or delegates to Dataflows.
 
 Back to the topic of lifecycle, when a child is registered (no matter it is a block or sub flow), how will it affect the parent? The following rules answer the question:
 
 - The parent comes to its completion only when **all** of its children completes.
 - The parent fails if **any** of its children fails.
-- When one of the children fails, the parent will notify and wait other children to shutdown, and then comes to Faulted state.
+- When one of the children fails, the parent will notify and wait other children to shutdown, and then comes to Faulted state itself.
 
-So, in this form, the parent takes care of each child to guarantee nothing is wrong. Whenever something bad happens, the parent dataflow takes a fast-fail approach while those normal children still have a chance to gracefully stop.
+So, in this form, the parent takes care of each child to guarantee nothing is wrong. Whenever something bad happens, the parent dataflow takes a fast-fail approach and propagates the error to other running children so they comes to a grinding halt.
 
-> **Tip:** To provide custom shutdown behavior on sibling failure, override Dataflow.Fault().
+> **Notice:** It is common need for Dataflow instances to gracefully stop, no matter it is a natural completion or exceptional shutdown (E.g. A file writer may want to flush buffered data to disk). To meet this need Dataflow class provides a virtual method *CleanUp()* which will be called after all children of the dataflow is finished or faulted. You can override this method to provide your customized tear-down operation for your dataflow. In case of exceptional shutdown, the exception object will be assigned to the input parameter of CleanUp(); in case of a happy ending, the exception parameter value is *null*. But bear in mind that, when there is an error, this method doesn't change the fact that the dataflow is down. It is just your last chance to do some work before the original exception gets thrown eventually.   
 
-This is all about the lifecyle management. A parent keeps his child under umbrella and never leaves any baby behind. 
+This is the general idea about lifecyle management in DataflowEx. A parent keeps his child under umbrella and never leaves any baby behind. 
 
 ### 4.2 Graph construction
 
@@ -685,6 +685,8 @@ aflowEx\Gridsum.DataflowEx\Dataflow.cs:line 846
 e\DataflowEx\Gridsum.DataflowEx\Exceptions\TaskEx.cs:line 59
 ...
 ```
+
+To sum up, a) DataflowEx provides its own versatile LinkTo() system and it is preferred over raw TPL Dataflow LinkTo(). b) although a Dataflow instance may be a complex graph itself, it is treated a fundamental node in the data network when connecting to its siblings.
 
 ### 5.2 Cyclic graph and ring completion detection
 
