@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Gridsum.DataflowEx.Databases
 {
+    /// <summary>
+    /// Represents a target for db bulk insertion and the chosen mapping category
+    /// </summary>
     public class TargetTable
     {
         public readonly string ConnectionString;

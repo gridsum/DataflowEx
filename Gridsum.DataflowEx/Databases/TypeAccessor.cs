@@ -13,9 +13,12 @@ namespace Gridsum.DataflowEx.Databases
     using System.Collections.Immutable;
     using System.Diagnostics;
     using System.IO;
-
     using Common.Logging;
 
+    /// <summary>
+    /// Global manager for type accessors
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public class TypeAccessorManager<T> where T : class
     {
         private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> s_accessors;

@@ -9,32 +9,31 @@ namespace Gridsum.DataflowEx.Databases
     public class DBColumnMapping : Attribute
     {
         /// <summary>
-        /// 用途： 1、标记ValueType与String类型，表明将与数据库表的字段名为PropertyInfo.Name的匹配。
+        /// Constructs a mapping from the tagged property to a db column name by property name
         /// </summary>
-        /// <param name="destLabel">产品名称</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
         public DBColumnMapping(string destLabel)
             : this(destLabel, -1, null, null, ColumnMappingOption.Mandatory)
         {
         }
 
         /// <summary>
-        /// 用途： 用于将该属性匹配到数据库表的特定的列，采用字段的位置参数进行匹配
+        /// Constructs a mapping from the tagged property to a db column by column offset in the db table
         /// </summary>
-        /// <param name="destLabel">产品名称</param>
-        /// <param name="destColumnOffset">将要匹配的数据库表的列位置</param>
-        /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
-        /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
+        /// <param name="destColumnOffset">the column offset in the db table</param>
+        /// <param name="defaultValue">default value for the property if the propety is null</param>
+        /// <param name="option">The option, or priority of this mapping</param>
         public DBColumnMapping(string destLabel, int destColumnOffset, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory) 
             : this(destLabel, destColumnOffset, null, defaultValue, option) { }
 
         /// <summary>
-        /// 用途：
-        /// 用于将该属性匹配到数据库表的特定的列，采用字段名称进行匹配
+        /// Constructs a mapping from the tagged property to a db column by column name in the db table
         /// </summary>
-        /// <param name="destLabel">产品名称 </param>
-        /// <param name="destColumnName">将要匹配的数据库表的列名称</param>
-        /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
-        /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
+        /// <param name="destColumnName">the column name in the db table</param>
+        /// <param name="defaultValue">default value for the property if the propety is null</param>
+        /// <param name="option">The option, or priority of this mapping</param>
         public DBColumnMapping(string destLabel, string destColumnName, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory)
             : this(destLabel, -1, destColumnName, defaultValue, option)
         {
@@ -50,34 +49,38 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         /// <summary>
-        /// 产品类型
+        /// The label to help categorize all column mappings
         /// </summary>
         public string DestLabel { get; private set; }
         
         /// <summary>
-        /// 对应数据库表的第几列
+        /// Column offset in the db table
         /// </summary>
         public int DestColumnOffset { get; set; }
+
         /// <summary>
-        /// 对应数据库表的列名称
+        /// Column name in the db table
         /// </summary>
         public string DestColumnName { get; set; }
 
         /// <summary>
-        /// 默认的值
+        /// Default value for the property if the propety is null
         /// </summary>
         public object DefaultValue { get; internal set; }
 
+        /// <summary>
+        /// The option, or priority of this mapping
+        /// </summary>
         public ColumnMappingOption Option { get; set; }
 
-        public PropertyTreeNode Host { get; set; }
+        internal PropertyTreeNode Host { get; set; }
 
-        public bool IsDestColumnOffsetOk()
+        internal bool IsDestColumnOffsetOk()
         {
             return DestColumnOffset >= 0;
         }
 
-        public bool IsDestColumnNameOk()
+        internal bool IsDestColumnNameOk()
         {
             return string.IsNullOrWhiteSpace(DestColumnName) == false;
         }

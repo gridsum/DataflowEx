@@ -28,16 +28,31 @@ namespace Gridsum.DataflowEx
         protected ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>> m_destinations;
         private Func<TKey, Lazy<Dataflow<TIn>>> m_initer;
 
-        public DataDispatcher(Func<TIn, TKey> dispatcherFunc) : this(dispatcherFunc, DataflowOptions.Default)
+        /// <summary>
+        /// Construct an DataDispatcher instance 
+        /// </summary>
+        /// <param name="dispatchFunc">The dispatch function</param>
+        public DataDispatcher(Func<TIn, TKey> dispatchFunc) : this(dispatchFunc, DataflowOptions.Default)
         {
         }
 
-        public DataDispatcher(Func<TIn, TKey> dispatcherFunc, DataflowOptions option)
-            : this(dispatcherFunc, EqualityComparer<TKey>.Default, option)
+        /// <summary>
+        /// Construct an DataDispatcher instance 
+        /// </summary>
+        /// <param name="dispatchFunc">The dispatch function</param>
+        /// <param name="option">Option for this dataflow</param>
+        public DataDispatcher(Func<TIn, TKey> dispatchFunc, DataflowOptions option)
+            : this(dispatchFunc, EqualityComparer<TKey>.Default, option)
         {
         }
 
-        public DataDispatcher(Func<TIn, TKey> dispatcherFunc, EqualityComparer<TKey> keyComparer, DataflowOptions option)
+        /// <summary>
+        /// Construct an DataDispatcher instance 
+        /// </summary>
+        /// <param name="dispatchFunc">The dispatch function</param>
+        /// <param name="keyComparer">The key comparer for this dataflow</param>
+        /// <param name="option">Option for this dataflow</param>
+        public DataDispatcher(Func<TIn, TKey> dispatchFunc, EqualityComparer<TKey> keyComparer, DataflowOptions option)
             : base(option)
         {
             m_destinations = new ConcurrentDictionary<TKey, Lazy<Dataflow<TIn>>>(keyComparer);
@@ -54,7 +69,7 @@ namespace Gridsum.DataflowEx
             m_dispatcherBlock = new ActionBlock<TIn>(async
                 input =>
             {
-                var childFlow = m_destinations.GetOrAdd(dispatcherFunc(input), m_initer).Value;
+                var childFlow = m_destinations.GetOrAdd(dispatchFunc(input), m_initer).Value;
                 await childFlow.SendAsync(input).ConfigureAwait(false);
             }, option.ToExecutionBlockOption());
 
@@ -70,7 +85,10 @@ namespace Gridsum.DataflowEx
         /// The dispatch key should have a one-one relatioship with child flow
         /// </remarks>
         protected abstract Dataflow<TIn> CreateChildFlow(TKey dispatchKey);
-
+        
+        /// <summary>
+        /// See <see cref="Dataflow{T}.InputBlock"/>
+        /// </summary>
         public override ITargetBlock<TIn> InputBlock
         {
             get

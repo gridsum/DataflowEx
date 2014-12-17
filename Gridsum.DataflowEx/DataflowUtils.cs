@@ -14,8 +14,6 @@ namespace Gridsum.DataflowEx
 {
     using System.IO;
 
-    using Microsoft.SqlServer.Server;
-
     public static class DataflowUtils
     {
         public static Dataflow<TIn> FromDelegate<TIn>(Action<TIn> action)

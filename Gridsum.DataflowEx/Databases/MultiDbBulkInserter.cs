@@ -19,6 +19,17 @@ namespace Gridsum.DataflowEx.Databases
         private readonly string m_displayName;
         private readonly PostBulkInsertDelegate<T> m_postBulkInsert;
 
+        /// <summary>
+        /// Constructs a MultiDbBulkInserter instance.
+        /// </summary>
+        /// <param name="options">The option for this dataflow</param>
+        /// <param name="dispatchFunc">The dispatch function to decide which child flow the incoming objects will be delivered to</param>
+        /// <param name="connectionGetter">Connection string generator for child flows</param>
+        /// <param name="destTable">The table name in database to bulk insert into for every child</param>
+        /// <param name="destLabel">The mapping label to help choose among all column mappings</param>
+        /// <param name="bulkSize">The bulk size to insert in a batch. Default to 8192.</param>
+        /// <param name="displayName">A given name of this multi bulk inserter (would be nice for logging)</param>
+        /// <param name="postBulkInsert">A delegate that enables you to inject some customized work whenever a bulk insert is done</param>
         public MultiDbBulkInserter(DataflowOptions options, 
             Func<T, int> dispatchFunc, 
             Func<int, string> connectionGetter, 
@@ -50,6 +61,9 @@ namespace Gridsum.DataflowEx.Databases
                 this.m_postBulkInsert);
         }
         
+        /// <summary>
+        /// See <see cref="Dataflow{T}.Name"/>
+        /// </summary>
         public override string Name
         {
             get

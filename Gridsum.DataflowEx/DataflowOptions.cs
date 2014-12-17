@@ -17,10 +17,19 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public int? RecommendedCapacity { get; set; }
 
+        /// <summary>
+        /// Whether the monitor logging is enabled for parent dataflow
+        /// </summary>
         public bool FlowMonitorEnabled { get; set; }
 
+        /// <summary>
+        /// Whether the monitor logging is enabled for childrens of the dataflow
+        /// </summary>
         public bool BlockMonitorEnabled { get; set; }
         
+        /// <summary>
+        /// The monitor logging mode 
+        /// </summary>
         public PerformanceLogMode PerformanceMonitorMode { get; set; }
 
         /// <summary>
@@ -29,6 +38,10 @@ namespace Gridsum.DataflowEx
         public int? RecommendedParallelismIfMultiThreaded { get; set; }
 
         private TimeSpan m_monitorInterval;
+
+        /// <summary>
+        /// The interval of the async monitor loop
+        /// </summary>
         public TimeSpan MonitorInterval
         {
             get
@@ -60,6 +73,9 @@ namespace Gridsum.DataflowEx
             RecommendedCapacity = 100000
         };
 
+        /// <summary>
+        /// A predefined default setting for DataflowOptions
+        /// </summary>
         public static DataflowOptions Default
         {
             get
@@ -68,6 +84,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// A predefined verbose setting for DataflowOptions
+        /// </summary>
         public static DataflowOptions Verbose
         {
             get
@@ -76,6 +95,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// The default monitor interval, 10 seconds
+        /// </summary>
         public static TimeSpan DefaultInterval
         {
             get
@@ -84,6 +106,10 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Extract relative information from dataflow option to a block-level ExecutionDataflowBlockOptions 
+        /// </summary>
+        /// <param name="isBlockMultiThreaded">Whether the block using return value is multi-threaded</param>
         public ExecutionDataflowBlockOptions ToExecutionBlockOption(bool isBlockMultiThreaded = false)
         {
             var option = new ExecutionDataflowBlockOptions();
@@ -102,6 +128,9 @@ namespace Gridsum.DataflowEx
             return option;
         }
 
+        /// <summary>
+        /// Extract relative information from dataflow option to a block-level GroupingDataflowBlockOptions 
+        /// </summary>
         public GroupingDataflowBlockOptions ToGroupingBlockOption()
         {
             var option = new GroupingDataflowBlockOptions();
@@ -114,6 +143,9 @@ namespace Gridsum.DataflowEx
             return option;
         }
 
+        /// <summary>
+        /// Mode of performance logging
+        /// </summary>
         public enum PerformanceLogMode
         {
             /// <summary>

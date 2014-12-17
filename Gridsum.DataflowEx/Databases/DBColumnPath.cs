@@ -10,17 +10,24 @@
     {
         protected readonly DBColumnPathOptions m_options;
 
+        /// <summary>
+        /// Constructs a DBColumnPath instance
+        /// </summary>
+        /// <param name="options">Options for a property path</param>
         public DBColumnPath(DBColumnPathOptions options)
         {
             this.m_options = options;
         }
 
-        public bool HasOption(DBColumnPathOptions option)
+        internal bool HasOption(DBColumnPathOptions option)
         {
             return m_options.HasFlag(option);
         }
     }
 
+    /// <summary>
+    /// Options for a property path
+    /// </summary>
     [Flags]
     public enum DBColumnPathOptions
     {

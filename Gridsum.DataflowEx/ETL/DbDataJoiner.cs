@@ -15,6 +15,9 @@
     using Gridsum.DataflowEx.AutoCompletion;
     using Gridsum.DataflowEx.Databases;
 
+    /// <summary>
+    /// A wrapper for a data batch
+    /// </summary>
     public struct JoinBatch<TIn> where TIn : class
     {
         public readonly TIn[] Data;
@@ -34,6 +37,12 @@
         RemoteLookup,
     }
 
+    /// <summary>
+    /// The data joiner flow empowers you to join a coming flow with a remote table in the database 
+    /// and populate some fields of in-memory objects. Typically works like a Lookup Component in SSIS.
+    /// </summary>
+    /// <typeparam name="TIn">The type of you incoming object into the flow</typeparam>
+    /// <typeparam name="TLookupKey">The key type to join with remote table</typeparam>
     public abstract class DbDataJoiner<TIn, TLookupKey> : Dataflow<TIn, TIn> where TIn : class 
     {
         /// <summary>
@@ -198,6 +207,14 @@
         protected IEqualityComparer<TLookupKey> m_keyComparer;
         protected ILog m_logger;
 
+        /// <summary>
+        /// Constructs a DbDataJoiner instance
+        /// </summary>
+        /// <param name="joinOn">Property path from the root object down to the lookup key</param>
+        /// <param name="dimTableTarget">Table information of the remote dimension table</param>
+        /// <param name="option">Option to use for this dataflow</param>
+        /// <param name="batchSize">The batch size for a batched remote look up</param>
+        /// <param name="cacheSize">The local cache item count (part of the remote table)</param>
         public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, DataflowOptions option, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
             : base(option)
         {
@@ -241,7 +258,7 @@
             RegisterChildRing(transformer.CompletionTask, m_lookupNode, m_dimInserter, hb);
         }
 
-        public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
+        protected PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
         {
             var me = expression.Body as MemberExpression;
 
@@ -360,7 +377,10 @@
         /// Usually the implementation of this method should assign to some fields/properties(e.g. key column) of the input item according to the dimension row.
         /// </summary>
         protected abstract void OnSuccessfulLookup(TIn input, IDimRow<TLookupKey> rowInDimTable);
-        
+
+        /// <summary>
+        /// See <see cref="Dataflow{T}.InputBlock"/>
+        /// </summary>
         public override ITargetBlock<TIn> InputBlock
         {
             get
@@ -369,6 +389,9 @@
             }
         }
 
+        /// <summary>
+        /// See <see cref="IOutputDataflow{T}.OutputBlock"/>
+        /// </summary>
         public override ISourceBlock<TIn> OutputBlock
         {
             get
