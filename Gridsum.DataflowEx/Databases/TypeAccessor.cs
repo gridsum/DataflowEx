@@ -18,7 +18,6 @@ namespace Gridsum.DataflowEx.Databases
     /// <summary>
     /// Global manager for type accessors
     /// </summary>
-    /// <typeparam name="T"></typeparam>
     public class TypeAccessorManager<T> where T : class
     {
         private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> s_accessors;
@@ -33,13 +32,9 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         /// <summary>
-        /// if the typeAccessor exists, just return it; else create a new one with parameter: destLabel, connectionString,
+        /// If the typeAccessor exists, just return it; else create a new one with parameter: destLabel, connectionString,
         /// dataTableName
         /// </summary>
-        /// <param name="destLabel"></param>
-        /// <param name="connectionString"></param>
-        /// <param name="dataTableName"></param>
-        /// <returns></returns>
         public static TypeAccessor<T> GetAccessorForTable(TargetTable target)
         {
             return s_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
@@ -53,14 +48,21 @@ namespace Gridsum.DataflowEx.Databases
     {
         internal static List<Tuple<Expression, DBColumnMapping>> s_externalMappings = new List<Tuple<Expression, DBColumnMapping>>();
 
-        public static void RegisterMapping(Expression propertyPath, DBColumnMapping mapping)
+        private static void RegisterMapping(Expression propertyPath, DBColumnMapping mapping)
         {
             s_externalMappings.Add(Tuple.Create(propertyPath, mapping));
         }
 
+        /// <summary>
+        /// Register an external mapping to affect the column mapping process by type accessors.
+        /// </summary>
+        /// <typeparam name="T">Type of the root object</typeparam>
+        /// <typeparam name="TValue">Return type of the leaf property</typeparam>
+        /// <param name="propertyPath">A lambda expression which defines the property path from root type to the leaf property</param>
+        /// <param name="mapping">The mapping to register to the give property path</param>
         public static void RegisterMapping<T, TValue>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping) where T : class
         {
-            //todo: add check
+            //todo: add lambda expression check
             RegisterMapping(propertyPath.Body, mapping);
         }
 

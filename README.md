@@ -357,7 +357,7 @@ Meanwhile, set up NLog in you NLog.config:
 
 Then the logging infomation will be written to both the console and a log file. 
 
-> **Note:** Notice that "Gridsum.DataflowEx*" is used as the logger name in the rules section. This represents the logging categories used by DataflowEx. In fact, most logging of DataflowEx is recorded under category "Gridsum.DataflowEx" and a few uses subcategories with the prefix (e.g. "Gridsum.DataflowEx.Databases"). So an extra wildcard ¡®*¡¯ includes every message from the library.
+> **Note:** Notice that "Gridsum.DataflowEx*" is used as the logger name in the rules section. This represents the logging categories used by DataflowEx. In fact, most logging of DataflowEx is recorded under category "Gridsum.DataflowEx" and a few uses subcategories with the prefix (e.g. "Gridsum.DataflowEx.Databases"). So an extra wildcard â€˜*â€™ includes every message from the library.
 
 O.K. Let's take a look of the log file after executing the ComplexIntFlow demo:
 
@@ -1042,7 +1042,9 @@ Now take a glimpse of what's been put in the table, just as expected (Notice the
 
 ![ScreenShot](/images/dbbulkinserter_screenshot1.png)
 
-If you want more insights of how DbBulkInserter works, check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
+> **Notice:** One thing that you may complain about *attribute tagging* is, db column mappings are pre-defined along with the domain object types. Chances are that your object types are defined in a dependent library which is completely out of your control. Yes, this was a problem. Luckily, starting from DataflowEx 1.1.0 *TypeAccessorConfig.RegisterMapping()* is added to enable manual mapping construction and mapping overwriting at runtime. Check out the API's [unit test](https://github.com/gridsum/DataflowEx/blob/master/Gridsum.DataflowEx.Test/DatabaseTests/ExternalMappingTest.cs) for how to use it. 
+
+If you want more insights of how DbBulkInserter works, please check the log where you get the internals of DbBulkInserter, especially how type properties are mapped to columns of a database table. 
 
 ```
 14/11/13 17:55:08 [Gridsum.DataflowEx.Databases.TypeAccessor<Person>].[Debug] Populated column offset for DBColumnMapping: [ColName:NameCol, ColOffset:1, DefaultValue:N/A] on property node: Person->Name by table dbo.People  
@@ -1130,7 +1132,7 @@ In this case, type Order is the root type and it has a property whose type is Pe
 
 > **Tip:** Make sure the destination label is the same for different levels of properties. In this demo, Person class added two mappings for label "OrderTarget", same as the label used in Order class.
 
-One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?¡¡D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[DBColumnPath]**, to allow you to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B with option *DBColumnPathOptions.DoNotGenerateNullCheck* and the null check will be stripped out: only A.B.C ?? D is generated. But remember you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
+One final point: DbBulkInserter is very careful about 'null's when generating deep property accessors like A.B.C. Since A.B could be null, DbBulkInserter generates something like 'A.B == null ?ã€€D : (A.B.C ?? D)' rather than A.B.C ?? D (D is the default value defined on C's DBColumnMapping) to avoid NullReferenceException. This affects the performance, of course, especially when your property tree is tall. So DataflowEx gives you an attribute, **[DBColumnPath]**, to allow you to turn off the null check in the IL of the generated property accessor. Simply tag it on A.B with option *DBColumnPathOptions.DoNotGenerateNullCheck* and the null check will be stripped out: only A.B.C ?? D is generated. But remember you take the risk to guarantee A.B is not null (otherwise NullReferenceException will be thrown at runtime). 
 
 In the last demo, if you are sure each of the Order objects has a non-null Customer propety, try tagging **DBColumnPath** like this to get better performance:
 
