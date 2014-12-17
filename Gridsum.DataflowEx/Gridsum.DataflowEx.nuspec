@@ -11,7 +11,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>Gridsum's dataflow framework built upon TPL Dataflow</summary>
     <description>
-      DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind.
+      Gridsum.DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind.
       DataflowEx enables you to write reusable components and easily link them together as a high-level graph while still having the power of low level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. Find more at https://github.com/gridsum/dataflowex.
     </description>
     <releaseNotes>
