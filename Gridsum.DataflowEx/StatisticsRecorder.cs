@@ -23,10 +23,17 @@ namespace Gridsum.DataflowEx
         protected ConcurrentDictionary<Type, IntHolder> m_typeCounter = new ConcurrentDictionary<Type, IntHolder>();
         protected ConcurrentDictionary<DataflowEvent, IntHolder> m_eventCounter = new ConcurrentDictionary<DataflowEvent, IntHolder>(new DataflowEventComparer());
 
+        /// <summary>
+        /// Constructs a statistics recorder instance without a parent
+        /// </summary>
         public StatisticsRecorder() : this(null)
         {
         }
 
+        /// <summary>
+        /// Constructs a statistics recorder instance
+        /// </summary>
+        /// <param name="parent">The dataflow that this recorder belongs to</param>
         public StatisticsRecorder(IDataflow parent)
         {
             this.m_parent = parent;
@@ -97,6 +104,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the count of exceptions received by the recorder
+        /// </summary>
         public int ExceptionCount
         {
             get
@@ -113,6 +123,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Total count of objects in all types received
+        /// </summary>
         public int TotalTypeCount
         {
             get
@@ -126,6 +139,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Name of this recorder
+        /// </summary>
         public string Name { get; set; }
 
         /// <summary>
@@ -143,6 +159,10 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Record once for a certain type 
+        /// </summary>
+        /// <param name="t">Type of the object passing dataflow</param>
         public void RecordType(Type t)
         {
             IntHolder intHolder;
@@ -153,11 +173,20 @@ namespace Gridsum.DataflowEx
             intHolder.Increment();
         }
 
+        /// <summary>
+        /// Record once for a certain dataflow event
+        /// </summary>
+        /// <param name="level1">The first level information of the event</param>
+        /// <param name="level2">The second level information of the event</param>
         public void RecordEvent(string level1, string level2 = null)
         {
             RecordEvent(new DataflowEvent(level1, level2));
         }
 
+        /// <summary>
+        /// Record once for a certain dataflow event 
+        /// </summary>
+        /// <param name="eventToAggregate">The event to record</param>
         public void RecordEvent(DataflowEvent eventToAggregate)
         {
             if (DataflowEvent.IsEmpty(eventToAggregate)) return; //ignore empty event
@@ -170,16 +199,30 @@ namespace Gridsum.DataflowEx
             intHolder.Increment();
         }
 
+        /// <summary>
+        /// Get a snapshot of current status of the internal type counter
+        /// </summary>
         public ImmutableDictionary<Type, int> SnapshotTypeCounter()
         {
             return this.m_typeCounter.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.Count);
         }
 
+        /// <summary>
+        /// Get a snapshot of current status of the internal event counter
+        /// </summary>
         public ImmutableDictionary<DataflowEvent, int> SnapshotEventCounter()
         {
             return this.m_eventCounter.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.Count);
         }
 
+        /// <summary>
+        /// Generate a multi-line string which describes the current aggregated statistics of this recorder
+        /// </summary>
+        /// <remarks>
+        /// Typically you want to call this method at the end of your application to get
+        /// an overview of how many objects are processed in your dataflow.
+        /// </remarks>
+        /// <returns>A multi-line statistics string</returns>
         public virtual string DumpStatistics()
         {
             string recorderName = this.Name ?? this.GetType().GetFriendlyName();
@@ -192,26 +235,26 @@ namespace Gridsum.DataflowEx
             StringBuilder sb = new StringBuilder();
 
             sb.AppendFormat("[{0}] Entities:", recorderName);
-            foreach (KeyValuePair<Type, IntHolder> keyValuePair in this.m_typeCounter)
+            foreach (KeyValuePair<Type, int> keyValuePair in this.SnapshotTypeCounter())
             {
                 if (!typeof(Exception).IsAssignableFrom(keyValuePair.Key))
                 {
                     sb.Append(' ');
                     sb.Append(keyValuePair.Key.GetFriendlyName());
                     sb.Append('(');
-                    sb.Append(keyValuePair.Value.Count);
+                    sb.Append(keyValuePair.Value);
                     sb.Append(')');
                 }
             }
             sb.AppendLine();
 
             sb.AppendFormat("[{0}] Events:", recorderName);
-            foreach (KeyValuePair<DataflowEvent, IntHolder> keyValuePair in this.m_eventCounter)
+            foreach (KeyValuePair<DataflowEvent, int> keyValuePair in this.SnapshotEventCounter())
             {
                 sb.Append(' ');
                 sb.Append(keyValuePair.Key);
                 sb.Append('(');
-                sb.Append(keyValuePair.Value.Count);
+                sb.Append(keyValuePair.Value);
                 sb.Append(')');
             }
             sb.AppendLine();
@@ -227,7 +270,7 @@ namespace Gridsum.DataflowEx
     }
 
     /// <summary>
-    /// Represents an 2-level event that you want <see cref="StatisticsRecorder"/> to aggregate for you
+    /// A value type which represents an 2-level event that you want <see cref="StatisticsRecorder"/> to aggregate
     /// </summary>
     public struct DataflowEvent
     {
@@ -245,16 +288,33 @@ namespace Gridsum.DataflowEx
             m_level2 = level2;
         }
 
+        /// <summary>
+        /// The first level information of the event
+        /// </summary>
         public string Level1 { get { return m_level1; } }
+
+        /// <summary>
+        /// The second level information of the event
+        /// </summary>
         public string Level2 { get { return m_level2; } }
 
+        /// <summary>
+        /// String representation of the event
+        /// </summary>
         public override string ToString()
         {
             return m_level2 == null ? m_level1 : string.Concat(m_level1, "-", m_level2);
         }
 
+        /// <summary>
+        /// An empty event that will not be recorded by statistics recorder
+        /// </summary>
         public static DataflowEvent Empty = new DataflowEvent(null, null);
 
+        /// <summary>
+        /// Checks if the given dataflow event is an empty event
+        /// </summary>
+        /// <param name="flowEvent">The dataflow event to check</param>
         public static bool IsEmpty(DataflowEvent flowEvent)
         {
             return flowEvent.Level1 == null && flowEvent.Level2 == null;
