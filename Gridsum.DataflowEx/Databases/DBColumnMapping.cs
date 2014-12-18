@@ -5,52 +5,35 @@ namespace Gridsum.DataflowEx.Databases
     /// <summary>
     /// Represents a mapping from C# property to a DB column
     /// </summary> 
-    /// <remarks>
-    /// 采用尽可能匹配的原则，即如果发现用户设置的参数与数据库的不匹配，一般情况下打印Warn级别的日志，不会直接报错退出。
-    /// Warn:由于C#里的继承的属性的Attribute是不继承的，因此，想要添加DBColumnMapping，必须添加到子类中。示例：
-    /// public abstract class Base{
-    ///     public abstract int Data{get;set;}
-    /// 
-    ///     [DBColumnMapping()]
-    ///     public float Price{get;set;}
-    /// }
-    /// 
-    /// public class Drived: Base{
-    ///     [DBColumnMapping()]
-    ///     public override int Data{get;set;}
-    /// }
-    /// 如果将DBColumnMapping标签在Base类的Data中，则不能实现匹配。必须 标记在Drived的Data属性中
-    /// </remarks>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public class DBColumnMapping : Attribute
     {
         /// <summary>
-        /// 用途： 1、标记ValueType与String类型，表明将与数据库表的字段名为PropertyInfo.Name的匹配。
+        /// Constructs a mapping from the tagged property to a db column name by property name
         /// </summary>
-        /// <param name="destLabel">产品名称</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
         public DBColumnMapping(string destLabel)
             : this(destLabel, -1, null, null, ColumnMappingOption.Mandatory)
         {
         }
 
         /// <summary>
-        /// 用途： 用于将该属性匹配到数据库表的特定的列，采用字段的位置参数进行匹配
+        /// Constructs a mapping from the tagged property to a db column by column offset in the db table
         /// </summary>
-        /// <param name="destLabel">产品名称</param>
-        /// <param name="destColumnOffset">将要匹配的数据库表的列位置</param>
-        /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
-        /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
+        /// <param name="destColumnOffset">the column offset in the db table</param>
+        /// <param name="defaultValue">default value for the property if the propety is null</param>
+        /// <param name="option">The option, or priority of this mapping</param>
         public DBColumnMapping(string destLabel, int destColumnOffset, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory) 
             : this(destLabel, destColumnOffset, null, defaultValue, option) { }
 
         /// <summary>
-        /// 用途：
-        /// 用于将该属性匹配到数据库表的特定的列，采用字段名称进行匹配
+        /// Constructs a mapping from the tagged property to a db column by column name in the db table
         /// </summary>
-        /// <param name="destLabel">产品名称 </param>
-        /// <param name="destColumnName">将要匹配的数据库表的列名称</param>
-        /// <param name="defaultValue">默认值，如果不填，将采用default(T)的形式得到该类型的默认值</param>
-        /// <param name="destTableName">数据库表：默认为null，将匹配所有该产品的数据库表</param>
+        /// <param name="destLabel">The label to help categorize all column mappings</param>
+        /// <param name="destColumnName">the column name in the db table</param>
+        /// <param name="defaultValue">default value for the property if the propety is null</param>
+        /// <param name="option">The option, or priority of this mapping</param>
         public DBColumnMapping(string destLabel, string destColumnName, object defaultValue = null, ColumnMappingOption option = ColumnMappingOption.Mandatory)
             : this(destLabel, -1, destColumnName, defaultValue, option)
         {
@@ -66,34 +49,38 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         /// <summary>
-        /// 产品类型
+        /// The label to help categorize all column mappings
         /// </summary>
         public string DestLabel { get; private set; }
         
         /// <summary>
-        /// 对应数据库表的第几列
+        /// Column offset in the db table
         /// </summary>
         public int DestColumnOffset { get; set; }
+
         /// <summary>
-        /// 对应数据库表的列名称
+        /// Column name in the db table
         /// </summary>
         public string DestColumnName { get; set; }
 
         /// <summary>
-        /// 默认的值
+        /// Default value for the property if the propety is null
         /// </summary>
         public object DefaultValue { get; internal set; }
 
+        /// <summary>
+        /// The option, or priority of this mapping
+        /// </summary>
         public ColumnMappingOption Option { get; set; }
 
-        public PropertyTreeNode Host { get; set; }
+        internal PropertyTreeNode Host { get; set; }
 
-        public bool IsDestColumnOffsetOk()
+        internal bool IsDestColumnOffsetOk()
         {
             return DestColumnOffset >= 0;
         }
 
-        public bool IsDestColumnNameOk()
+        internal bool IsDestColumnNameOk()
         {
             return string.IsNullOrWhiteSpace(DestColumnName) == false;
         }
@@ -101,10 +88,11 @@ namespace Gridsum.DataflowEx.Databases
         public override string ToString()
         {
             return string.Format(
-                "[ColName:{0}, ColOffset:{1}, DefaultValue:{2}]",
+                "[ColName:{0}, ColOffset:{1}, DefaultValue:{2}, Option: {3}]",
                 this.DestColumnName,
                 this.DestColumnOffset,
-                this.DefaultValue);
+                this.DefaultValue,
+                this.Option);
         }
     }
 
@@ -114,14 +102,19 @@ namespace Gridsum.DataflowEx.Databases
     public enum ColumnMappingOption
     {
         /// <summary>
+        /// Used typically by external mappings to overwrite Mandatory option on tagged attribute. The column must exist in the destination table.
+        /// </summary>
+        Overwrite = short.MinValue,
+
+        /// <summary>
         /// The column must exist in the destination table
         /// </summary>
-        Mandatory,
+        Mandatory = 1,
 
         /// <summary>
         /// The column mapping can be ignored if the column is not found in the destination table
         /// This option is useful when you have one dest label for multiple different tables
         /// </summary>
-        Optional
+        Optional = 2
     }
 }

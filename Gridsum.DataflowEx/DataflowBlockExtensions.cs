@@ -68,10 +68,17 @@ namespace Gridsum.DataflowEx
                 return new Tuple<int, int>(0, b.OutputCount * b.BatchSize);                
             }
 
-//            if (typeof(ISourceBlock<>).IsInstanceOfType(block))
-//            {
-//                return b.OutputCount;
-//            }
+            if (block.GetType().Name.StartsWith("EncapsulatingPropagator"))
+            {
+//                we wish we could do this: (but it is not feasible due to TPL Dataflow design)
+//                var t1 = (b.Source as IDataflowBlock).GetBufferCount();
+//                var t2 = (b.Target as IDataflowBlock).GetBufferCount();
+//                return new Tuple<int, int>(t1.Item1 + t2.Item1, t1.Item2 + t2.Item2);
+                
+                //return 0 for encapuslated block otherwise exception will be thrown
+                //to monitor encapsulated blocks, user should register underlying blocks as children
+                return new Tuple<int, int>(0, 0);
+            }
 
             throw new ArgumentException("Fail to auto-detect buffer count of block: " + Utils.GetFriendlyName(block.GetType()), "block");
         }

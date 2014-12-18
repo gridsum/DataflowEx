@@ -14,6 +14,7 @@ namespace Gridsum.DataflowEx.Databases
     /// If a tagged property happens to be null. NullReferenceException will be thrown at runtime by DbBulkInserter.
     /// This is the cost of performance.
     /// </remarks>
+    [Obsolete("Please use [DBColumnPath(DBColumnPathOptions.DoNotGenerateNullCheck)] instead")]
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
     public class NoNullCheckAttribute : Attribute 
     {

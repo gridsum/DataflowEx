@@ -30,16 +30,12 @@ namespace Gridsum.DataflowEx.PatternMatch
                 switch (MatchType)
                 {
                     case MatchType.ExactMatch:
-                        // 精确匹配
                         return string.Equals(MatchPattern, input, StringComparison.OrdinalIgnoreCase);
                     case MatchType.BeginsWith:
-                        // 处理左匹配
                         return input.StartsWith(MatchPattern, StringComparison.OrdinalIgnoreCase);
                     case MatchType.EndsWith:
-                        // 处理右匹配
                         return input.EndsWith(MatchPattern, StringComparison.OrdinalIgnoreCase);
                     case MatchType.Contains:
-                        // 处理包含情况
                         return input.IndexOf(MatchPattern, StringComparison.OrdinalIgnoreCase) >= 0;
                     case MatchType.RegexMatch:
                         return Regex.IsMatch(input);

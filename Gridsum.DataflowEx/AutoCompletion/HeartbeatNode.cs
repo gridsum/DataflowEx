@@ -8,16 +8,20 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Gridsum.DataflowEx.AutoCompletion
 {
+    /// <summary>
+    /// A dataflow node used in ring completion detection infrastructure. 
+    /// </summary>
     public interface IHeartbeatNode : IRingNode
     {
         long ProcessedItemCount { get; }
-
-        void Complete();
 
         bool NoHeartbeatDuring(Action action);
         Task<bool> NoHeartbeatDuring(Func<Task> action);
     }
 
+    /// <summary>
+    /// A default implementation of IHeartbeatNode, used in ring completion detection.
+    /// </summary>
     public class HeartbeatNode<T> : Dataflow<T, T>, IHeartbeatNode
     {
         private long m_beats;
@@ -63,7 +67,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
             }
         }
 
-        public void Complete()
+        public override void Complete()
         {
             this.InputBlock.Complete();
         }
@@ -79,7 +83,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         public async Task<bool> NoHeartbeatDuring(Func<Task> action)
         {
             long before = m_beats;
-            await action();
+            await action().ConfigureAwait(false);
             long after = m_beats;
             return after == before;
         }

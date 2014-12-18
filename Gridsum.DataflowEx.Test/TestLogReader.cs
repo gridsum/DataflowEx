@@ -35,11 +35,19 @@
         }
 
         [TestMethod]
-        [ExpectedException(typeof(OperationCanceledException))]
         public async Task TestMethod2()
         {
             var logReader = new SimpleLogReader(DataflowOptions.Default);
-            long count = await logReader.ProcessAsync(this.GetStringSequence());
+
+            try
+            {
+                long count = await logReader.ProcessAsync(this.GetStringSequence());
+                Assert.Fail("shouldn't arrive here");
+            }
+            catch (Exception e)
+            {
+                Assert.AreEqual(typeof(OperationCanceledException), e.InnerException.GetType());
+            }
         }
         #endregion
 
@@ -89,7 +97,7 @@
                         return s.Split(Splitor);
                     });
 
-            this.m_recorder = new StatisticsRecorder();
+            this.m_recorder = new StatisticsRecorder(this);
             this.m_recordBlock = new ActionBlock<string>(
                 s =>
                     {

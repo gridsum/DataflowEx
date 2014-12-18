@@ -15,6 +15,9 @@
     using Gridsum.DataflowEx.AutoCompletion;
     using Gridsum.DataflowEx.Databases;
 
+    /// <summary>
+    /// A wrapper for a data batch
+    /// </summary>
     public struct JoinBatch<TIn> where TIn : class
     {
         public readonly TIn[] Data;
@@ -34,6 +37,12 @@
         RemoteLookup,
     }
 
+    /// <summary>
+    /// The data joiner flow empowers you to join a coming flow with a remote table in the database 
+    /// and populate some fields of in-memory objects. Typically works like a Lookup Component in SSIS.
+    /// </summary>
+    /// <typeparam name="TIn">The type of you incoming object into the flow</typeparam>
+    /// <typeparam name="TLookupKey">The key type to join with remote table</typeparam>
     public abstract class DbDataJoiner<TIn, TLookupKey> : Dataflow<TIn, TIn> where TIn : class 
     {
         /// <summary>
@@ -108,7 +117,7 @@
                     command.ExecuteNonQuery();
                 }
 
-                await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable);
+                await base.DumpToDBAsync(deduplicatedData, m_tmpTargetTable).ConfigureAwait(false);
                 
                 m_host.m_logger.DebugFormat("{0} Executing merge as server-side lookup: {1}", this.FullName, m_mergeTmpToDimTable);
 
@@ -159,7 +168,7 @@
 
                 //and output as a already-looked-up batch
                 var doneBatch = new JoinBatch<TIn>(data, CacheLookupStrategy.NoLookup);
-                await this.m_outputBuffer.SendAsync(doneBatch);
+                await this.m_outputBuffer.SendAsync(doneBatch).ConfigureAwait(false);
 
                 IsBusy = false;
             }
@@ -179,9 +188,9 @@
                 return m_outputBuffer.OutputBlock;
             } }
 
-            public void LinkTo(IDataflow<JoinBatch<TIn>> other)
+            public void LinkTo(IDataflow<JoinBatch<TIn>> other, Predicate<JoinBatch<TIn>> predicate = null)
             {
-                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other);
+                this.LinkBlockToFlow(this.m_outputBuffer.OutputBlock, other, predicate);
             }
 
             public bool IsBusy { get; private set; }
@@ -189,7 +198,7 @@
         
         protected readonly TargetTable m_dimTableTarget;
         protected readonly int m_batchSize;
-        protected BatchBlock<TIn> m_batchBlock;
+        protected Dataflow<TIn, TIn[]> m_batcher;
         protected TransformManyDataflow<JoinBatch<TIn>, TIn> m_lookupNode;
         protected DBColumnMapping m_joinOnMapping;
         protected TypeAccessor<TIn> m_typeAccessor;
@@ -198,12 +207,21 @@
         protected IEqualityComparer<TLookupKey> m_keyComparer;
         protected ILog m_logger;
 
+        /// <summary>
+        /// Constructs a DbDataJoiner instance
+        /// </summary>
+        /// <param name="joinOn">Property path from the root object down to the lookup key</param>
+        /// <param name="dimTableTarget">Table information of the remote dimension table</param>
+        /// <param name="option">Option to use for this dataflow</param>
+        /// <param name="batchSize">The batch size for a batched remote look up</param>
+        /// <param name="cacheSize">The local cache item count (part of the remote table)</param>
         public DbDataJoiner(Expression<Func<TIn, TLookupKey>> joinOn, TargetTable dimTableTarget, DataflowOptions option, int batchSize = 8 * 1024, int cacheSize = 1024 * 1024)
             : base(option)
         {
             m_dimTableTarget = dimTableTarget;
             m_batchSize = batchSize;
-            m_batchBlock = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption());
+            m_batcher = new BatchBlock<TIn>(batchSize, option.ToGroupingBlockOption()).ToDataflow(option);
+            m_batcher.Name = "Batcher";
             m_lookupNode = new TransformManyDataflow<JoinBatch<TIn>, TIn>(this.JoinBatch, option);
             m_lookupNode.Name = "LookupNode";
             m_typeAccessor = TypeAccessorManager<TIn>.GetAccessorForTable(dimTableTarget);
@@ -220,10 +238,10 @@
                     array => new JoinBatch<TIn>(array, CacheLookupStrategy.RemoteLookup), option.ToExecutionBlockOption()).ToDataflow(option);
             transformer.Name = "ArrayToJoinBatchConverter";
 
-            transformer.LinkFromBlock(m_batchBlock);
+            m_batcher.LinkTo(transformer);
             transformer.LinkTo(m_lookupNode);
             
-            RegisterChild(m_batchBlock);
+            RegisterChild(m_batcher);
             RegisterChild(transformer);
             RegisterChild(m_lookupNode);
 
@@ -240,7 +258,7 @@
             RegisterChildRing(transformer.CompletionTask, m_lookupNode, m_dimInserter, hb);
         }
 
-        public PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
+        protected PropertyInfo ExtractPropertyInfo<T1, T2>(Expression<Func<T1, T2>> expression)
         {
             var me = expression.Body as MemberExpression;
 
@@ -307,7 +325,7 @@
             foreach (var cacheMiss in remoteLookupList)
             {
                 //post to dim inserter to do remote lookup (insert to tmp table and do a MERGE)
-                await m_dimInserter.SendAsync(cacheMiss);
+                await m_dimInserter.SendAsync(cacheMiss).ConfigureAwait(false);
             }
 
             m_logger.DebugFormat("{0} {1} cache miss among {2} lookup in this round of JoinBatch()", FullName, missCount, batch.Data.Length);
@@ -359,15 +377,21 @@
         /// Usually the implementation of this method should assign to some fields/properties(e.g. key column) of the input item according to the dimension row.
         /// </summary>
         protected abstract void OnSuccessfulLookup(TIn input, IDimRow<TLookupKey> rowInDimTable);
-        
+
+        /// <summary>
+        /// See <see cref="Dataflow{T}.InputBlock"/>
+        /// </summary>
         public override ITargetBlock<TIn> InputBlock
         {
             get
             {
-                return this.m_batchBlock;
+                return m_batcher.InputBlock;
             }
         }
 
+        /// <summary>
+        /// See <see cref="IOutputDataflow{T}.OutputBlock"/>
+        /// </summary>
         public override ISourceBlock<TIn> OutputBlock
         {
             get

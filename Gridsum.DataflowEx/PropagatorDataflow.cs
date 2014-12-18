@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx
         private async Task<IEnumerable<TOut>> Transform(TIn @in)
         {
             IsBusy = true;
-            var outs = await m_transformMany(@in);
+            var outs = await m_transformMany(@in).ConfigureAwait(false);
             IsBusy = false;
             return outs;
         }

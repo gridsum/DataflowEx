@@ -12,15 +12,19 @@ namespace Gridsum.DataflowEx.Databases
     using System.Collections;
     using System.Collections.Immutable;
     using System.Diagnostics;
+    using System.IO;
     using Common.Logging;
 
+    /// <summary>
+    /// Global manager for type accessors
+    /// </summary>
     public class TypeAccessorManager<T> where T : class
     {
-        private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> m_accessors;
+        private static readonly ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>> s_accessors;
 
         static TypeAccessorManager()
         {
-            m_accessors = new ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>>();
+            s_accessors = new ConcurrentDictionary<TargetTable, Lazy<TypeAccessor<T>>>();
         }
 
         private TypeAccessorManager()
@@ -28,16 +32,63 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         /// <summary>
-        /// if the typeAccessor exists, just return it; else create a new one with parameter: destLabel, connectionString,
+        /// If the typeAccessor exists, just return it; else create a new one with parameter: destLabel, connectionString,
         /// dataTableName
         /// </summary>
-        /// <param name="destLabel"></param>
-        /// <param name="connectionString"></param>
-        /// <param name="dataTableName"></param>
-        /// <returns></returns>
         public static TypeAccessor<T> GetAccessorForTable(TargetTable target)
         {
-            return m_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
+            return s_accessors.GetOrAdd(target, t => new Lazy<TypeAccessor<T>>(() => new TypeAccessor<T>(t))).Value;
+        }
+    }
+
+    /// <summary>
+    /// Allows external configs to be registered and used by TypeAccessors.
+    /// </summary>
+    public class TypeAccessorConfig
+    {
+        internal static List<Tuple<Expression, DBColumnMapping>> s_externalMappings = new List<Tuple<Expression, DBColumnMapping>>();
+
+        private static void RegisterMapping(Expression propertyPath, DBColumnMapping mapping)
+        {
+            s_externalMappings.Add(Tuple.Create(propertyPath, mapping));
+        }
+
+        /// <summary>
+        /// Register an external mapping to affect the column mapping process by type accessors.
+        /// </summary>
+        /// <typeparam name="T">Type of the root object</typeparam>
+        /// <typeparam name="TValue">Return type of the leaf property</typeparam>
+        /// <param name="propertyPath">A lambda expression which defines the property path from root type to the leaf property</param>
+        /// <param name="mapping">The mapping to register to the give property path</param>
+        public static void RegisterMapping<T, TValue>(Expression<Func<T, TValue>> propertyPath, DBColumnMapping mapping) where T : class
+        {
+            //todo: add lambda expression check
+            RegisterMapping(propertyPath.Body, mapping);
+        }
+
+        internal static bool ExpressionPathEquals(Expression e1, Expression e2)
+        {
+            if (e1 is ParameterExpression && e2 is ParameterExpression)
+            {
+                return e1.Type == e2.Type;
+            }
+
+            if (e1 is MemberExpression && e2 is MemberExpression)
+            {
+                MemberExpression m1 = e1 as MemberExpression;
+                MemberExpression m2 = e2 as MemberExpression;
+                
+                if (m1.Member.Equals(m2.Member))
+                {
+                    return ExpressionPathEquals(m1.Expression, m2.Expression);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -63,7 +114,7 @@ namespace Gridsum.DataflowEx.Databases
             m_schemaTable = new Lazy<DataTable>(this.GetSchemaTable);
             m_properties = new Dictionary<int, Func<T, object>>();
             m_dbColumnMappings = new List<DBColumnMapping>();
-            m_classLogger = LogManager.GetLogger(Assembly.GetExecutingAssembly().GetName().Name + "." + this.GetType().GetFriendlyName()); 
+            m_classLogger = LogManager.GetLogger(this.GetType().Namespace + "." + this.GetType().GetFriendlyName()); 
             CreateTypeVisitor();
         }
 
@@ -126,7 +177,7 @@ namespace Gridsum.DataflowEx.Databases
 
             #region 读取所有的引用类型、值类型及String类型的属性
 
-            var typeExpandQueue = new Queue<IExpandableNode>();
+            var typeExpandQueue = new Queue<ExpressionTreeNode>();
             typeExpandQueue.Enqueue(root);
             
             while (typeExpandQueue.Count > 0)
@@ -167,8 +218,10 @@ namespace Gridsum.DataflowEx.Databases
                     }
                 }
             }
-
             #endregion
+
+
+
             //Check and complete DBColumnMapping 
             foreach (LeafPropertyNode leafNode in leafs)
             {
@@ -397,15 +450,14 @@ namespace Gridsum.DataflowEx.Databases
                 else
                 {
                     //规则二、三
-                    int minDepth = group.Min(t => t.Host.Depth);
-                    DBColumnMapping selected = group.First(t => t.Host.Depth == minDepth);
+                    DBColumnMapping selected = group.OrderBy(t => t.Host.Depth * 10 + (int)t.Option).First();
                     filtered.Add(selected);
 
                     foreach (var mapping in group)
                     {
                         if (!object.ReferenceEquals(mapping, selected))
                         {
-                            m_classLogger.WarnFormat("Column mapping {0} on {1} abandoned as its offset {2} is already used", mapping, mapping.Host, mapping.DestColumnOffset);
+                            m_classLogger.WarnFormat("Column mapping {0} on {1} abandoned as its offset {2} is already used by {3}", mapping, mapping.Host, mapping.DestColumnOffset, selected);
                         }
                     }
                 }
@@ -475,42 +527,25 @@ namespace Gridsum.DataflowEx.Databases
         }
         #endregion
     }
-
-    public interface IExpandableNode
+    
+    public abstract class ExpressionTreeNode
     {
-        bool IsExpandable { get; }
-        Type ResultType { get; }
-        int Depth { get; }
-        Expression Expression { get; }
-        bool NoNullCheck { get; }
-        IExpandableNode Parent { get; }
-    }
-
-    public abstract class PropertyTreeNode
-    {
-        public Type ResultType { get; set; }
-        public PropertyInfo PropertyInfo { get; set; }
-        public IExpandableNode Parent { get; set; }
+        public abstract Type ResultType { get; }
+        public ExpressionTreeNode Parent { get; set; }
         public int Depth { get; set; }
 
-        public PropertyTreeNode(PropertyInfo propertyInfo, IExpandableNode parent)
+        public ExpressionTreeNode(ExpressionTreeNode parent)
         {
             this.Parent = parent;
-            Depth = parent.Depth + 1;
-            this.PropertyInfo = propertyInfo;
-            this.ResultType = propertyInfo.PropertyType;
 
-            this.DbColumnMappings = new List<DBColumnMapping>((DBColumnMapping[])propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true));
-
-            foreach (var dbColumnMapping in DbColumnMappings)
+            if (parent == null)
             {
-                dbColumnMapping.Host = this;
+                Depth = 0;
             }
-        }
-
-        public static bool IsLeafNodeType(Type type)
-        {
-            return type.IsValueType || type == typeof(string) || type == typeof(byte[]);
+            else
+            {
+                Depth = parent.Depth + 1;            
+            }            
         }
 
         public bool HasReferenceLoop
@@ -530,6 +565,50 @@ namespace Gridsum.DataflowEx.Databases
                 return false;
             }
         }
+
+        public ExpressionTreeNode Root
+        {
+            get
+            {
+                ExpressionTreeNode node = this;
+                while (node.Parent != null)
+                {
+                    node = node.Parent;
+                }
+                return node;
+            }
+        }
+
+        public abstract bool IsExpandable { get; }
+        public abstract Expression Expression { get; }
+        public abstract bool NoNullCheck { get; }
+
+        //Expression without null check and default value involvement
+        public abstract Expression RawExpression { get; }
+    }
+
+    public abstract class PropertyTreeNode : ExpressionTreeNode
+    {
+        private Type m_resultType;
+        public PropertyInfo PropertyInfo { get; set; }
+                
+        public PropertyTreeNode(PropertyInfo propertyInfo, ExpressionTreeNode parent) : base(parent)
+        {
+            this.PropertyInfo = propertyInfo;
+            m_resultType = propertyInfo.PropertyType;
+
+            this.DbColumnMappings = new List<DBColumnMapping>((DBColumnMapping[])propertyInfo.GetCustomAttributes(typeof(DBColumnMapping), true));
+
+            foreach (var dbColumnMapping in DbColumnMappings)
+            {
+                dbColumnMapping.Host = this;
+            }
+        }
+        
+        public static bool IsLeafNodeType(Type type)
+        {
+            return type.IsValueType || type == typeof(string) || type == typeof(byte[]);
+        }
         
         public override string ToString()
         {
@@ -544,9 +623,7 @@ namespace Gridsum.DataflowEx.Databases
         }
 
         public List<DBColumnMapping> DbColumnMappings { get; set; }
-
-        public abstract Expression Expression { get; }
-
+        
         /// <summary>
         /// Create property access expression with a default value
         /// </summary>
@@ -677,6 +754,39 @@ namespace Gridsum.DataflowEx.Databases
                 return block;
             }
         }
+
+        public override Type ResultType
+        {
+            get { return m_resultType; }
+        }
+        
+        public override Expression RawExpression
+        {
+            get
+            {
+                return Expression.Property(this.Parent.RawExpression, this.PropertyInfo);
+            }
+        }
+
+        public override bool IsExpandable
+        {
+            get
+            {
+                if (typeof(IEnumerable).IsAssignableFrom(this.ResultType))
+                {
+                    return false;
+                }
+
+                var paths = (DBColumnPath[])PropertyInfo.GetCustomAttributes(typeof(DBColumnPath), true);
+
+                if (paths.Any(p => p.HasOption(DBColumnPathOptions.DoNotExpand)))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+        }
     }
 
     /// <summary>
@@ -685,27 +795,26 @@ namespace Gridsum.DataflowEx.Databases
     /// <remarks>
     /// Middle node in property tree
     /// </remarks>
-    public class NonLeafPropertyNode : PropertyTreeNode, IExpandableNode
+    public class NonLeafPropertyNode : PropertyTreeNode
     {
         private readonly Lazy<Expression> m_exprIniter;
+        private readonly bool m_noNullCheck;
+        private static ILog s_logger = LogManager.GetLogger(typeof(NonLeafPropertyNode).Namespace);
 
-        private bool m_noNullCheck;
-
-        public NonLeafPropertyNode(PropertyInfo propertyInfo, IExpandableNode parent)
+        public NonLeafPropertyNode(PropertyInfo propertyInfo, ExpressionTreeNode parent)
             : base(propertyInfo, parent)
         {
             this.m_exprIniter = new Lazy<Expression>(this.CreatePropertyAccessorExpression);
-            m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any();
-        }
+            m_noNullCheck = propertyInfo.GetCustomAttributes(typeof(NoNullCheckAttribute), true).Any()
+                | propertyInfo.GetCustomAttributes(typeof(DBColumnPath), true).Cast<DBColumnPath>()
+                .Any(p => p.HasOption(DBColumnPathOptions.DoNotGenerateNullCheck));
 
-        public bool IsExpandable
-        {
-            get
+            if (m_noNullCheck && s_logger.IsTraceEnabled)
             {
-                return !typeof(IEnumerable).IsAssignableFrom(this.ResultType);
+                s_logger.TraceFormat("No null check is enabled on {0}", this);
             }
         }
-
+        
         public override Expression Expression
         {
             get
@@ -714,7 +823,7 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public bool NoNullCheck
+        public override bool NoNullCheck
         {
             get
             {
@@ -723,16 +832,16 @@ namespace Gridsum.DataflowEx.Databases
         }
     }
 
-    public class RootNode<T> : IExpandableNode
+    public class RootNode<T> : ExpressionTreeNode
     {
         private ParameterExpression m_param;
 
-        public RootNode()
+        public RootNode() : base(null)
         {
             m_param = Expression.Parameter(typeof(T), "t");
         }
 
-        public bool IsExpandable
+        public override bool IsExpandable
         {
             get
             {
@@ -740,22 +849,14 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public Type ResultType {
+        public override Type ResultType {
             get
             {
                 return typeof(T);
             }
         }
-
-        public int Depth
-        {
-            get
-            {
-                return 0;
-            }
-        }
-
-        public Expression Expression
+        
+        public override Expression Expression
         {
             get
             {
@@ -763,7 +864,7 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public bool NoNullCheck
+        public override bool NoNullCheck
         {
             get
             {
@@ -771,7 +872,15 @@ namespace Gridsum.DataflowEx.Databases
             }
         }
 
-        public IExpandableNode Parent
+        public override Expression RawExpression
+        {
+            get
+            {
+                return m_param;
+            }
+        }
+
+        public PropertyTreeNode Parent
         {
             get
             {
@@ -801,10 +910,21 @@ namespace Gridsum.DataflowEx.Databases
     /// </remarks>
     public class LeafPropertyNode : PropertyTreeNode
     {
-        public LeafPropertyNode(PropertyInfo propertyInfo, IExpandableNode parent, string destLabel)
+        public LeafPropertyNode(PropertyInfo propertyInfo, ExpressionTreeNode parent, string destLabel)
             : base(propertyInfo, parent)
         {
-            this.DbColumnMappings = this.DbColumnMappings.Where(m => m.DestLabel == destLabel).ToList();
+            var externalMappings =
+                TypeAccessorConfig.s_externalMappings.Where(pair => pair.Item2.DestLabel == destLabel)
+                    .Where(pair => TypeAccessorConfig.ExpressionPathEquals(pair.Item1, this.RawExpression))
+                    .Select(pair => pair.Item2)
+                    .ToList();
+
+            foreach (var externalMapping in externalMappings)
+            {
+                externalMapping.Host = this;
+            }
+
+            DbColumnMappings = DbColumnMappings.Where(m => m.DestLabel == destLabel).Union(externalMappings).ToList();
 
             //type safety check for db column mappings in order to fail early rather than insertion time
             foreach (var dbColumnMapping in DbColumnMappings)
@@ -864,6 +984,16 @@ namespace Gridsum.DataflowEx.Databases
                 //defaultValue = this.DbColumnMappings.Select(_ => _.DefaultValue).Distinct().Single();
                 //return this.GetExpressionWithDefaultVal(defaultValue);
             }
+        }
+
+        public override bool IsExpandable
+        {
+            get { return false; }
+        }
+
+        public override bool NoNullCheck
+        {
+            get { return true; }
         }
     }
 }

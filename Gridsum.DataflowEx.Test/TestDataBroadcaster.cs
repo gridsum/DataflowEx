@@ -10,13 +10,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Gridsum.DataflowEx.Test
 {
     [TestClass]
-    public class TestDataBrancher
+    public class TestDataBroadcaster
     {
         [TestMethod]
-        public async Task TestDataBrancher1()
+        public async Task TestDataBroadcaster1()
         {
             var random = new Random();
-            var dataCopier = new DataBrancher<int>();
+            var dataCopier = new DataBroadcaster<int>();
 
             int sum1 = 0;
             int sum2 = 0;
@@ -41,7 +41,7 @@ namespace Gridsum.DataflowEx.Test
         }
 
         [TestMethod]
-        public async Task TestDataBrancher2()
+        public async Task TestDataBroadcaster2()
         {
             var random = new Random();
             var buffer = new BufferBlock<int>();

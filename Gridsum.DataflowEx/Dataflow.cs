@@ -34,6 +34,10 @@ namespace Gridsum.DataflowEx
         protected ImmutableList<IDataflowDependency> m_dependencies = ImmutableList.Create<IDataflowDependency>();
         protected string m_defaultName;
 
+        /// <summary>
+        /// Constructs a Dataflow instance
+        /// </summary>
+        /// <param name="dataflowOptions">The dataflow option object</param>
         public Dataflow(DataflowOptions dataflowOptions)
         {
             m_dataflowOptions = dataflowOptions;
@@ -65,6 +69,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// The option of the dataflow instance
+        /// </summary>
         public DataflowOptions DataflowOptions
         {
             get
@@ -73,6 +80,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// The full name of the dataflow instance
+        /// </summary>
         public string FullName
         {
             get
@@ -93,6 +103,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// A snapshot of the dataflow's children 
+        /// </summary>
         public ImmutableList<IDataflowDependency> Children
         {
             get
@@ -101,6 +114,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// A snapshot of the dataflow's parents
+        /// </summary>
         public ImmutableList<Dataflow> Parents
         {
             get
@@ -257,6 +273,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Starts the async loop which periodically check the status of the dataflow and its children
+        /// </summary>
         private async void StartPerformanceMonitorAsync()
         {
             try
@@ -275,13 +294,19 @@ namespace Gridsum.DataflowEx
 
                     if (m_dataflowOptions.BlockMonitorEnabled)
                     {
+                        bool verboseMode = m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose;
+
                         foreach(IDataflowDependency child in m_children)
                         {
-                            var bufferStatus = child.BufferStatus;
-
-                            if (bufferStatus.Total() != 0 || m_dataflowOptions.PerformanceMonitorMode == DataflowOptions.PerformanceLogMode.Verbose)
+                            IDataflowDependency c = child;
+                            Tuple<int, int> bufferStatus = c.BufferStatus;
+                            
+                            if (child.Completion.IsCompleted && verboseMode)
                             {
-                                IDataflowDependency c = child;
+                                LogHelper.PerfMon.DebugFormat("{0} is completed");
+                            }
+                            else if (bufferStatus.Total() != 0 || verboseMode)
+                            {
                                 LogHelper.PerfMon.Debug(h => h("{0} has {1} todo items (in:{2}, out:{3}) at this moment. ", c.DisplayName, bufferStatus.Total(), bufferStatus.Item1, bufferStatus.Item2));
                             }
                         }
@@ -289,7 +314,7 @@ namespace Gridsum.DataflowEx
 
                     CustomPerfMonBehavior();
 
-                    await Task.Delay(m_dataflowOptions.MonitorInterval);
+                    await Task.Delay(m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
                 }
             }
             catch (Exception e)
@@ -319,7 +344,7 @@ namespace Gridsum.DataflowEx
             if (m_children.Count == 0)
             {
                 LogHelper.Logger.WarnFormat("{0} still has no children. Will check again soon.", this.FullName);
-                await Task.Delay(m_dataflowOptions.MonitorInterval);
+                await Task.Delay(m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
 
                 if (m_children.Count == 0)
                 {
@@ -327,28 +352,42 @@ namespace Gridsum.DataflowEx
                 }
             }
 
+            Exception exception = null;
             try
             {
-                await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion);
-                await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f());
-                
-                //todo: move it to finally
-                this.CleanUp();
-                LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));
+                await TaskEx.AwaitableWhenAll(() => m_children, b => b.Completion).ConfigureAwait(false);
+                await TaskEx.AwaitableWhenAll(() => m_postDataflowTasks, f => f()).ConfigureAwait(false);
             }
-            catch (AggregateException e)
+            catch (Exception e)
             {
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
                 }
-                throw; //TaskEx.UnwrapWithPriority(e);
+                exception = e;
+            }
+            finally
+            {
+                this.CleanUp(exception);
+
+                if (exception == null)
+                {
+                    LogHelper.Logger.Info(string.Format("{0} completed", this.FullName));    
+                }
+                else
+                {
+                    throw new AggregateException(exception);
+                }
             }
         }
 
-        protected virtual void CleanUp()
+        /// <summary>
+        /// A method which allows you to do some clean up job when the dataflow finishes normally or bump into error.
+        /// </summary>
+        /// <param name="dataflowException">Exception thrown during dataflow execution. Null if dataflow completes succesfully.</param>
+        protected virtual void CleanUp(Exception dataflowException)
         {
-            //
+            
         }
 
         /// <summary>
@@ -369,8 +408,14 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Get the underlying blocks inside the dataflow. Will dig into child if the child is dataflow itself.
+        /// </summary>
         public virtual IEnumerable<IDataflowBlock> Blocks { get { return m_children.SelectMany(bm => bm.Blocks); } }
 
+        /// <summary>
+        /// Fault the whole dataflow instance and its children
+        /// </summary>
         public virtual void Fault(Exception exception)
         {
             LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);
@@ -419,6 +464,9 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// The count of buffered items in the dataflow
+        /// </summary>
         public int BufferedCount
         {
             get
@@ -427,20 +475,31 @@ namespace Gridsum.DataflowEx
             }
         }
 
+        /// <summary>
+        /// Signal to the dataflow that it should not accept any more messages.
+        /// </summary>
         public virtual void Complete()
         {
-            throw new NotSupportedException(string.Format("{0} doesn't know how to explicitly complete.", this.FullName));
+            //inheritors should override this method 
+            LogHelper.Logger.WarnFormat("{0} doesn't know how to explicitly complete. Perform a no-op instead.", this.FullName);
         }
 
         //Linkd MY block to OHTER dataflow
-        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow)
+        protected void LinkBlockToFlow<T>(ISourceBlock<T> block, IDataflow<T> otherDataflow, Predicate<T> predicate = null)
         {
             if (!IsMyChild(block))
             {
                 throw new InvalidOperationException(string.Format("{0} Cannot link block to flow as the output block is not my child.", this.FullName));
             }
 
-            block.LinkTo(otherDataflow.InputBlock, new DataflowLinkOptions { PropagateCompletion = false });
+            if (predicate == null)
+            {
+                block.LinkTo(otherDataflow.InputBlock);
+            }
+            else
+            {
+                block.LinkTo(otherDataflow.InputBlock, predicate);
+            }
 
             otherDataflow.RegisterDependency(this);
 
@@ -467,7 +526,7 @@ namespace Gridsum.DataflowEx
 
         /// <summary>
         /// Register an external dataflow as dependency, whose completion will trigger completion of this dataflow
-        /// if this dependencies finishes as the last amony all dependencies.
+        /// if this dependency finishes as the last among all dependencies.
         /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
         /// </summary>
         public void RegisterDependency(IDataflow dependencyDataflow)
@@ -480,6 +539,11 @@ namespace Gridsum.DataflowEx
             this.RegisterDependency(new DataflowDependency(dependencyDataflow, this, DependencyKind.External));
         }
 
+        /// <summary>
+        /// Register an external block as dependency, whose completion will trigger completion of this dataflow
+        /// if this dependency finishes as the last among all dependencies.
+        /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
+        /// </summary>
         public void RegisterDependency(IDataflowBlock upstreamBlock)
         {
             this.RegisterDependency(new BlockDependency(upstreamBlock, this, DependencyKind.External));
@@ -490,7 +554,7 @@ namespace Gridsum.DataflowEx
         /// if this dependencies finishes as the last amony all dependencies.
         /// i.e. Completion of this dataflow will only be triggered after ALL dependencies finish.
         /// </summary>
-        public void RegisterDependency(IDataflowDependency dependency)
+        internal void RegisterDependency(IDataflowDependency dependency)
         {
             bool isFirstDependency = m_dependencies.IsEmpty;
 
@@ -524,17 +588,23 @@ namespace Gridsum.DataflowEx
             }
             else
             {
-                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies.", this.FullName, m_dependencies.Count);
+                LogHelper.Logger.InfoFormat("{0} now has {1} dependencies. (Added {2})", this.FullName, m_dependencies.Count, dependency.DisplayName);
             }
         }
     }
 
+    /// <summary>
+    /// Represents a dataflow graph that has a typed input node
+    /// </summary>
     public abstract class Dataflow<TIn> : Dataflow, IDataflow<TIn>
     {
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
         }
 
+        /// <summary>
+        /// The typed input block of this dataflow
+        /// </summary>
         public abstract ITargetBlock<TIn> InputBlock { get; }
         
         /// <summary>
@@ -551,11 +621,11 @@ namespace Gridsum.DataflowEx
                             foreach (var item in reader)
                             {
                                 ct.ThrowIfCancellationRequested();
-                                await this.SendAsync(item);
+                                await this.SendAsync(item).ConfigureAwait(false);
                                 count++;
                             }
                         }
-                        catch (Exception)
+                        catch (Exception e)
                         {
                             LogHelper.Logger.WarnFormat(
                                 "{0} Pulled and posted {1} {2}s to {3} before an exception",
@@ -564,7 +634,7 @@ namespace Gridsum.DataflowEx
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
 
-                            throw;
+                            throw new AggregateException(e);
                         }
 
                         LogHelper.Logger.InfoFormat(
@@ -578,12 +648,7 @@ namespace Gridsum.DataflowEx
                     },
                 ct);
         }
-
-        public void LinkFromBlock(ISourceBlock<TIn> block)
-        {
-            block.LinkTo(this.InputBlock, m_defaultLinkOption);
-        }
-
+        
         protected string ReceiverDisplayName
         {
             get
@@ -618,28 +683,32 @@ namespace Gridsum.DataflowEx
             long count;
             try
             {
-                count = await readAndPostTask;
+                count = await readAndPostTask.ConfigureAwait(false);
                 LogHelper.Logger.InfoFormat("{0} Finished reading from enumerable and posting to the dataflow.", this.FullName);
             }
             catch (OperationCanceledException oce)
             {
                 LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
-                throw;
+                throw new AggregateException(oce);
             }
 
             if (completeFlowOnFinish)
             {
-                await this.SignalAndWaitForCompletionAsync();
+                await this.SignalAndWaitForCompletionAsync().ConfigureAwait(false);
             }
 
             return count;
         }
 
+        /// <summary>
+        /// Send a complete signal to the dataflow and return a task representing the completion task
+        /// of the dataflow. The task will be completed when all queued jobs are done.
+        /// </summary>
         public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
             this.InputBlock.Complete(); //no more input
-            await this.CompletionTask;
+            await this.CompletionTask.ConfigureAwait(false);
         }
 
         /// <summary>
@@ -657,12 +726,12 @@ namespace Gridsum.DataflowEx
             long count = 0;
             foreach (var enumerable in enumerables)
             {
-                count += await ProcessAsync(enumerable, false);
+                count += await ProcessAsync(enumerable, false).ConfigureAwait(false);
             }
 
             if (completeLogReaderOnFinish)
             {
-                await this.SignalAndWaitForCompletionAsync();
+                await this.SignalAndWaitForCompletionAsync().ConfigureAwait(false);
             }
 
             return count;
@@ -683,12 +752,18 @@ namespace Gridsum.DataflowEx
             return ProcessMultipleAsync(enumerables, completeLogReaderOnFinish);
         }
 
+        /// <summary>
+        /// Signal to the dataflow that it should not accept any more messages.
+        /// </summary>
         public override void Complete()
         {
             this.InputBlock.Complete();
         }
     }
 
+    /// <summary>
+    /// Represents a dataflow graph that has a typed input node and a typed output node
+    /// </summary>
     public abstract class Dataflow<TIn, TOut> : Dataflow<TIn>, IDataflow<TIn, TOut>
     {
         protected ImmutableList<Predicate<TOut>>.Builder m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
@@ -701,7 +776,7 @@ namespace Gridsum.DataflowEx
 
         protected Dataflow(DataflowOptions dataflowOptions) : base(dataflowOptions)
         {
-            this.GarbageRecorder = new StatisticsRecorder();
+            this.GarbageRecorder = new StatisticsRecorder(this) {Name = "GarbageRecorder"};
             m_condBuilder = ImmutableList<Predicate<TOut>>.Empty.ToBuilder();
             m_frozenConditions = new Lazy<ImmutableList<Predicate<TOut>>>(() =>
             {
@@ -709,15 +784,19 @@ namespace Gridsum.DataflowEx
             });
         }
 
+        /// <summary>
+        /// The typed output node of this dataflow
+        /// </summary>
         public abstract ISourceBlock<TOut> OutputBlock { get; }
-        
+
         /// <summary>
         /// Link data stream to the given dataflow and propagates completion
         /// </summary>
         /// <param name="other">The dataflow to connect to</param>
-        public void LinkTo(IDataflow<TOut> other)
+        /// <param name="predicate">The filtering condition, if any</param>
+        public void LinkTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            this.GoTo(other);
+            this.GoTo(other, predicate);
         }
 
         /// <summary>
@@ -728,23 +807,32 @@ namespace Gridsum.DataflowEx
         /// </remarks>
         /// <param name="other">The dataflow to connect to</param>
         /// <returns>returns the dataflow to connect to</returns>
-        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other)
+        public virtual IDataflow<TOut> GoTo(IDataflow<TOut> other, Predicate<TOut> predicate = null)
         {
-            m_condBuilder.Add(new Predicate<TOut>(@out => true));
-            LinkBlockToFlow(this.OutputBlock, other);
+            m_condBuilder.Add(predicate ?? new Predicate<TOut>(@out => true));
+            LinkBlockToFlow(this.OutputBlock, other, predicate);
             return other;
         }
 
+        /// <summary>
+        /// Link data stream to the given dataflow and propagates completion. 
+        /// </summary>
         public Dataflow<TOut, TNext> GoTo<TNext>(Dataflow<TOut, TNext> other)
         {
             return GoTo(other as IDataflow<TOut>) as Dataflow<TOut, TNext>;
         }
 
+        /// <summary>
+        /// Conditionally transforms the output of the dataflow and link results to a given target flow
+        /// </summary>
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, IMatchCondition<TOut> condition)
         {
             this.TransformAndLink(other, transform, new Predicate<TOut>(condition.Matches));
         }
 
+        /// <summary>
+        /// Conditionally transforms the output of the dataflow and link results to a given target flow
+        /// </summary>
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform, Predicate<TOut> predicate)
         {
             if (m_frozenConditions.IsValueCreated)
@@ -759,16 +847,18 @@ namespace Gridsum.DataflowEx
             other.RegisterDependency(this);
         }
 
+        /// <summary>
+        /// Transforms the output of the dataflow and link results to a given target flow
+        /// </summary>
         public void TransformAndLink<TTarget>(IDataflow<TTarget> other, Func<TOut, TTarget> transform)
         {
             this.TransformAndLink(other, transform, @out => true);
         }
-
-        public void TransformAndLink<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
-        {
-            this.TransformAndLink(other, @out => { return ((TTarget)@out); }, @out => @out is TTarget);
-        }
-
+        
+        /// <summary>
+        /// Conditionally transforms the output of the dataflow and link results to a given target flow. 
+        /// The condition is whether the output is a certain sub type of the output type.
+        /// </summary>
         public void TransformAndLink<TTarget, TOutSubType>(IDataflow<TTarget> other, Func<TOutSubType, TTarget> transform) where TOutSubType : TOut
         {
             this.TransformAndLink(other, @out => { return transform(((TOutSubType)@out)); }, @out => @out is TOutSubType);
@@ -781,10 +871,23 @@ namespace Gridsum.DataflowEx
         /// <param name="other">The given dataflow which is linked to</param>
         public void LinkSubTypeTo<TTarget>(IDataflow<TTarget> other) where TTarget : TOut
         {
-            //todo: use internal block-level support for subtype linking?
             this.TransformAndLink(other, @out => (TTarget)@out, @out => @out is TTarget);
         }
-        
+
+        /// <summary>
+        /// After this dataflow has linked to some targets conditionally, it is possible that some output objects
+        /// are 'left' (i.e. matches none of the conditions). This methods provides a way to easily dump these left objects
+        /// to a given target flow. Otherwise these objects will stay in the buffer this dataflow which will never
+        /// come to an end state.
+        /// </summary>
+        public void LinkLeftTo(IDataflow<TOut> target)
+        {
+            var frozenConds = m_frozenConditions.Value;
+            var left = new Predicate<TOut>(@out => frozenConds.All(condition => !condition(@out)));
+
+            this.LinkBlockToFlow(this.OutputBlock, target, left);
+        }
+
         /// <summary>
         /// After this dataflow has linked to some targets conditionally, it is possible that some output objects
         /// are 'left' (i.e. matches none of the conditions). This methods provides a way to easily dump these left objects
@@ -798,8 +901,8 @@ namespace Gridsum.DataflowEx
                 {
                     if (frozenConds.All(condition => !condition(@out)))
                     {
-                        OnOutputToNull(@out);
-                        return true;
+                        OnOutputToNull(@out); 
+                         return true;
                     }
                     else
                     {

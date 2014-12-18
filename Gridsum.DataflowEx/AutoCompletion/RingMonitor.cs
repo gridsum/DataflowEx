@@ -55,12 +55,12 @@ namespace Gridsum.DataflowEx.AutoCompletion
         public async void StartMonitoring(Task preTask)
         {
             LogHelper.Logger.InfoFormat("{0} A ring is set up: {1}", m_host.FullName, DisplayName);
-            await preTask;
+            await preTask.ConfigureAwait(false);
             LogHelper.Logger.InfoFormat("{0} Ring pretask done. Starting check loop for {1}", m_host.FullName, DisplayName);
 
             while (true)
             {
-                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval);
+                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
 
                 bool empty = false;
                 
@@ -77,10 +77,10 @@ namespace Gridsum.DataflowEx.AutoCompletion
                                     batchedFlow.TriggerBatch();
                                 }
 
-                                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval);
+                                await Task.Delay(m_host.m_dataflowOptions.MonitorInterval).ConfigureAwait(false);
 
                                 empty = this.IsRingEmpty();
-                            });
+                            }).ConfigureAwait(false);
 
                     if (noHeartbeat && empty)
                     {

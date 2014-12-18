@@ -56,7 +56,7 @@ namespace Gridsum.DataflowEx.Exceptions
                 childrenSnapShot = listGetter();
                 try
                 {
-                    await AwaitableWhenAll(childrenSnapShot.Select(itemCompletion).ToArray());
+                    await AwaitableWhenAll(childrenSnapShot.Select(itemCompletion).ToArray()).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {

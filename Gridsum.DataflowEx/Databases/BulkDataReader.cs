@@ -6,14 +6,13 @@ using System.Data.SqlClient;
 namespace Gridsum.DataflowEx.Databases
 {
     /// <summary>
-    /// 这个类完整实现IDataReader<T>的功能，并更新属性与数据库列的对应功能。
-    /// 不再动态获得数据库的列，而采用将列名称设置到属性的Attribute上，并能够根据不同的产品指定对应不同的列名称
+    /// A class wrapping typeaccesor which implements IDataReader.
     /// </summary>
     /// <remarks>
     /// This class was initially inspired by https://github.com/WimAtIHomer/SqlBulkCopyListReader
     /// and then we took further steps to improve it.
     /// </remarks>
-    /// <typeparam name="T">The type to dissect and auto-generate delegate visitors</typeparam>
+    /// <typeparam name="T">The type to dissect and auto-generate column visitors</typeparam>
     public class BulkDataReader<T> : IDataReader where T:class
     {
         #region private fields (instance and static)

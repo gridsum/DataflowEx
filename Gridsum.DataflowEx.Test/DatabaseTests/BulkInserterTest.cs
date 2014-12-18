@@ -210,7 +210,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [DBColumnMapping(GSProduct.SEOD, "Name2", "default")]
         public string Key { get; set; }
 
-        [NoNullCheck]
+        [DBColumnPath(DBColumnPathOptions.DoNotGenerateNullCheck)]
         public Leg MyLeg { get; set; }
 
         [DBColumnMapping(GSProduct.SEOD, "Uid")]

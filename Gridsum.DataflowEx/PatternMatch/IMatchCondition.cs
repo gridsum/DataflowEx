@@ -1,5 +1,9 @@
 ﻿namespace Gridsum.DataflowEx.PatternMatch
 {
+    /// <summary>
+    /// Represents a match condition
+    /// </summary>
+    /// <typeparam name="T">Type of the input the condition can accept</typeparam>
     public interface IMatchCondition<in T>
     {
         bool Matches(T input);
