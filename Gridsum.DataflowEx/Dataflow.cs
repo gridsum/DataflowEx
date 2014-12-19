@@ -707,7 +707,7 @@ namespace Gridsum.DataflowEx
         public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
-            this.InputBlock.Complete(); //no more input
+            this.Complete(); //no more input
             await this.CompletionTask.ConfigureAwait(false);
         }
 

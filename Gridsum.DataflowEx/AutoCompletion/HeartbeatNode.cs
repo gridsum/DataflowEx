@@ -66,12 +66,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
                 return m_beats;
             }
         }
-
-        public override void Complete()
-        {
-            this.InputBlock.Complete();
-        }
-
+        
         public bool NoHeartbeatDuring(Action action)
         {
             long before = m_beats;

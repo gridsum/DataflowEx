@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx.Test
             container2.LinkLeftToNull();
 
             container1.InputBlock.SafePost(1);
-            container1.InputBlock.Complete();
+            container1.Complete();
 
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
             Assert.IsTrue(postTaskDone);
@@ -91,7 +91,7 @@ namespace Gridsum.DataflowEx.Test
             
             container1.InputBlock.Post(1);
             await Task.Delay(1000); //IMPORTANT: wait for block work done (nothing left in their input/output queue)
-            container1.InputBlock.Complete();
+            container1.Complete();
 
             Assert.IsTrue(await container2.CompletionTask.FinishesIn(TimeSpan.FromSeconds(1)));
         }
@@ -174,8 +174,7 @@ namespace Gridsum.DataflowEx.Test
             flow.LinkLeftToNull();
             flow.InputBlock.SafePost("abc");
             flow.InputBlock.SafePost(new object());
-            flow.InputBlock.Complete();
-            await flow.CompletionTask;
+            await flow.SignalAndWaitForCompletionAsync();
         }
 
         [TestMethod]
@@ -187,8 +186,7 @@ namespace Gridsum.DataflowEx.Test
             flow.LinkLeftToError();
             flow.InputBlock.SafePost("abc");
             flow.InputBlock.SafePost(new object());
-            flow.InputBlock.Complete();
-            await flow.CompletionTask;
+            await flow.SignalAndWaitForCompletionAsync();
         }
         
         [TestMethod]
@@ -197,7 +195,7 @@ namespace Gridsum.DataflowEx.Test
             var container = new DynamicContainer();
             var completion = container.CompletionTask;
             var dynamicBlock = container.RegisterBlockDynamically();
-            container.InputBlock.Complete();
+            container.Complete();
             Assert.IsFalse(await completion.FinishesIn(TimeSpan.FromMilliseconds(100)));
             
             dynamicBlock.Complete();

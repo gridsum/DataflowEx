@@ -68,7 +68,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
         {
             LogHelper.Logger.InfoFormat("Auto complete timer elapsed. Shutting down the inner dataflow ({0})..", m_Dataflow.FullName);
 
-            m_before.InputBlock.Complete(); //pass completion down to the chain
+            m_before.Complete(); //pass completion down to the chain
         }
 
         public override ISourceBlock<TOut> OutputBlock
