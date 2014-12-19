@@ -83,9 +83,9 @@ public class AggregatorFlow : Dataflow<string>
 
     public AggregatorFlow() : base(DataflowOptions.Default)
     {
-        _splitter = new TransformBlock<string, KeyValuePair<string, int>>((Func<string, KeyValuePair<string, int>>)t
+        _splitter = new TransformBlock<string, KeyValuePair<string, int>>(s => this.Split(s));
         _dict = new Dictionary<string, int>();
-        _aggregater = new ActionBlock<KeyValuePair<string, int>>((Action<KeyValuePair<string, int>>)this.Aggregate);
+        _aggregater = new ActionBlock<KeyValuePair<string, int>>(p => this.Aggregate(p));
 
         //Block linking
         _splitter.LinkTo(_aggregater, new DataflowLinkOptions() { PropagateCompletion = true });
