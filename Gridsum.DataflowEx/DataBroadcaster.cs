@@ -16,7 +16,9 @@ namespace Gridsum.DataflowEx
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
     public class DataBroadcaster<T> : Dataflow<T, T>
     {
+        //todo: fix race condition
         private ImmutableList<Dataflow<T, T>> m_copyBuffers;
+
         private readonly TransformBlock<T, T> m_transformBlock;
 
         /// <summary>

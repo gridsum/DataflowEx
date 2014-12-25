@@ -27,6 +27,8 @@ namespace Gridsum.DataflowEx
         protected internal readonly DataflowOptions m_dataflowOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
+
+        //todo: fix race condition
         protected ImmutableList<IDataflowDependency> m_children = ImmutableList.Create<IDataflowDependency>();
         protected ImmutableList<Dataflow> m_parents = ImmutableList.Create<Dataflow>();
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
