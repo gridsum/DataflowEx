@@ -82,8 +82,9 @@ namespace Gridsum.DataflowEx
             RegisterChild(copyBuffer);
             copyBuffer.RegisterDependency(m_transformBlock);
 
-            m_copyBuffers = m_copyBuffers.Add(copyBuffer);
-            copyBuffer.Name = "Buffer" + m_copyBuffers.Count;
+            var afterAdd = ImmutableUtils.AddOptimistically(ref m_copyBuffers, copyBuffer);
+
+            copyBuffer.Name = "Buffer" + afterAdd.Count;
             copyBuffer.LinkTo(other);
         }
 

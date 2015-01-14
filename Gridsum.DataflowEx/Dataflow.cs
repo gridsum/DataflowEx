@@ -157,7 +157,8 @@ namespace Gridsum.DataflowEx
             }
          
             //add myself as parents
-            childFlow.m_parents = childFlow.m_parents.Add(this);
+            ImmutableUtils.AddOptimistically(ref childFlow.m_parents, this);
+
             RegisterChild(new DataflowDependency(childFlow, this, DependencyKind.Internal, dataflowCompletionCallback), allowDuplicate);
         }
 
@@ -258,7 +259,7 @@ namespace Gridsum.DataflowEx
         /// <param name="postDataflowTask"></param>
         public void RegisterPostDataflowTask(Func<Task> postDataflowTask)
         {
-            m_postDataflowTasks = m_postDataflowTasks.Add(postDataflowTask);
+            ImmutableUtils.AddOptimistically(ref m_postDataflowTasks, postDataflowTask);
         }
 
         /// <summary>
@@ -268,7 +269,7 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public void RegisterCancellationTokenSource(CancellationTokenSource cts)
         {
-            m_ctsList = m_ctsList.Add(cts);
+            ImmutableUtils.AddOptimistically(ref m_ctsList, cts);
 
             if (m_children.Count != 0)
             {
