@@ -63,6 +63,7 @@ namespace Gridsum.DataflowEx.Test
             var l = ImmutableHashSet<int>.Empty;
 
             Parallel.For(0, c, i => Assert.IsTrue(ImmutableUtils.TryAddOptimistically(ref l, i)));
+            Parallel.For(0, c, i => Assert.IsFalse(ImmutableUtils.TryAddOptimistically(ref l, i)));
 
             Assert.IsTrue(l.Count == c);
             Console.WriteLine(l.Count);

@@ -157,9 +157,6 @@ namespace Gridsum.DataflowEx
                     string.Format("{0} Cannot register a child {1} who is already my ancestor", this.FullName, childFlow.FullName));
             }
          
-            //add myself as parents
-            ImmutableUtils.AddOptimistically(ref childFlow.m_parents, this);
-
             RegisterChild(new DataflowDependency(childFlow, this, DependencyKind.Internal, dataflowCompletionCallback), allowDuplicate);
         }
 
@@ -226,15 +223,25 @@ namespace Gridsum.DataflowEx
             return false;
         }
 
-        internal void RegisterChild(IDataflowDependency childMeta, bool allowDuplicate)
+        internal void RegisterChild(IDataflowDependency childWrapper, bool allowDuplicate)
         {
-            var child = childMeta.Unwrap();
-
-            if (m_children.Any(cm => object.ReferenceEquals(cm.Unwrap(), child)))
+            if (ImmutableUtils.TryAddOptimistically(ref m_children, childWrapper))
+            {
+                var dataflowDependency = childWrapper as DataflowDependency;
+                if (dataflowDependency != null)
+                {
+                    //add myself as parents
+                    ImmutableUtils.AddOptimistically(ref dataflowDependency.Flow.m_parents, this);
+                }
+            }
+            else
             {
                 if (allowDuplicate)
                 {
-                    LogHelper.Logger.DebugFormat("Duplicate child registration ignored in {0}: {1}", this.FullName, childMeta.DisplayName);
+                    LogHelper.Logger.DebugFormat(
+                        "Duplicate child registration ignored in {0}: {1}",
+                        this.FullName,
+                        childWrapper.DisplayName);
                     return;
                 }
                 else
@@ -242,8 +249,6 @@ namespace Gridsum.DataflowEx
                     throw new ArgumentException("Duplicate child to register in " + this.FullName);
                 }
             }
-
-            m_children = m_children.Add(childMeta);
 
             if (! m_completionTask.IsValueCreated)
             {
@@ -562,7 +567,10 @@ namespace Gridsum.DataflowEx
         {
             bool isFirstDependency = m_dependencies.IsEmpty;
 
-            m_dependencies = m_dependencies.Add(dependency);
+            if (!ImmutableUtils.TryAddOptimistically(ref m_dependencies, dependency))
+            {
+                LogHelper.Logger.WarnFormat("A dependency registration is ignored by {0} as it is already a dependency: {1}", this.FullName, dependency.DisplayName);
+            }
 
             if (isFirstDependency)
             {

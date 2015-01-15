@@ -216,7 +216,7 @@ namespace Gridsum.DataflowEx
 
         public int GetHashCode(IDataflowDependency obj)
         {
-            return obj.GetHashCode();
+            return obj.Unwrap().GetHashCode();
         }
     }
 }
