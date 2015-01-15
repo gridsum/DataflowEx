@@ -29,11 +29,12 @@ namespace Gridsum.DataflowEx
         protected Lazy<Task> m_completionTask;
 
         //todo: fix race condition
-        protected ImmutableList<IDataflowDependency> m_children = ImmutableList.Create<IDataflowDependency>();
+        protected ImmutableHashSet<IDataflowDependency> m_children = ImmutableHashSet.Create<IDataflowDependency>(DependencyEqualityComparer.Instance);
+        protected ImmutableHashSet<IDataflowDependency> m_dependencies = ImmutableHashSet.Create<IDataflowDependency>(DependencyEqualityComparer.Instance);
+
         protected ImmutableList<Dataflow> m_parents = ImmutableList.Create<Dataflow>();
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
-        protected ImmutableList<IDataflowDependency> m_dependencies = ImmutableList.Create<IDataflowDependency>();
         protected string m_defaultName;
 
         /// <summary>
@@ -112,7 +113,7 @@ namespace Gridsum.DataflowEx
         {
             get
             {
-                return m_children;
+                return m_children.ToImmutableList();
             }
         }
 
