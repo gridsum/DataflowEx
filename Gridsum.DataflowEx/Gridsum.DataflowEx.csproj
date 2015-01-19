@@ -90,6 +90,7 @@
     <Compile Include="ETL\RowCache.cs" />
     <Compile Include="Exceptions\NoChildRegisteredException.cs" />
     <Compile Include="Exceptions\TaskEx.cs" />
+    <Compile Include="ImmutableUtils.cs" />
     <Compile Include="IntHolder.cs" />
     <Compile Include="IDataflowDependency.cs" />
     <Compile Include="LogHelper.cs" />

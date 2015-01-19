@@ -3,15 +3,17 @@ using System.Linq;
 
 namespace Gridsum.DataflowEx
 {
+    using System.Collections.Immutable;
     using System.Data;
     using System.Diagnostics;
     using System.Runtime.CompilerServices;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
 
     using Common.Logging;
 
-    internal static class Utils
+    public static class Utils
     {
         public static string GetFriendlyName(this Type type)
         {

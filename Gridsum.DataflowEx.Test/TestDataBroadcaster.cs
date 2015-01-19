@@ -32,7 +32,7 @@ namespace Gridsum.DataflowEx.Test
                 dataCopier.InputBlock.Post((int) (random.NextDouble()*10000));
             }
 
-            dataCopier.InputBlock.Complete();
+            dataCopier.Complete();
 
             await TaskEx.AwaitableWhenAll(action1.Completion, action2.Completion);
 

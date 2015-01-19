@@ -204,4 +204,19 @@ namespace Gridsum.DataflowEx
             return this.m_dependentFlow;
         }
     }
+
+    internal class DependencyEqualityComparer : IEqualityComparer<IDataflowDependency>
+    {
+        public static DependencyEqualityComparer Instance = new DependencyEqualityComparer();
+
+        public bool Equals(IDataflowDependency x, IDataflowDependency y)
+        {
+            return object.ReferenceEquals(x.Unwrap(), y.Unwrap());
+        }
+
+        public int GetHashCode(IDataflowDependency obj)
+        {
+            return obj.Unwrap().GetHashCode();
+        }
+    }
 }

@@ -47,9 +47,9 @@ namespace Gridsum.DataflowEx.Exceptions
             return tcs.Task;
         }
 
-        public static async Task AwaitableWhenAll<T>(Func<ImmutableList<T>> listGetter, Func<T, Task> itemCompletion)
+        public static async Task AwaitableWhenAll<T>(Func<IReadOnlyCollection<T>> listGetter, Func<T, Task> itemCompletion)
         {
-            ImmutableList<T> childrenSnapShot;
+            IReadOnlyCollection<T> childrenSnapShot;
             Exception cachedException = null;
             do
             {

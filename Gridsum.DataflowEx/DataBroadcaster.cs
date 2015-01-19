@@ -16,7 +16,9 @@ namespace Gridsum.DataflowEx
     /// <typeparam name="T">The input and output type of the data flow</typeparam>
     public class DataBroadcaster<T> : Dataflow<T, T>
     {
+        //todo: fix race condition
         private ImmutableList<Dataflow<T, T>> m_copyBuffers;
+
         private readonly TransformBlock<T, T> m_transformBlock;
 
         /// <summary>
@@ -80,8 +82,9 @@ namespace Gridsum.DataflowEx
             RegisterChild(copyBuffer);
             copyBuffer.RegisterDependency(m_transformBlock);
 
-            m_copyBuffers = m_copyBuffers.Add(copyBuffer);
-            copyBuffer.Name = "Buffer" + m_copyBuffers.Count;
+            var afterAdd = ImmutableUtils.AddOptimistically(ref m_copyBuffers, copyBuffer);
+
+            copyBuffer.Name = "Buffer" + afterAdd.Count;
             copyBuffer.LinkTo(other);
         }
 

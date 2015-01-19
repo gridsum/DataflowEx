@@ -27,11 +27,14 @@ namespace Gridsum.DataflowEx
         protected internal readonly DataflowOptions m_dataflowOptions;
         protected readonly DataflowLinkOptions m_defaultLinkOption;
         protected Lazy<Task> m_completionTask;
-        protected ImmutableList<IDataflowDependency> m_children = ImmutableList.Create<IDataflowDependency>();
+
+        //todo: fix race condition
+        protected ImmutableHashSet<IDataflowDependency> m_children = ImmutableHashSet.Create<IDataflowDependency>(DependencyEqualityComparer.Instance);
+        protected ImmutableHashSet<IDataflowDependency> m_dependencies = ImmutableHashSet.Create<IDataflowDependency>(DependencyEqualityComparer.Instance);
+
         protected ImmutableList<Dataflow> m_parents = ImmutableList.Create<Dataflow>();
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
-        protected ImmutableList<IDataflowDependency> m_dependencies = ImmutableList.Create<IDataflowDependency>();
         protected string m_defaultName;
 
         /// <summary>
@@ -110,7 +113,7 @@ namespace Gridsum.DataflowEx
         {
             get
             {
-                return m_children;
+                return m_children.ToImmutableList();
             }
         }
 
@@ -154,8 +157,6 @@ namespace Gridsum.DataflowEx
                     string.Format("{0} Cannot register a child {1} who is already my ancestor", this.FullName, childFlow.FullName));
             }
          
-            //add myself as parents
-            childFlow.m_parents = childFlow.m_parents.Add(this);
             RegisterChild(new DataflowDependency(childFlow, this, DependencyKind.Internal, dataflowCompletionCallback), allowDuplicate);
         }
 
@@ -222,15 +223,25 @@ namespace Gridsum.DataflowEx
             return false;
         }
 
-        internal void RegisterChild(IDataflowDependency childMeta, bool allowDuplicate)
+        internal void RegisterChild(IDataflowDependency childWrapper, bool allowDuplicate)
         {
-            var child = childMeta.Unwrap();
-
-            if (m_children.Any(cm => object.ReferenceEquals(cm.Unwrap(), child)))
+            if (ImmutableUtils.TryAddOptimistically(ref m_children, childWrapper))
+            {
+                var dataflowDependency = childWrapper as DataflowDependency;
+                if (dataflowDependency != null)
+                {
+                    //add myself as parents
+                    ImmutableUtils.AddOptimistically(ref dataflowDependency.Flow.m_parents, this);
+                }
+            }
+            else
             {
                 if (allowDuplicate)
                 {
-                    LogHelper.Logger.DebugFormat("Duplicate child registration ignored in {0}: {1}", this.FullName, childMeta.DisplayName);
+                    LogHelper.Logger.DebugFormat(
+                        "Duplicate child registration ignored in {0}: {1}",
+                        this.FullName,
+                        childWrapper.DisplayName);
                     return;
                 }
                 else
@@ -238,8 +249,6 @@ namespace Gridsum.DataflowEx
                     throw new ArgumentException("Duplicate child to register in " + this.FullName);
                 }
             }
-
-            m_children = m_children.Add(childMeta);
 
             if (! m_completionTask.IsValueCreated)
             {
@@ -256,7 +265,7 @@ namespace Gridsum.DataflowEx
         /// <param name="postDataflowTask"></param>
         public void RegisterPostDataflowTask(Func<Task> postDataflowTask)
         {
-            m_postDataflowTasks = m_postDataflowTasks.Add(postDataflowTask);
+            ImmutableUtils.AddOptimistically(ref m_postDataflowTasks, postDataflowTask);
         }
 
         /// <summary>
@@ -266,7 +275,7 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public void RegisterCancellationTokenSource(CancellationTokenSource cts)
         {
-            m_ctsList = m_ctsList.Add(cts);
+            ImmutableUtils.AddOptimistically(ref m_ctsList, cts);
 
             if (m_children.Count != 0)
             {
@@ -558,7 +567,10 @@ namespace Gridsum.DataflowEx
         {
             bool isFirstDependency = m_dependencies.IsEmpty;
 
-            m_dependencies = m_dependencies.Add(dependency);
+            if (!ImmutableUtils.TryAddOptimistically(ref m_dependencies, dependency))
+            {
+                LogHelper.Logger.WarnFormat("A dependency registration is ignored by {0} as it is already a dependency: {1}", this.FullName, dependency.DisplayName);
+            }
 
             if (isFirstDependency)
             {
@@ -707,7 +719,7 @@ namespace Gridsum.DataflowEx
         public async Task SignalAndWaitForCompletionAsync()
         {
             LogHelper.Logger.InfoFormat("{0} Telling myself there is no more input and wait for children completion", this.FullName);
-            this.InputBlock.Complete(); //no more input
+            this.Complete(); //no more input
             await this.CompletionTask.ConfigureAwait(false);
         }
 

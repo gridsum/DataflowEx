@@ -1,6 +1,6 @@
 Welcome to DataflowEx
 ===================
-**Gridsum.DataflowEx**, developed by [Gridsum](http://www.gridsum.com/en), is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management over underlying dataflow blocks to make your life easier. You can get compiled binaries on [nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
+**Gridsum.DataflowEx** is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management over underlying dataflow blocks to make your life easier. You can get compiled binaries on [nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 Here is a list of DataflowEx cool features:
 
@@ -1492,4 +1492,6 @@ To sum up, DataflowEx introduces very little overhead. When the pipeline is crea
 
 Thanks for reading such a long tutorial. Congratulations that you've reached the end.
 
-We wish you try [DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) in your application and enjoy it. For any issue or feedback please start a thread on github issue forum.
+> **Tip:** You can get full C# code of all demos used in this tutorial in the Gridsum.DataflowEx.Demo project. It will be a good start to clone the repo and play with the existing examples.
+
+[DataflowEx](http://www.nuget.org/packages/Gridsum.DataflowEx/) is being used at [Gridsum](http://www.gridsum.com/en/) internally to process hundreds of millions of messages per day. We wish you try the library in your application and enjoy it just like we do. For any issue or feedback please start a thread on github issue forum.
