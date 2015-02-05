@@ -603,6 +603,11 @@ namespace Gridsum.DataflowEx
                 LogHelper.Logger.InfoFormat("{0} now has {1} dependencies. (Added {2})", this.FullName, m_dependencies.Count, dependency.DisplayName);
             }
         }
+
+        public override string ToString()
+        {
+            return this.FullName;
+        }
     }
 
     /// <summary>

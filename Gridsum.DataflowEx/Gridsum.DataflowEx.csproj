@@ -70,7 +70,9 @@
     <Compile Include="AutoCompletion\RingMonitor.cs" />
     <Compile Include="AutoCompletion\TracableItemBase.cs" />
     <Compile Include="Blocks\TransformAndLinkPropagator.cs" />
+    <Compile Include="Databases\DbBulkInserterBase.cs" />
     <Compile Include="Databases\DBColumnPath.cs" />
+    <Compile Include="Databases\PostBulkInsertDelegate.cs" />
     <Compile Include="Databases\TargetTable.cs" />
     <Compile Include="ETL\ByteArrayEqualityComparer.cs" />
     <Compile Include="ETL\DbDataJoiner.cs" />
