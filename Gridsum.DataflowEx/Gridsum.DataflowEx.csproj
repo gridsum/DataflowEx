@@ -72,6 +72,7 @@
     <Compile Include="Blocks\TransformAndLinkPropagator.cs" />
     <Compile Include="Databases\DbBulkInserterBase.cs" />
     <Compile Include="Databases\DBColumnPath.cs" />
+    <Compile Include="Databases\EagerDbBulkInserter.cs" />
     <Compile Include="Databases\PostBulkInsertDelegate.cs" />
     <Compile Include="Databases\TargetTable.cs" />
     <Compile Include="ETL\ByteArrayEqualityComparer.cs" />

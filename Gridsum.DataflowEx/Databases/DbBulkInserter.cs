@@ -5,8 +5,12 @@ namespace Gridsum.DataflowEx.Databases
 {
     using System;
 
-    public class DbBulkInserter<T> : DbBulkInserterBase<T>
-        where T : class
+    /// <summary>
+    /// A bulk inserter that treats the whole lifecycle of the dataflow as a whole transaction
+    /// (no matter how many inserted batches)
+    /// </summary>
+    /// <typeparam name="T">Type of the strongly-typed objects to insert</typeparam>
+    public class DbBulkInserter<T> : DbBulkInserterBase<T> where T : class
     {
         protected SqlConnection m_longConnection;
         protected SqlTransaction m_transaction;

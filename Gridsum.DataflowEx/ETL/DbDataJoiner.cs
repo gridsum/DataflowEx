@@ -51,7 +51,7 @@
         /// (1) It has a preprocess step to select distinct rows
         /// (2) It will output original data out tagged with CacheLookupStrategy.NoLookup
         /// </summary>
-        protected class DimTableInserter : DbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
+        protected class DimTableInserter : EagerDbBulkInserter<TIn>, IEqualityComparer<TIn>, IOutputDataflow<JoinBatch<TIn>>, IRingNode
         {
             private readonly DbDataJoiner<TIn, TLookupKey> m_host;
             private Func<TIn, TLookupKey> m_keyGetter;
