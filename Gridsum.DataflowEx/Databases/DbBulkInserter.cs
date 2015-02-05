@@ -24,6 +24,8 @@ namespace Gridsum.DataflowEx.Databases
         protected readonly BatchBlock<T> m_batchBlock;
         protected readonly ActionBlock<T[]> m_actionBlock;
         protected readonly ILog m_logger;
+        protected SqlConnection m_longConnection;
+        protected SqlTransaction m_transaction;
         protected Timer m_timer;
 
         /// <summary>
@@ -84,13 +86,16 @@ namespace Gridsum.DataflowEx.Databases
             RegisterChild(m_batchBlock);
             RegisterChild(m_actionBlock);
 
+            m_longConnection = new SqlConnection(targetTable.ConnectionString);
+            m_longConnection.Open();
+
+            m_transaction = m_longConnection.BeginTransaction();
+
             m_timer = new Timer(
                 state =>
                     {
                         this.TriggerBatch();
                     }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
-
-            
         }
 
         protected async virtual Task DumpToDBAsync(T[] data, TargetTable targetTable)
@@ -99,50 +104,61 @@ namespace Gridsum.DataflowEx.Databases
 
             using (var bulkReader = new BulkDataReader<T>(m_typeAccessor, data))
             {
-                using (var conn = new SqlConnection(targetTable.ConnectionString))
+                try
                 {
-                    await conn.OpenAsync().ConfigureAwait(false);
-
-                    var transaction = conn.BeginTransaction();
-                    try
+                    using (var bulkCopy = new SqlBulkCopy(m_longConnection, SqlBulkCopyOptions.TableLock, m_transaction))
                     {
-                        using (var bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.TableLock, transaction))
+                        foreach (SqlBulkCopyColumnMapping map in bulkReader.ColumnMappings)
                         {
-                            foreach (SqlBulkCopyColumnMapping map in bulkReader.ColumnMappings)
-                            {
-                                bulkCopy.ColumnMappings.Add(map);
-                            }
-
-                            bulkCopy.DestinationTableName = targetTable.TableName;
-                            bulkCopy.BulkCopyTimeout = (int)TimeSpan.FromMinutes(30).TotalMilliseconds;
-                            bulkCopy.BatchSize = m_bulkSize;
-
-                            // Write from the source to the destination.
-                            await bulkCopy.WriteToServerAsync(bulkReader).ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        if (e is NullReferenceException)
-                        {
-                            m_logger.ErrorFormat(
-                                "{0} NullReferenceException occurred in bulk insertion. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.", this.FullName);
+                            bulkCopy.ColumnMappings.Add(map);
                         }
 
-                        m_logger.ErrorFormat("{0} Bulk insertion failed. Rolling back all changes...", this.FullName, e);
-                        transaction.Rollback();
-                        m_logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
+                        bulkCopy.DestinationTableName = targetTable.TableName;
+                        bulkCopy.BulkCopyTimeout = (int)TimeSpan.FromMinutes(30).TotalMilliseconds;
+                        bulkCopy.BatchSize = m_bulkSize;
 
-                        //As this is an unrecoverable exception, rethrow it
-                        throw new AggregateException(e);
+                        // Write from the source to the destination.
+                        await bulkCopy.WriteToServerAsync(bulkReader).ConfigureAwait(false);
                     }
-                    
-                    transaction.Commit();
-                    await this.OnPostBulkInsert(conn, targetTable, data).ConfigureAwait(false);
                 }
+                catch (Exception e)
+                {
+                    if (e is NullReferenceException)
+                    {
+                        m_logger.ErrorFormat(
+                            "{0} NullReferenceException occurred in bulk insertion. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.",
+                            this.FullName);
+                    }
+
+                    m_logger.ErrorFormat("{0} Bulk insertion error in the first place", e, this.FullName);
+
+                    //As this is an unrecoverable exception, rethrow it
+                    throw new AggregateException(e);
+                }
+
+                await this.OnPostBulkInsert(m_longConnection, targetTable, data).ConfigureAwait(false);
+
             }
 
             m_logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+        }
+
+        protected override void CleanUp(Exception dataflowException)
+        {
+            if (dataflowException != null)
+            {
+                m_logger.ErrorFormat("{0} Rolling back all changes...", this.FullName, dataflowException);
+                m_transaction.Rollback();
+                m_logger.InfoFormat("{0} Changes successfully rolled back", this.FullName);
+            }
+            else
+            {
+                m_logger.InfoFormat("{0} bulk insertions are done. Committing transaction...", this.FullName);
+                m_transaction.Commit();
+                m_logger.DebugFormat("{0} Transaction successfully committed.", this.FullName);
+            }
+
+            m_longConnection.Close();
         }
 
         /// <summary>
