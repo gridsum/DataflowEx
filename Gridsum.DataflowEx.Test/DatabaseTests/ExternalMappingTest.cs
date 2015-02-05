@@ -139,7 +139,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             //will take effect
             TypeAccessorConfig.RegisterMapping<Order, int?>(p => p.Customer.Age, new DBColumnMapping("OrderTarget", "CustomerAge", -99));
 
-            var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget");
+            var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget", bulkSize: 3);
 
             dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 15, Customer = new Person() { Name = "Aaron", Age = 38 } });
             dbInserter.Post(new Order { OrderDate = DateTime.Now, OrderValue = 25, Customer = new Person() { Name = "Bob", Age = 30 } });
