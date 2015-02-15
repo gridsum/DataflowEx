@@ -94,15 +94,26 @@ namespace Gridsum.DataflowEx
                 {
                     return string.Format("[{0}]", this.Name);
                 }
-                else if (m_parents.Count == 1)
+                else 
                 {
                     return string.Format("{0}->[{1}]", m_parents[0].FullName, this.Name);
                 }
-                else
-                {
-                    var parentPaths = string.Join("|", m_parents.Select(p => p.FullName));
-                    return string.Format("({0})->[{1}]", parentPaths, this.Name);
-                }
+            }
+        }
+
+        /// <summary>
+        /// Get detailed long name of the dataflow. Will expand the whole ancestor tree.
+        /// </summary>
+        public string GetDetailedName()
+        {
+            if (m_parents.IsEmpty)
+            {
+                return string.Format("[{0}]", this.Name);
+            }
+            else 
+            {
+                var parentPaths = string.Join("|", m_parents.Select(p => p.FullName));
+                return string.Format("({0})->[{1}]", parentPaths, this.Name);
             }
         }
 
@@ -427,8 +438,15 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public virtual void Fault(Exception exception)
         {
-            LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);
-
+            if (exception is PropagatedException)
+            {
+                LogHelper.Logger.WarnFormat("{0} External exception occur. Shutting down my children...", exception, this.FullName);    
+            }
+            else
+            {
+                LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);    
+            }
+            
             foreach (var child in m_children)
             {
                 if (!child.Completion.IsCompleted)
