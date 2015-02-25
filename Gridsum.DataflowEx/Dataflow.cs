@@ -36,6 +36,7 @@ namespace Gridsum.DataflowEx
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
         protected string m_defaultName;
+        protected int m_isFaulted;
 
         /// <summary>
         /// Constructs a Dataflow instance
@@ -50,7 +51,8 @@ namespace Gridsum.DataflowEx
             string friendlyName = Utils.GetFriendlyName(this.GetType());
             int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
             m_defaultName = friendlyName + count;
-            
+            m_isFaulted = 0;
+
             if (m_dataflowOptions.FlowMonitorEnabled || m_dataflowOptions.BlockMonitorEnabled)
             {
                 StartPerformanceMonitorAsync();
@@ -380,6 +382,7 @@ namespace Gridsum.DataflowEx
             }
             catch (Exception e)
             {
+                m_isFaulted = 1;
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
@@ -396,6 +399,7 @@ namespace Gridsum.DataflowEx
                 }
                 else
                 {
+                    LogHelper.Logger.Info(string.Format("{0} completed with error", this.FullName));    
                     throw new AggregateException(exception);
                 }
             }
@@ -438,6 +442,12 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public virtual void Fault(Exception exception)
         {
+            if (Interlocked.CompareExchange(ref m_isFaulted, 1, 0) != 0)
+            {
+                LogHelper.Logger.DebugFormat("{0} is already faulted or faulting. Skip its downward error propagation.", exception, this.FullName);
+                return;
+            }
+
             if (exception is PropagatedException)
             {
                 LogHelper.Logger.WarnFormat("{0} External exception occur. Shutting down my children...", exception, this.FullName);    
@@ -451,7 +461,7 @@ namespace Gridsum.DataflowEx
             {
                 if (!child.Completion.IsCompleted)
                 {
-                    string msg = string.Format("{1} Child {0} is shutting down", child.DisplayName, this.FullName);
+                    string msg = string.Format("{1} is shutting down its child {0}", child.DisplayName, this.FullName);
                     LogHelper.Logger.Warn(msg);
 
                     //just pass on PropagatedException (do not use original exception here)
