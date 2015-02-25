@@ -447,12 +447,12 @@ namespace Gridsum.DataflowEx
                 LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);    
             }
             
-            foreach (var child in m_children)
+            foreach (IDataflowDependency child in m_children)
             {
                 if (!child.Completion.IsCompleted)
                 {
-                    string msg = string.Format("{0} is shutting down", child.DisplayName);
-                    LogHelper.Logger.Error(msg);
+                    string msg = string.Format("{1} Child {0} is shutting down", child.DisplayName, this.FullName);
+                    LogHelper.Logger.Warn(msg);
 
                     //just pass on PropagatedException (do not use original exception here)
                     if (exception is PropagatedException)

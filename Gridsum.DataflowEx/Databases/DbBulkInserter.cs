@@ -88,7 +88,7 @@ namespace Gridsum.DataflowEx.Databases
                 await this.OnPostBulkInsert(m_longConnection, targetTable, data).ConfigureAwait(false);
             }
 
-            m_logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+            m_logger.Debug(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
         }
     }
 }
