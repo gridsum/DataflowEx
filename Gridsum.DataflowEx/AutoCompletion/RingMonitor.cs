@@ -52,7 +52,7 @@ namespace Gridsum.DataflowEx.AutoCompletion
             }
         }
 
-        public async void StartMonitoring(Task preTask)
+        public async Task StartMonitoring(Task preTask)
         {
             LogHelper.Logger.InfoFormat("{0} A ring is set up: {1}", m_host.FullName, DisplayName);
             await preTask.ConfigureAwait(false);
