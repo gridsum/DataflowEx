@@ -68,7 +68,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestReader()
         {
-            var connectString = TestUtils.GetLocalDBConnectionString();
+            var connectString = TestUtils.GetLocalDBConnectionString("TestReader2");
             //init database
             Database.SetInitializer(new DropCreateDatabaseAlways<MyContext>());
             var context = new MyContext(connectString);
