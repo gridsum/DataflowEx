@@ -24,13 +24,13 @@ namespace Gridsum.DataflowEx.Test
             {
                 conn.Open();
                 var command = conn.CreateCommand();
-                command.CommandText = $"IF db_id('DataflowEx-TestDB-{dbName}') is null begin CREATE DATABASE [DataflowEx-TestDB-{dbName}] end;";
+                command.CommandText = $"IF db_id('DataflowEx-TestDB-{dbName}') is null BEGIN CREATE DATABASE [DataflowEx-TestDB-{dbName}] END;";
                 command.ExecuteNonQuery();
             }
 
-            var conn2 = new SqlConnection(GetLocalDBConnectionString(dbName));
-            conn2.Open();
-            return conn2;
+            var connToDBName = new SqlConnection(GetLocalDBConnectionString(dbName));
+            connToDBName.Open();
+            return connToDBName;
         }
 
         public static string GetLocalDBConnectionString(string dbName = null, bool addPrefix = true)
@@ -47,12 +47,6 @@ namespace Gridsum.DataflowEx.Test
             builder.Password = "UpLow123-+";      // update me
             builder.InitialCatalog = addPrefix ? $"DataflowEx-TestDB-{dbName}" : dbName;
             return builder.ConnectionString;
-
-            AppDomain.CurrentDomain.SetData("DataDirectory", AppDomain.CurrentDomain.BaseDirectory);
-            var connectString = string.Format(
-@"Data Source=(LocalDB)\v11.0;AttachDbFilename=|DataDirectory|\TestDB-{0}.mdf;Initial Catalog={0};Integrated Security=True;Connect Timeout=30",
-               dbName );
-            return connectString;
         }
 
         public static byte[] ToByteArray(this string s)
