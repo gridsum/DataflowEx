@@ -722,13 +722,11 @@ namespace Gridsum.DataflowEx
         public virtual async Task<long> ProcessAsync(IEnumerable<TIn> enumerable, bool completeFlowOnFinish = true)
         {
             var cts = new CancellationTokenSource();
-            Task<long> readAndPostTask = this.PullFromAsync(enumerable, cts.Token);
             this.RegisterCancellationTokenSource(cts);
-
             long count;
             try
             {
-                count = await readAndPostTask.ConfigureAwait(false);
+                count = await this.PullFromAsync(enumerable, cts.Token).ConfigureAwait(false);
                 LogHelper.Logger.InfoFormat("{0} Finished reading from enumerable and posting to the dataflow.", this.FullName);
             }
             catch (OperationCanceledException oce)
