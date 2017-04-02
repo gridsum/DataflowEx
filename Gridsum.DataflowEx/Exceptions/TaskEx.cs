@@ -63,7 +63,7 @@ namespace Gridsum.DataflowEx.Exceptions
                     cachedException = e;
                 }
             }
-            while (!object.ReferenceEquals(listGetter(), childrenSnapShot));
+            while (!object.ReferenceEquals(listGetter(), childrenSnapShot)); //this loop deals with dynamic children registration
 
             if (cachedException != null)
             {
