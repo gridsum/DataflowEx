@@ -61,7 +61,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             dbInserter.Post(new PersonEx { Age = 10, Name = "Aaron", Me = new Person { Age = 20, Name = "Bob" } });
             await dbInserter.SignalAndWaitForCompletionAsync();
 
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest4"))
+            using (var conn = TestUtils.GetLocalDB("ExternalMappingTest4"))
             {
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'Aaron'"));
@@ -80,7 +80,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             dbInserter.Post(new PersonEx2 { Age = 10, Name = "Aaron", Me = new Person { Age = 20, Name = "Bob" } });
             await dbInserter.SignalAndWaitForCompletionAsync();
 
-            using (var conn = LocalDB.GetLocalDB("ExternalMappingTest4"))
+            using (var conn = TestUtils.GetLocalDB("ExternalMappingTest4"))
             {
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People"));
                 Assert.AreEqual(1, conn.ExecuteScalar<int>("select count(*) from dbo.People where NameCol = 'Bob'"));

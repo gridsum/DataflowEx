@@ -60,7 +60,7 @@ namespace Gridsum.DataflowEx.Demo
             }
         }
 
-        public static bool CreateDatabase(string dbName, string dbFileName)
+        private static bool CreateDatabase(string dbName, string dbFileName)
         {
             try
             {
@@ -90,7 +90,7 @@ namespace Gridsum.DataflowEx.Demo
             }
         }
 
-        public static bool DetachDatabase(string dbName)
+        private static bool DetachDatabase(string dbName)
         {
             try
             {

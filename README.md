@@ -1,5 +1,5 @@
-Welcome to DataflowEx
-===================
+# Welcome to DataflowEx
+
 **Gridsum.DataflowEx** is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management over underlying dataflow blocks to make your life easier. You can get compiled binaries on [nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
 Here is a list of DataflowEx cool features:
@@ -17,8 +17,7 @@ Here is a list of DataflowEx cool features:
 
 Interested? O.K. Let's start the DataflowEx tour.
 
-1. Prerequisites
--------------
+## 1. Prerequisites
 
 If you are not familiar with [TPL Dataflow](http://msdn.microsoft.com/en-us/library/hh228603(v=vs.110).aspx) yet, please take your time to watch two videos:
 
@@ -28,8 +27,7 @@ http://channel9.msdn.com/posts/TPL-Dataflow-Tour
 Advanced (63min):
 https://channel9.msdn.com/Shows/Going+Deep/Stephen-Toub-Inside-TPL-Dataflow
 
-2. Background
--------------
+## 2. Background
 
 The very first question you may ask: what's wrong with TPL Dataflow? Nothing. The library from Microsoft library looks simply great. However, in the tough real world there are some obstacles when we apply **RAW** TPL Dataflow. Let's look at an example:
 ```c#
@@ -64,8 +62,8 @@ Things are getting complicated. Obviously Copy&Paste is not an acceptable choice
 
 Clearly we need a **class** representing the graph and being the handle of all the stakeholders. Object oriented design is a perfect fit here to solve all problems mentioned above. That is why we gave birth to Gridsum.DataflowEx.
 
-3. Introduction to DataflowEx
--------------
+## 3. Introduction to DataflowEx
+
 Code tells a lot. Let's migrate the above example to DataflowEx and see what it looks like:
 
 ```c#
@@ -142,8 +140,8 @@ It is now that easy with <kbd>ProcessAsync</kbd> as DataflowEx handles the tedio
 
 This is the basic idea of DataflowEx which empowers you with a fully functional handle of your dataflow graph. Find more in the following topics.
  
-4. Understanding DataflowEx design
--------------
+## 4. Understanding DataflowEx design
+
 Just like IDataflowBlock is the fundamental piece in TPL Dataflow, IDataflow is the counterpart in DataflowEx library. Take a look at the IDataflow design:
 ```c#
 public interface IDataflow
@@ -536,8 +534,7 @@ DataflowEx.Demo\Program.cs:line 50
 
 Hence, if you think the exception is expected or tolerable, please catch it in the very beginning in the delegate passed to the low level block. Otherwise, the domino effect will spread and fail the whole dataflow graph. 
 
-5. DataflowEx In Depth
--------------
+## 5. DataflowEx In Depth
 
 ### 5.1 Advanced Linking
 
@@ -956,8 +953,8 @@ As expected, people recorder captures the old person event as well as the total 
 
 To sum up, StatisticsRecorder is the aggregation engine in DataflowEx for reporting/monitoring purpose. Feel free to extend it and enrich your dataflow statistics.
 
-6. Built-in Components
--------------
+## 6. Built-in Components
+
 Here is another big reason why many projects inside Gridsum use DataflowEx: its powerful built-in components. Provided as generic reusable Dataflow classes, you get the their power out of the box. Data bulk insertion, data branching, 
 
 ### 6.1 Bulk insertion support
@@ -1153,6 +1150,7 @@ public class Order
 > **Tip:** Another option you may use when constructing a DBColumnPath attribute is *DBColumnPathOptions.DoNotExpand*, which disables the expansion of a certain property. This means this property path will be totally ignored when generating a mapping from your object model to the database table. 
 
 ### 6.2 DataBroadcaster
+
 When beginners touch Microsoft TPL Dataflow, one thing they complain is that an item can only travel to one of the many destinations. This is due to the design principle of TPL Dataflow but admittedly yes, there are scenarios this feature could be quite useful. That's why DataflowEx brings **DataBroadcaster** to make your life easier.
 
 DataBroadcaster acts simply like a copy machine. When it is linked to multiple targets, whenever an item flows in, it passes the reference of the same item to multiple targets. Optionally you can indicate a clone function to DataBroadcaster if you want to copy the item before handing to targets.
@@ -1203,6 +1201,7 @@ Printer2: third message
 > **Tip:** TPL Dataflow also has a BroadcastBlock<T> but it *provides a buffer for storing at most one element at time, overwriting each message with the next as it arrives*, which is very different from DataflowEx's DataBroadcaster that guarantees no data loss. IMHO, in most cases DataBroadcaster rather than BroadcastBlock is what you want. 
 
 ### 6.3 DataDispatcher
+
 DataDispatcher also falls into the 'one source multi targets' category. But it is different from DataBroadcaster in several aspects:
 >1. It ensures one input item only goes to one target.
 >2. Target dataflow nodes are created dynamically on demand, depending on the input items and the dispatch function.
@@ -1432,8 +1431,7 @@ Secondly, of course, it did a good job setting the ProductKey column for the fac
 
 We build DbDataJoiner not only because we need the functionality in production but also we want to show the potential of DataflowEx framework as well: it is the most complex Dataflow<T> implementation in DataflowEx. Feel free to use it or extend it to meet your need. If you wish, pull requests are always welcome.
 
-7. DataflowEx Best Practices
--------------
+## 7. DataflowEx Best Practices
 
 ### 7.1 Building your own Dataflow<TIn, TOut>
 
@@ -1487,8 +1485,7 @@ To sum up, DataflowEx introduces very little overhead. When the pipeline is crea
 
 > **Tip:** Using DataflowEx doesn't cause performance problems. But you still need to properly design your dataflow at the level of TPL Dataflow blocks. One simple design rule is to *'avoid too many blocks'*. If one simple task could be implemented within a block, don't split it into two linked blocks: this hurts performance. Bear in mind that every single TPL block comes with a cost like buffering, threading and additional data travelling. Balancing between proper task granularity and component modularity/reusability is a key part in Dataflow/DataflowEx performance tuning. Again, don't have too many dataflows or blocks.
 
-8. Have a try now!
--------------
+## 8. Have a try now!
 
 Thanks for reading such a long tutorial. Congratulations that you've reached the end.
 

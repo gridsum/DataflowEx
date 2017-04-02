@@ -401,7 +401,7 @@ namespace Gridsum.DataflowEx
                 {
                     LogHelper.Logger.Info(string.Format("{0} completed with error", this.FullName));    
                     throw new AggregateException(exception);
-                }
+                }                
             }
         }
 
@@ -679,7 +679,7 @@ namespace Gridsum.DataflowEx
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
 
-                            throw new AggregateException(e);
+                            throw;
                         }
 
                         LogHelper.Logger.InfoFormat(
@@ -734,7 +734,7 @@ namespace Gridsum.DataflowEx
             catch (OperationCanceledException oce)
             {
                 LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
-                throw new AggregateException(oce);
+                throw;
             }
 
             if (completeFlowOnFinish)
