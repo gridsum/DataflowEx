@@ -36,6 +36,7 @@ namespace Gridsum.DataflowEx
         protected ImmutableList<Func<Task>> m_postDataflowTasks = ImmutableList.Create<Func<Task>>();
         protected ImmutableList<CancellationTokenSource> m_ctsList = ImmutableList.Create<CancellationTokenSource>();
         protected string m_defaultName;
+        protected int m_isFaulted;
 
         /// <summary>
         /// Constructs a Dataflow instance
@@ -50,7 +51,8 @@ namespace Gridsum.DataflowEx
             string friendlyName = Utils.GetFriendlyName(this.GetType());
             int count = s_nameDict.GetOrAdd(friendlyName, new IntHolder()).Increment();
             m_defaultName = friendlyName + count;
-            
+            m_isFaulted = 0;
+
             if (m_dataflowOptions.FlowMonitorEnabled || m_dataflowOptions.BlockMonitorEnabled)
             {
                 StartPerformanceMonitorAsync();
@@ -380,6 +382,7 @@ namespace Gridsum.DataflowEx
             }
             catch (Exception e)
             {
+                m_isFaulted = 1;
                 foreach (var cts in m_ctsList)
                 {
                     cts.Cancel();
@@ -396,8 +399,9 @@ namespace Gridsum.DataflowEx
                 }
                 else
                 {
+                    LogHelper.Logger.Info(string.Format("{0} completed with error", this.FullName));    
                     throw new AggregateException(exception);
-                }
+                }                
             }
         }
 
@@ -438,6 +442,12 @@ namespace Gridsum.DataflowEx
         /// </summary>
         public virtual void Fault(Exception exception)
         {
+            if (Interlocked.CompareExchange(ref m_isFaulted, 1, 0) != 0)
+            {
+                LogHelper.Logger.DebugFormat("{0} is already faulted or faulting. Skip its downward error propagation.", exception, this.FullName);
+                return;
+            }
+
             if (exception is PropagatedException)
             {
                 LogHelper.Logger.WarnFormat("{0} External exception occur. Shutting down my children...", exception, this.FullName);    
@@ -447,12 +457,12 @@ namespace Gridsum.DataflowEx
                 LogHelper.Logger.ErrorFormat("{0} Exception occur. Shutting down my children...", exception, this.FullName);    
             }
             
-            foreach (var child in m_children)
+            foreach (IDataflowDependency child in m_children)
             {
                 if (!child.Completion.IsCompleted)
                 {
-                    string msg = string.Format("{0} is shutting down", child.DisplayName);
-                    LogHelper.Logger.Error(msg);
+                    string msg = string.Format("{1} is shutting down its child {0}", child.DisplayName, this.FullName);
+                    LogHelper.Logger.Warn(msg);
 
                     //just pass on PropagatedException (do not use original exception here)
                     if (exception is PropagatedException)
@@ -669,7 +679,7 @@ namespace Gridsum.DataflowEx
                                 typeof(TIn).GetFriendlyName(),
                                 ReceiverDisplayName);
 
-                            throw new AggregateException(e);
+                            throw;
                         }
 
                         LogHelper.Logger.InfoFormat(
@@ -712,19 +722,17 @@ namespace Gridsum.DataflowEx
         public virtual async Task<long> ProcessAsync(IEnumerable<TIn> enumerable, bool completeFlowOnFinish = true)
         {
             var cts = new CancellationTokenSource();
-            Task<long> readAndPostTask = this.PullFromAsync(enumerable, cts.Token);
             this.RegisterCancellationTokenSource(cts);
-
             long count;
             try
             {
-                count = await readAndPostTask.ConfigureAwait(false);
+                count = await this.PullFromAsync(enumerable, cts.Token).ConfigureAwait(false);
                 LogHelper.Logger.InfoFormat("{0} Finished reading from enumerable and posting to the dataflow.", this.FullName);
             }
             catch (OperationCanceledException oce)
             {
                 LogHelper.Logger.InfoFormat("{0} Reading from enumerable canceled halfway. Possibly there is something wrong with dataflow processing.", this.FullName);
-                throw new AggregateException(oce);
+                throw;
             }
 
             if (completeFlowOnFinish)

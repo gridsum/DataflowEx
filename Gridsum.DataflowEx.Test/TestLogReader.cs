@@ -46,7 +46,7 @@
             }
             catch (Exception e)
             {
-                Assert.AreEqual(typeof(OperationCanceledException), e.InnerException.GetType());
+                Assert.AreEqual(typeof(OperationCanceledException), e.GetType());
             }
         }
         #endregion
@@ -56,8 +56,9 @@
             yield return "a";
             yield return "b";
             yield return "ERROR";
-            Thread.Sleep(1000);
+            Thread.Sleep(5000);
             yield return "c";
+            Thread.Sleep(5000);
             yield return "d";
         }
     }

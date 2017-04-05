@@ -49,8 +49,6 @@ namespace Gridsum.DataflowEx.Databases
 
         protected override async Task DumpToDBAsync(T[] data, TargetTable targetTable)
         {
-            m_logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
-
             using (var bulkReader = new BulkDataReader<T>(m_typeAccessor, data))
             {
                 try
@@ -74,21 +72,14 @@ namespace Gridsum.DataflowEx.Databases
                 {
                     if (e is NullReferenceException)
                     {
-                        m_logger.ErrorFormat(
-                            "{0} NullReferenceException occurred in bulk insertion. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.",
-                            this.FullName);
-                    }
-
-                    m_logger.ErrorFormat("{0} Bulk insertion error in the first place", e, this.FullName);
-
+                        m_logger.Error($"{this.FullName} NullReferenceException occurred in bulk insertion for type {typeof(T).Name}. This is probably caused by forgetting assigning value to a [NoNullCheck] attribute when constructing your object.");
+                    }                    
                     //As this is an unrecoverable exception, rethrow it
-                    throw new AggregateException(e);
+                    throw;
                 }
-
                 await this.OnPostBulkInsert(m_longConnection, targetTable, data).ConfigureAwait(false);
             }
 
-            m_logger.Info(h => h("{3} bulk-inserted {0} {1} to db table {2}", data.Length, typeof(T).Name, targetTable.TableName, this.FullName));
         }
     }
 }

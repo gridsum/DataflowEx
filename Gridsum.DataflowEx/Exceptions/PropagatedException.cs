@@ -34,7 +34,7 @@ namespace Gridsum.DataflowEx.Exceptions
         }
     }
 
-    public class SiblingUnitCanceledException : Exception
+    public class SiblingUnitCanceledException : PropagatedException
     {
         public SiblingUnitCanceledException()
             : base("Some sibling was canceled so I am down")

@@ -76,9 +76,25 @@ namespace Gridsum.DataflowEx.Databases
                 bulkInsertOption.BoundedCapacity = bulkInsertOption.BoundedCapacity / bulkSize;
             }
 
-            this.m_actionBlock = new ActionBlock<T[]>(array => this.DumpToDBAsync(array, targetTable), bulkInsertOption);
-            this.m_batchBlock.LinkTo(this.m_actionBlock, this.m_defaultLinkOption);
             this.m_logger = Utils.GetNamespaceLogger();
+            this.m_actionBlock = new ActionBlock<T[]>(
+                async array => 
+                {
+                    m_logger.Debug(h => h("{3} starts bulk-inserting {0} {1} to db table {2}", array.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+                    try
+                    {
+                        await this.DumpToDBAsync(array, targetTable);
+                    }
+                    catch(Exception e)
+                    {
+                        m_logger.Error($"{this.FullName} failed bulk-inserting {array.Length} {typeof(T).Name} to db table {targetTable.TableName}", e);
+                        throw;
+                    }
+                    m_logger.Debug(h => h("{3} bulk-inserted {0} {1} to db table {2}", array.Length, typeof(T).Name, targetTable.TableName, this.FullName));
+                }
+                , bulkInsertOption);
+            this.m_batchBlock.LinkTo(this.m_actionBlock, this.m_defaultLinkOption);
+            
 
             this.RegisterChild(this.m_batchBlock);
             this.RegisterChild(this.m_actionBlock);

@@ -82,6 +82,7 @@
   <ItemGroup>
     <Compile Include="DatabaseTests\DbColumnPathTest.cs" />
     <Compile Include="DatabaseTests\ExternalMappingTest.cs" />
+    <Compile Include="DataflowFaultTest.cs" />
     <Compile Include="DataflowTest.cs" />
     <Compile Include="DatabaseTests\BulkInserterTest.cs" />
     <Compile Include="DatabaseTests\GSProduct.cs" />
