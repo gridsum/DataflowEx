@@ -15,6 +15,7 @@
       DataflowEx enables you to write reusable components and easily link them together as a high-level graph while still having the power of low level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. Find more at https://github.com/gridsum/dataflowex.
     </description>
     <releaseNotes>
+* 1.1.3   - Optimize some logging and exception handling.
 * 1.1.2   - DbBulkInserter now uses a single transaction to ensure full rollback on error.
 * 1.1.1   - Fix potential race condition for RegisterChild() and RegisterDependency().
 * 1.1.0   - Tutorial and documentation added. Also supports manual db column mapping registration.
