@@ -14,23 +14,34 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     {
         internal static string s_containerName = "mssql-for-dataflowex-test";
         internal static string s_saPassword = "UpLow123-+";
+        internal static string s_imageName = "microsoft/mssql-server-linux";
         internal static string s_runningSqlServerContainerID;
 
         [AssemblyInitialize]
         public static void BootSqlServerWithDockerCli(TestContext tc)
         {
-            var process = ExecuteCommand("docker", $"run --name \"{s_containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD=UpLow123-+\" -a stdin -a stdout -a stderr -p 1433:1433 microsoft/mssql-server-linux", ".", Console.WriteLine, Console.WriteLine);
-            Thread.Sleep(20 * 1000);
+            using (var pullProcess = ExecuteCommand("docker", $"pull {s_imageName}", ".", Console.WriteLine, Console.WriteLine))
+            {
+                pullProcess.WaitForExit();
+            }
+
+            var process = ExecuteCommand("docker", $"run --name \"{s_containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD={s_saPassword}\" -a stdin -a stdout -a stderr -p 1433:1433 {s_imageName}", ".", Console.WriteLine, Console.WriteLine);
+            Thread.Sleep(20 * 1000); //todo: improve this 
             GC.KeepAlive(process);            
         }
 
         [AssemblyCleanup]
         public static void ShutdownSqlServerWithDockerCli()
         {
-            var process = ExecuteCommand("docker", $"stop \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine);
-            process.WaitForExit();
-            process = ExecuteCommand("docker", $"rm \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine);
-            process.WaitForExit();
+            using (var process = ExecuteCommand("docker", $"stop \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine))
+            {
+                process.WaitForExit();
+            }
+
+            using (var process2 = ExecuteCommand("docker", $"rm \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine))
+            {
+                process2.WaitForExit();
+            }
         }
 
         #region docker client approach (not working)
