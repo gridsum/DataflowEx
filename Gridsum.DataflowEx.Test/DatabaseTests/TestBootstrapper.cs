@@ -16,6 +16,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         internal static string s_saPassword = "UpLow123-+";
         internal static string s_imageName = "microsoft/mssql-server-linux";
         internal static string s_runningSqlServerContainerID;
+        internal static Process s_sqlserverDockerProcess;
 
         [AssemblyInitialize]
         public static void BootSqlServerWithDockerCli(TestContext tc)
@@ -25,9 +26,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 pullProcess.WaitForExit();
             }
 
-            var process = ExecuteCommand("docker", $"run --name \"{s_containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD={s_saPassword}\" -a stdin -a stdout -a stderr -p 1433:1433 {s_imageName}", ".", Console.WriteLine, Console.WriteLine);
-            Thread.Sleep(20 * 1000); //todo: improve this 
-            GC.KeepAlive(process);            
+            s_sqlserverDockerProcess = ExecuteCommand("docker", $"run --name \"{s_containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD={s_saPassword}\" -a stdin -a stdout -a stderr -p 1433:1433 {s_imageName}", ".", Console.WriteLine, Console.WriteLine);
+            Thread.Sleep(20 * 1000); //todo: improve this                      
         }
 
         [AssemblyCleanup]
@@ -37,6 +37,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             {
                 process.WaitForExit();
             }
+
+            s_sqlserverDockerProcess.Dispose();
 
             using (var process2 = ExecuteCommand("docker", $"rm \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine))
             {
