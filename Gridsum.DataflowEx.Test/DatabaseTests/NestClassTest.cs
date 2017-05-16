@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
 using Gridsum.DataflowEx.Databases;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
@@ -38,7 +38,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestNestClass()
         {
             var connectString = TestUtils.GetLocalDBConnectionString();
-            Database.SetInitializer(new DropCreateDatabaseAlways<NestContext>());
             var context = new NestContext(connectString);
             context.NestInits.Add(new NestInit());
             context.SaveChanges();
@@ -72,7 +71,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         }
     }
 
-    public class NestContext : DbContext
+    public class NestContext : DbContextBase<NestContext>
     {
         public NestContext(string config)
             : base(config)

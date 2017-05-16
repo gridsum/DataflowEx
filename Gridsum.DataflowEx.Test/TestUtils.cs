@@ -10,6 +10,22 @@ namespace Gridsum.DataflowEx.Test
     using System.Data.SqlClient;
     using System.Diagnostics;
     using System.Reflection;
+    using Microsoft.EntityFrameworkCore;
+
+    public class DbContextBase<T> : DbContext where T : DbContext
+    {
+        public DbContextBase(string connectString)
+            : base(new DbContextOptionsBuilder<T>().UseSqlServer(connectString).Options)
+        {
+            this.ConnectionString = connectString;
+            this.Database.EnsureDeleted();
+            this.Database.EnsureCreated();
+        }
+
+        public string ConnectionString { get; private set; }
+
+        
+    }
 
     public static class TestUtils
     {

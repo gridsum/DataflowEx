@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Linq;
 using System.Threading.Tasks.Dataflow;
 using Gridsum.DataflowEx.Databases;
@@ -9,6 +8,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
     using System.Runtime.InteropServices;
     using System.Text;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage;
 
     [TestClass]
     public class BulkInserterTest
@@ -17,7 +18,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter()
         {
             //init db
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
@@ -56,7 +56,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter_NoNullCheck()
         {
             //init db
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
@@ -108,7 +107,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestMultiDbBulkInserter()
         {
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString("TestMultiDbBulkInserter_{0}");
             //init db
             int profileIdCount = 3;
@@ -260,7 +258,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public byte[] RawData { get; set; }
     }
 
-    public class InsertContext : DbContext
+    public class InsertContext : DbContextBase<InsertContext>
     {
         public InsertContext(string conn)
             : base(conn)
