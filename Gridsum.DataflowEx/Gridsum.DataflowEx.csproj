@@ -5,6 +5,25 @@
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <FileVersion>2.0.0</FileVersion>
     <Version>2.0.0-alpha</Version>
+    <Description>Gridsum.DataflowEx is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. 
+DataflowEx enables you to write reusable components and easily link them together as a high-level graph while still having the power of low level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. Find more at https://github.com/gridsum/dataflowex.</Description>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageReleaseNotes>* 2.0.0-alpha - Migrate to .Net standard 2.0
+* 1.1.3   - Optimize some logging and exception handling.
+* 1.1.2   - DbBulkInserter now uses a single transaction to ensure full rollback on error.
+* 1.1.1   - Fix potential race condition for RegisterChild() and RegisterDependency().
+* 1.1.0   - Tutorial and documentation added. Also supports manual db column mapping registration.
+* 1.0.9.* - Built-in flows now respect given DataflowOptions wherever applicable.
+* 1.0.9   - Allows optional db column mapping.
+* 1.0.8   - Add DbDataJoiner to help lookup and populate a dimension table. Also comes with a new ring completion mechanism.
+* 1.0.7   - A better DataBrancher that supports multiple outputs. Add varbinary support for bulk insertion.
+* 1.0.6   - Optimize property accessor in bulk inserter. Add NoNullCheck attribute.
+* 1.0.5   - Add LogReader abstraction. Add basic circular dependency detection logic.
+* 1.0.4   - Add LinkLeftToError(). Enhance StatisticsRecorder indexer. Fix DataflowEvent ToString().
+* 1.0.3   - RegisterChild() becomes public and defensive.
+* 1.0.2   - Add Dataflow.RegisterPostDataflowTask and Dataflow.RegisterCancellationTokenSource. StatisticsRecorder now supports event aggregation.
+* 1.0.1   - More extensible DbBulkInserter/MultiDbBulkInserter and exact matching for multi-match.
+* 1.0.0   - First release after 9 beta versions.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0-preview2-25405-01" />
