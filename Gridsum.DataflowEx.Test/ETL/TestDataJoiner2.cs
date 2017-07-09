@@ -44,11 +44,11 @@ namespace Gridsum.DataflowEx.Test.ETL.Test2
                 context.Leafs.Add(new Leaf() { IntValue = i, Key = i.ToString().ToByteArray(), StrValue = "Str" + i });
             }
 
-            context.SaveChanges();
+            context.SaveChanges();           
 
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
-                new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
+                new TargetTable(Leaf.DimLeaf, connectString, "Leafs"),
                 2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);

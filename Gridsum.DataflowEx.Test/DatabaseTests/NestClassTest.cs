@@ -50,7 +50,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             using (var connection = new SqlConnection(connectString))
             {
                 connection.Open();
-                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorForTable(new TargetTable("NestClassTest", connectString, "dbo.AEFs"));
+                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorForTable(new TargetTable("NestClassTest", connectString, "dbo.AAs"));
                 var aReader = new BulkDataReader<ABulk>(aTypeAccessor, new[] { a1, a2, a3, a4 });
                 using (var aCopy = new SqlBulkCopy(connection))
                 {
@@ -58,7 +58,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                     {
                         aCopy.ColumnMappings.Add(map);
                     }
-                    aCopy.DestinationTableName = "dbo.AEFs";
+                    aCopy.DestinationTableName = "dbo.AAs";
                     aCopy.WriteToServer(aReader);
                 }
             }

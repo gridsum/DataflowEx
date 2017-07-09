@@ -10,6 +10,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     using System.Text;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Storage;
+    using System.Threading;
 
     [TestClass]
     public class BulkInserterTest
@@ -110,12 +111,13 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             var connectString = TestUtils.GetLocalDBConnectionString("TestMultiDbBulkInserter_{0}");
             //init db
             int profileIdCount = 3;
+            InsertContext[] contexts = new InsertContext[profileIdCount + 1];
             for (int i = 1; i <= profileIdCount; ++i)
             {
                 var init = new Init2();
-                var context = new InsertContext(string.Format(connectString, i, i));
-                context.Inits.Add(init);
-                context.SaveChanges();
+                contexts[i] = new InsertContext(string.Format(connectString, i, i));
+                contexts[i].Inits.Add(init);
+                contexts[i].SaveChanges();
             }
 
             var profileDispatch = new Func<Entity2, int>(e => e.ProfileId);
@@ -139,12 +141,10 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             //assert result
             for (int i = 1; i <= profileIdCount; ++i)
             {
-                var connString = connectionGetter(i);
-                var curContext = new InsertContext(connString);
-                Assert.AreEqual(i, curContext.Seods.Count());
-                Assert.AreEqual(i, curContext.Seods.FirstOrDefault().Price);
-                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name.Length == 1);
-                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name2.Length == 1);
+                Assert.AreEqual(i,  contexts[i].Seods.Count());
+                Assert.AreEqual(i,  contexts[i].Seods.FirstOrDefault().Price);
+                Assert.IsTrue(      contexts[i].Seods.FirstOrDefault().Name.Length == 1);
+                Assert.IsTrue(      contexts[i].Seods.FirstOrDefault().Name2.Length == 1);
             }
         }
     }

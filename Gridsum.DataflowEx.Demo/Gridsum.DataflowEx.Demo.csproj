@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj"/>
-    <ProjectReference Include="..\Gridsum.DataflowEx.Test\Gridsum.DataflowEx.Test.csproj"/>
+    <ProjectReference Include="..\Gridsum.DataflowEx\Gridsum.DataflowEx.csproj" />
+    <ProjectReference Include="..\Gridsum.DataflowEx.Test\Gridsum.DataflowEx.Test.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="10.0.2"/>
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>
 </Project>

@@ -53,7 +53,7 @@ namespace Gridsum.DataflowEx.Test.ETL
 
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
-                new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
+                new TargetTable(Leaf.DimLeaf, connectString, "Leafs"),
                 2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
