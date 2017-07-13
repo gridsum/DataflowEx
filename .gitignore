@@ -175,3 +175,4 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 FakesAssemblies/
+/.vs/Gridsum.DataflowEx/v15/sqlite3/storage.ide
