@@ -56,8 +56,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                 AttachStdin = true,
                 AttachStdout = true,
                 Env = new[] { "ACCEPT_EULA=Y", $"SA_PASSWORD={s_saPassword}" },
-                ExposedPorts = new Dictionary<string, object>() {
-                    { "1433/tcp", new { HostPort = "1433/tcp" } }
+                ExposedPorts = new Dictionary<string, EmptyStruct>() {
+                    { "1433/tcp", new EmptyStruct() }
                 },
                 HostConfig = new HostConfig
                 {

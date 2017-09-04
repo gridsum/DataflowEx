@@ -34,11 +34,11 @@ DataflowEx enables you to write reusable components and easily link them togethe
     <RepositoryUrl>https://github.com/gridsum/DataflowEx</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="C5" Version="2.5.0" />
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0-preview2-25405-01" />
-    <PackageReference Include="System.Collections.Immutable" Version="1.4.0-preview2-25405-01" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.4.0-preview2-25405-01" />
-    <PackageReference Include="Common.Logging.Core" Version="3.4.0-beta2" />
-    <PackageReference Include="Common.Logging" Version="3.4.0-beta2" />
+    <PackageReference Include="C5" Version="2.5.3" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.4.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.4.0" />
+    <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
+    <PackageReference Include="Common.Logging" Version="3.4.1" />
   </ItemGroup>
 </Project>
