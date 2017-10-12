@@ -34,6 +34,12 @@ DataflowEx enables you to write reusable components and easily link them togethe
     <PackageProjectUrl>https://github.com/gridsum/DataflowEx</PackageProjectUrl>
     <RepositoryUrl>https://github.com/gridsum/DataflowEx</RepositoryUrl>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Gridsum.DataflowEx.xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>bin\Release\netstandard2.0\Gridsum.DataflowEx.xml</DocumentationFile>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="C5" Version="2.5.3" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0" />

@@ -2,6 +2,8 @@
 
 **Gridsum.DataflowEx** is a high-level dataflow framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. It does not replace TPL Dataflow but provides reusability, abstraction and management over underlying dataflow blocks to make your life easier. You can get compiled binaries on [nuget.org](http://www.nuget.org/packages/Gridsum.DataflowEx/).
 
+> **Update:** Gridsum.DataflowEx v2.0 has been [released](https://www.nuget.org/packages/Gridsum.DataflowEx/2.0.0-beta)! This new major version fully supports [.NET standard 2.0](https://blogs.msdn.microsoft.com/dotnet/2017/08/14/announcing-net-standard-2-0/), which means you are able to utilize the library in a wide range of platforms including .Net Core, Xamarin and UWP. 
+
 Here is a list of DataflowEx cool features:
 
 * Block chain/graph encapsulation as a reusable component
