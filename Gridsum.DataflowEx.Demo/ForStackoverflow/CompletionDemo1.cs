@@ -84,10 +84,12 @@ namespace Gridsum.DataflowEx.Demo.ForStackoverflow
             Console.ReadLine();
         }
 
+/*  
         public static void Main()
         {
             var demo = new CompletionDemo1();
             demo.Start();
-        }
+        }    
+    */
     }
 }

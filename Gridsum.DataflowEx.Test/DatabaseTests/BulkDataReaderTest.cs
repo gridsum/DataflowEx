@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
 using Gridsum.DataflowEx.Databases;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
@@ -70,8 +70,8 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         {
             var connectString = TestUtils.GetLocalDBConnectionString("TestReader2");
             //init database
-            Database.SetInitializer(new DropCreateDatabaseAlways<MyContext>());
             var context = new MyContext(connectString);
+
             context.Inits.Add(new Init());
             context.SaveChanges();
 
@@ -229,7 +229,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         }
     }
 
-    public class MyContext : DbContext
+    public class MyContext : DbContextBase<MyContext>
     {
         public MyContext(string connectString)
             : base(connectString)

@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
 using Gridsum.DataflowEx.Databases;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
@@ -39,7 +39,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         {
             var connectString = TestUtils.GetLocalDBConnectionString();
             //init database
-            Database.SetInitializer(new DropCreateDatabaseAlways<LoopContext>());
             var context = new LoopContext(connectString);
             context.LoopInits.Add(new LoopInit());
             context.SaveChanges();
@@ -85,7 +84,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     }
 
 
-    public class LoopContext : DbContext
+    public class LoopContext : DbContextBase<LoopContext>
     {
         public LoopContext(string con) : base(con) { }
 

@@ -298,7 +298,7 @@ namespace Gridsum.DataflowEx
         /// <summary>
         /// Starts the async loop which periodically check the status of the dataflow and its children
         /// </summary>
-        private async void StartPerformanceMonitorAsync()
+        private async Task StartPerformanceMonitorAsync()
         {
             try
             {
@@ -352,12 +352,12 @@ namespace Gridsum.DataflowEx
         /// </summary>
         /// <param name="preTask">The task after which ring check begins</param>
         /// <param name="ringNodes">Child dataflows that forms a ring</param>
-        protected async void RegisterChildRing(Task preTask, params IRingNode[] ringNodes)
+        protected async Task RegisterChildRing(Task preTask, params IRingNode[] ringNodes)
         {
             var ring = new RingMonitor(this, ringNodes);
             //todo: check if it is a real ring
 
-            ring.StartMonitoring(preTask);
+            await ring.StartMonitoring(preTask);
         }
 
         protected virtual async Task GetCompletionTask()
