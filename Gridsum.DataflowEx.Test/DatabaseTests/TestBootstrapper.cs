@@ -14,35 +14,48 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     {
         internal static string s_containerName = "mssql-for-dataflowex-test";
         internal static string s_saPassword = "UpLow123-+";
-        internal static string s_imageName = "microsoft/mssql-server-linux";
+        internal static string s_imageName = "microsoft/mssql-server-linux:2017-GA";
         internal static string s_runningSqlServerContainerID;
         internal static Process s_sqlserverDockerProcess;
 
         [AssemblyInitialize]
         public static void BootSqlServerWithDockerCli(TestContext tc)
         {
+            BootSqlServerWithDockerCli(tc, s_containerName);
+        }
+
+        public static void BootSqlServerWithDockerCli(TestContext tc, string containerName)
+        {
             //using (var pullProcess = ExecuteCommand("docker", $"pull {s_imageName}", ".", Console.WriteLine, Console.WriteLine))
             //{
             //    pullProcess.WaitForExit();
             //}
 
-            s_sqlserverDockerProcess = ExecuteCommand("docker", $"run --name \"{s_containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD={s_saPassword}\" -a stdin -a stdout -a stderr -p 1433:1433 {s_imageName}", ".", Console.WriteLine, Console.WriteLine);
+            s_sqlserverDockerProcess = ExecuteCommand("docker", $"run --name \"{containerName}\" -e \"ACCEPT_EULA=Y\" -e \"SA_PASSWORD={s_saPassword}\" -a stdin -a stdout -a stderr -p 1433:1433 {s_imageName}", ".", Console.WriteLine, Console.WriteLine);
             Thread.Sleep(20 * 1000); //todo: improve this                      
         }
 
         [AssemblyCleanup]
         public static void ShutdownSqlServerWithDockerCli()
         {
-            using (var process = ExecuteCommand("docker", $"stop \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine))
+            ShutdownSqlServerWithDockerCli(true, s_containerName);
+        }
+
+        public static void ShutdownSqlServerWithDockerCli(bool removeAfterShutDown, string containerName)
+        {
+            using (var process = ExecuteCommand("docker", $"stop \"{containerName}\"", ".", Console.WriteLine, Console.WriteLine))
             {
                 process.WaitForExit();
             }
 
             s_sqlserverDockerProcess.Dispose();
 
-            using (var process2 = ExecuteCommand("docker", $"rm \"{s_containerName}\"", ".", Console.WriteLine, Console.WriteLine))
+            if (removeAfterShutDown)
             {
-                process2.WaitForExit();
+                using (var process2 = ExecuteCommand("docker", $"rm \"{containerName}\"", ".", Console.WriteLine, Console.WriteLine))
+                {
+                    process2.WaitForExit();
+                }
             }
         }
 

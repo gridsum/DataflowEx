@@ -15,6 +15,7 @@ namespace Gridsum.DataflowEx.Demo
     {
         public const string DB_DIRECTORY = "Data";
 
+        [Obsolete]
         public static SqlConnection GetLocalDB(string dbName, bool deleteIfExists = false)
         {
             try

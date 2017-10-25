@@ -11,6 +11,8 @@
     using Common.Logging;
 
     using Gridsum.DataflowEx.Databases;
+    using Gridsum.DataflowEx.Test;
+    using Gridsum.DataflowEx.Test.DatabaseTests;
 
     class Program
     {
@@ -51,7 +53,8 @@
             aggregater.Completion.Wait();
             Console.WriteLine("sum(a) = {0}", dict["a"]); //prints sum(a) = 6
 
-
+            string containerName = "dataflowex-demo-" + Guid.NewGuid();
+            TestBootstrapper.BootSqlServerWithDockerCli(null, containerName);
             //CalcAsync().Wait();
             //SlowFlowAsync().Wait();
             //FailDemoAsync().Wait();
@@ -64,6 +67,8 @@
             //BroadcasterDemo().Wait();
             //MyLoggerDemo().Wait();
             //ETLLookupDemo().Wait();
+
+            TestBootstrapper.ShutdownSqlServerWithDockerCli(false, containerName); // leave the container so that we can check result manually through ssms.
         }
 
         public static async Task CalcAsync()
@@ -187,10 +192,10 @@
 
         public static async Task BulkInserterDemo()
         {
-            string connStr;
+            string connStr = TestUtils.GetLocalDBConnectionString("BulkInserterDemo");
 
             //initialize table
-            using (var conn = LocalDB.GetLocalDB("BulkInserterDemo"))
+            using (var conn = TestUtils.GetLocalDB("BulkInserterDemo"))
             {
                 var cmd = new SqlCommand(@"
                 IF OBJECT_id('dbo.People', 'U') IS NOT NULL
@@ -204,7 +209,7 @@
                 )
                 ", conn);
                 cmd.ExecuteNonQuery();
-                connStr = conn.ConnectionString;
+                
             }
 
             var f = new PeopleFlow(DataflowOptions.Default);
@@ -221,10 +226,10 @@
 
         public static async Task BulkInserterDemo2()
         {
-            string connStr;
+            string connStr = TestUtils.GetLocalDBConnectionString("BulkInserterDemo");
 
             //initialize table
-            using (var conn = LocalDB.GetLocalDB("BulkInserterDemo"))
+            using (var conn = TestUtils.GetLocalDB("BulkInserterDemo"))
             {
                 var cmd = new SqlCommand(@"
                 IF OBJECT_id('dbo.Orders', 'U') IS NOT NULL
@@ -239,8 +244,7 @@
                     CustomerAge INT NOT NULL
                 )
                 ", conn);
-                cmd.ExecuteNonQuery();
-                connStr = conn.ConnectionString;
+                cmd.ExecuteNonQuery();                
             }
 
             var dbInserter = new DbBulkInserter<Order>(connStr, "dbo.Orders", DataflowOptions.Default, "OrderTarget");
@@ -290,10 +294,10 @@
 
         public static async Task ETLLookupDemo()
         {
-            string connStr;
+            string connStr = TestUtils.GetLocalDBConnectionString("ETLLookupDemo");
 
             //initialize table
-            using (var conn = LocalDB.GetLocalDB("ETLLookupDemo"))
+            using (var conn = TestUtils.GetLocalDB("ETLLookupDemo"))
             {
                 //We will create a dimension table and a fact table
                 //We also populate the dimension table with some pre-defined rows
@@ -323,8 +327,7 @@
                     ProductKey INT NULL,
                 )
                 ", conn);
-                cmd.ExecuteNonQuery();
-                connStr = conn.ConnectionString;
+                cmd.ExecuteNonQuery();                
             }
 
             var lookupNode = new ProductLookupFlow(new TargetTable("LookupDemo", connStr, "dbo.Product"));
