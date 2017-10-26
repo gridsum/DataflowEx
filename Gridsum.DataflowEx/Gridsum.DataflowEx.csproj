@@ -4,13 +4,17 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <FileVersion>2.0.0</FileVersion>
-    <Version>2.0.0-beta</Version>
+    <Version>2.0.0</Version>
     <Description>Gridsum.DataflowEx is a dataflow and etl framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. 
-DataflowEx enables you to write reusable components and easily link them together as a high-level dataflow graph while still having the power of low-level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. Find more at https://github.com/gridsum/dataflowex .</Description>
+
+DataflowEx enables you to write reusable components and easily link them together as a high-level dataflow graph while still having the power of low-level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. 
+
+More information is available at: https://github.com/gridsum/dataflowex </Description>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageReleaseNotes>* 2.0.0-beta - Upgrade to .Net Core 2 RTM
+    <PackageReleaseNotes>* 2.0.0   - First formal V2 release that targets .Net Standard 2.0
+* 2.0.0-beta   - Upgrade to .Net Core 2 RTM dependencies
 * 2.0.0-alpha2 - Update pacakge metadata and dependent libraries
-* 2.0.0-alpha  - Migrate to .Net standard 2.0
+* 2.0.0-alpha  - Migrate to .Net Standard 2.0
 * 1.1.3   - Optimize some logging and exception handling.
 * 1.1.2   - DbBulkInserter now uses a single transaction to ensure full rollback on error.
 * 1.1.1   - Fix potential race condition for RegisterChild() and RegisterDependency().
