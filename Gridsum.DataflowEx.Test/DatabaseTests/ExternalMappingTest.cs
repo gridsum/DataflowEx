@@ -10,7 +10,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
     using System.Data.SqlClient;
 
     using Gridsum.DataflowEx.Databases;
-    using Gridsum.DataflowEx.Demo;
+    using Gridsum.DataflowEx.Test.Demo;
 
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 

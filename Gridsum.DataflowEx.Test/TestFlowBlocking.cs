@@ -3,7 +3,7 @@
     using System;
     using System.Threading.Tasks;
 
-    using Gridsum.DataflowEx.Demo;
+    using Gridsum.DataflowEx.Test.Demo;
 
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 

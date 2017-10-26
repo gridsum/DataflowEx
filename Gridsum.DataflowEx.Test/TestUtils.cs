@@ -6,9 +6,26 @@ using System.Threading.Tasks;
 
 namespace Gridsum.DataflowEx.Test
 {
+    using DatabaseTests;
     using System.Data.SqlClient;
     using System.Diagnostics;
     using System.Reflection;
+    using Microsoft.EntityFrameworkCore;
+
+    public class DbContextBase<T> : DbContext where T : DbContext
+    {
+        public DbContextBase(string connectString)
+            : base(new DbContextOptionsBuilder<T>().UseSqlServer(connectString).Options)
+        {
+            this.ConnectionString = connectString;
+            this.Database.EnsureDeleted();
+            this.Database.EnsureCreated();
+        }
+
+        public string ConnectionString { get; private set; }
+
+        
+    }
 
     public static class TestUtils
     {
@@ -44,7 +61,7 @@ namespace Gridsum.DataflowEx.Test
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder();
             builder.DataSource = "localhost";   // update me
             builder.UserID = "sa";              // update me
-            builder.Password = "UpLow123-+";      // update me
+            builder.Password = TestBootstrapper.s_saPassword;
             builder.InitialCatalog = addPrefix ? $"DataflowEx-TestDB-{dbName}" : dbName;
             return builder.ConnectionString;
         }

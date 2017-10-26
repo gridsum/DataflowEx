@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 namespace Gridsum.DataflowEx.Test.ETL
 {
     using System.Data;
-    using System.Data.Entity;
     using System.Diagnostics;
     using System.Linq.Expressions;
     using System.Threading.Tasks.Dataflow;
@@ -15,7 +14,7 @@ namespace Gridsum.DataflowEx.Test.ETL
     using Gridsum.DataflowEx.Databases;
     using Gridsum.DataflowEx.ETL;
     using Gridsum.DataflowEx.Test.DatabaseTests;
-
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     [TestClass]
@@ -42,7 +41,6 @@ namespace Gridsum.DataflowEx.Test.ETL
         [TestMethod]
         public async Task TestDataJoinerJoining()
         {
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString("TestDataJoinerJoining");
             var context = new InsertContext(connectString);
 
@@ -55,7 +53,7 @@ namespace Gridsum.DataflowEx.Test.ETL
 
             var joiner = new JoinerWithAsserter(
                 t => t.Pointer,
-                new TargetTable(Leaf.DimLeaf, connectString, "Leaves"),
+                new TargetTable(Leaf.DimLeaf, connectString, "Leafs"),
                 2);
 
             joiner.DataflowOptions.MonitorInterval = TimeSpan.FromSeconds(3);
@@ -116,9 +114,9 @@ namespace Gridsum.DataflowEx.Test.ETL
         public int IntValue { get; set; }
     }
 
-    public class InsertContext : DbContext
+    public class InsertContext : DbContextBase<InsertContext>
     {
-        public InsertContext(string conn)
+        public InsertContext(string conn) 
             : base(conn)
         {
         }

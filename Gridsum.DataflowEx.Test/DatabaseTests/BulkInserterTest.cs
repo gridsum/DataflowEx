@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Linq;
 using System.Threading.Tasks.Dataflow;
 using Gridsum.DataflowEx.Databases;
@@ -9,6 +8,9 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
 {
     using System.Runtime.InteropServices;
     using System.Text;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Storage;
+    using System.Threading;
 
     [TestClass]
     public class BulkInserterTest
@@ -17,7 +19,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter()
         {
             //init db
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
@@ -56,7 +57,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestDbBulkInserter_NoNullCheck()
         {
             //init db
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString();
             var context = new InsertContext(connectString);
             context.Inits.Add(new Init2());
@@ -108,16 +108,16 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         [TestMethod]
         public void TestMultiDbBulkInserter()
         {
-            Database.SetInitializer(new DropCreateDatabaseAlways<InsertContext>());
             var connectString = TestUtils.GetLocalDBConnectionString("TestMultiDbBulkInserter_{0}");
             //init db
             int profileIdCount = 3;
+            InsertContext[] contexts = new InsertContext[profileIdCount + 1];
             for (int i = 1; i <= profileIdCount; ++i)
             {
                 var init = new Init2();
-                var context = new InsertContext(string.Format(connectString, i, i));
-                context.Inits.Add(init);
-                context.SaveChanges();
+                contexts[i] = new InsertContext(string.Format(connectString, i, i));
+                contexts[i].Inits.Add(init);
+                contexts[i].SaveChanges();
             }
 
             var profileDispatch = new Func<Entity2, int>(e => e.ProfileId);
@@ -141,12 +141,10 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             //assert result
             for (int i = 1; i <= profileIdCount; ++i)
             {
-                var connString = connectionGetter(i);
-                var curContext = new InsertContext(connString);
-                Assert.AreEqual(i, curContext.Seods.Count());
-                Assert.AreEqual(i, curContext.Seods.FirstOrDefault().Price);
-                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name.Length == 1);
-                Assert.IsTrue(curContext.Seods.FirstOrDefault().Name2.Length == 1);
+                Assert.AreEqual(i,  contexts[i].Seods.Count());
+                Assert.AreEqual(i,  contexts[i].Seods.FirstOrDefault().Price);
+                Assert.IsTrue(      contexts[i].Seods.FirstOrDefault().Name.Length == 1);
+                Assert.IsTrue(      contexts[i].Seods.FirstOrDefault().Name2.Length == 1);
             }
         }
     }
@@ -260,7 +258,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public byte[] RawData { get; set; }
     }
 
-    public class InsertContext : DbContext
+    public class InsertContext : DbContextBase<InsertContext>
     {
         public InsertContext(string conn)
             : base(conn)

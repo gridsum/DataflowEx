@@ -7,7 +7,7 @@
     using System.Threading;
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
-    using System.Xml.Serialization.Advanced;
+    using System.Xml.Serialization;
 
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 

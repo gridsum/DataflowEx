@@ -1,142 +1,55 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A4FD6288-AE2E-4C28-B7D4-D317D1601E86}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Gridsum.DataflowEx</RootNamespace>
-    <AssemblyName>Gridsum.DataflowEx</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
+    <Version>2.0.0</Version>
+    <Description>Gridsum.DataflowEx is a dataflow and etl framework redesigned on top of Microsoft TPL Dataflow library with Object-Oriented Programming in mind. 
+
+DataflowEx enables you to write reusable components and easily link them together as a high-level dataflow graph while still having the power of low-level blocks from TPL Dataflow. Other cool features include: Dataflow lifecycle management, built-in dataflow health monitor, cyclic graph auto completion support, sql bulk insertion support, etc. 
+
+More information is available at: https://github.com/gridsum/dataflowex </Description>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageReleaseNotes>* 2.0.0   - First formal V2 release that targets .Net Standard 2.0
+* 2.0.0-beta   - Upgrade to .Net Core 2 RTM dependencies
+* 2.0.0-alpha2 - Update pacakge metadata and dependent libraries
+* 2.0.0-alpha  - Migrate to .Net Standard 2.0
+* 1.1.3   - Optimize some logging and exception handling.
+* 1.1.2   - DbBulkInserter now uses a single transaction to ensure full rollback on error.
+* 1.1.1   - Fix potential race condition for RegisterChild() and RegisterDependency().
+* 1.1.0   - Tutorial and documentation added. Also supports manual db column mapping registration.
+* 1.0.9.* - Built-in flows now respect given DataflowOptions wherever applicable.
+* 1.0.9   - Allows optional db column mapping.
+* 1.0.8   - Add DbDataJoiner to help lookup and populate a dimension table. Also comes with a new ring completion mechanism.
+* 1.0.7   - A better DataBrancher that supports multiple outputs. Add varbinary support for bulk insertion.
+* 1.0.6   - Optimize property accessor in bulk inserter. Add NoNullCheck attribute.
+* 1.0.5   - Add LogReader abstraction. Add basic circular dependency detection logic.
+* 1.0.4   - Add LinkLeftToError(). Enhance StatisticsRecorder indexer. Fix DataflowEvent ToString().
+* 1.0.3   - RegisterChild() becomes public and defensive.
+* 1.0.2   - Add Dataflow.RegisterPostDataflowTask and Dataflow.RegisterCancellationTokenSource. StatisticsRecorder now supports event aggregation.
+* 1.0.1   - More extensible DbBulkInserter/MultiDbBulkInserter and exact matching for multi-match.
+* 1.0.0   - First release after 9 beta versions.</PackageReleaseNotes>
+    <PackageTags>dataflow etl dataflowex block gridsum bulk insert</PackageTags>
+    <Copyright>Copyright 2017, Gridsum</Copyright>
+    <Company>Gridsum</Company>
+    <Authors>karldodd</Authors>
+    <PackageIconUrl>http://www.gridsum.com/templets/gs/images/slogo.png</PackageIconUrl>
+    <PackageProjectUrl>https://github.com/gridsum/DataflowEx</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/gridsum/DataflowEx</RepositoryUrl>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\Gridsum.DataflowEx.XML</DocumentationFile>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Gridsum.DataflowEx.xml</DocumentationFile>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\Gridsum.DataflowEx.XML</DocumentationFile>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DocumentationFile>bin\Release\netstandard2.0\Gridsum.DataflowEx.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="C5">
-      <HintPath>..\packages\C5.2.3.0.1\lib\net40\C5.dll</HintPath>
-    </Reference>
-    <Reference Include="Common.Logging">
-      <HintPath>..\packages\Common.Logging.2.2.0\lib\net40\Common.Logging.dll</HintPath>
-    </Reference>
-    <Reference Include="Common.Logging.Core">
-      <HintPath>..\packages\Common.Logging.Core.2.2.0\lib\net40\Common.Logging.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Collections.Immutable, Version=1.0.34.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Bcl.Immutable.1.0.34\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Core" />
-    <Reference Include="System.IO" />
-    <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.23.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.23\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="C5" Version="2.5.3" />
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.8.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.4.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.4.0" />
+    <PackageReference Include="Common.Logging.Core" Version="3.4.1" />
+    <PackageReference Include="Common.Logging" Version="3.4.1" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="AutoCompletion\AutoCompleteWrapper.cs" />
-    <Compile Include="AutoCompletion\ControlItem.cs" />
-    <Compile Include="AutoCompletion\ControlType.cs" />
-    <Compile Include="AutoCompletion\HeartbeatNode.cs" />
-    <Compile Include="AutoCompletion\IRingNode.cs" />
-    <Compile Include="AutoCompletion\ITracableItem.cs" />
-    <Compile Include="AutoCompletion\RingMonitor.cs" />
-    <Compile Include="AutoCompletion\TracableItemBase.cs" />
-    <Compile Include="Blocks\TransformAndLinkPropagator.cs" />
-    <Compile Include="Databases\DbBulkInserterBase.cs" />
-    <Compile Include="Databases\DBColumnPath.cs" />
-    <Compile Include="Databases\EagerDbBulkInserter.cs" />
-    <Compile Include="Databases\PostBulkInsertDelegate.cs" />
-    <Compile Include="Databases\TargetTable.cs" />
-    <Compile Include="ETL\ByteArrayEqualityComparer.cs" />
-    <Compile Include="ETL\DbDataJoiner.cs" />
-    <Compile Include="Databases\InvalidDBColumnMappingException.cs" />
-    <Compile Include="Databases\NoNullCheckAttribute.cs" />
-    <Compile Include="DataDispatcher.cs" />
-    <Compile Include="Dataflow.cs" />
-    <Compile Include="DataflowMerger.cs" />
-    <Compile Include="DataflowOptions.cs" />
-    <Compile Include="DataflowUtils.cs" />
-    <Compile Include="Databases\BulkDataReader.cs" />
-    <Compile Include="Databases\DBColumnMapping.cs" />
-    <Compile Include="DataBroadcaster.cs" />
-    <Compile Include="DataflowBlockExtensions.cs" />
-    <Compile Include="ETL\PartialDimRow.cs" />
-    <Compile Include="ETL\IDimRow.cs" />
-    <Compile Include="ETL\RowCache.cs" />
-    <Compile Include="Exceptions\NoChildRegisteredException.cs" />
-    <Compile Include="Exceptions\TaskEx.cs" />
-    <Compile Include="ImmutableUtils.cs" />
-    <Compile Include="IntHolder.cs" />
-    <Compile Include="IDataflowDependency.cs" />
-    <Compile Include="LogHelper.cs" />
-    <Compile Include="Databases\DbBulkInserter.cs" />
-    <Compile Include="IDataflow.cs" />
-    <Compile Include="Databases\MultiDbBulkInserter.cs" />
-    <Compile Include="Exceptions\PropagatedException.cs" />
-    <Compile Include="LogReader.cs" />
-    <Compile Include="PatternMatch\MatchConditionBase.cs" />
-    <Compile Include="PatternMatch\IMatchable.cs" />
-    <Compile Include="PatternMatch\IMatchCondition.cs" />
-    <Compile Include="PatternMatch\MatchNoneCondition.cs" />
-    <Compile Include="PatternMatch\MatchType.cs" />
-    <Compile Include="PatternMatch\MultiMatcher.cs" />
-    <Compile Include="PatternMatch\StringMatchCondition.cs" />
-    <Compile Include="PatternMatch\UrlStringMatchCondition.cs" />
-    <Compile Include="Exceptions\PostToBlockFailedException.cs" />
-    <Compile Include="PropagatorDataflow.cs" />
-    <Compile Include="TargetDataflow.cs" />
-    <Compile Include="Utils.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Databases\TypeAccessor.cs" />
-    <Compile Include="StatisticsRecorder.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Gridsum.DataflowEx.nuspec" />
-    <None Include="packages.config">
-      <SubType>Designer</SubType>
-    </None>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
-  </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

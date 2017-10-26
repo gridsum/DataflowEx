@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
 using Gridsum.DataflowEx.Databases;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gridsum.DataflowEx.Test.DatabaseTests
@@ -38,7 +38,6 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         public void TestNestClass()
         {
             var connectString = TestUtils.GetLocalDBConnectionString();
-            Database.SetInitializer(new DropCreateDatabaseAlways<NestContext>());
             var context = new NestContext(connectString);
             context.NestInits.Add(new NestInit());
             context.SaveChanges();
@@ -51,7 +50,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
             using (var connection = new SqlConnection(connectString))
             {
                 connection.Open();
-                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorForTable(new TargetTable("NestClassTest", connectString, "dbo.AEFs"));
+                var aTypeAccessor = TypeAccessorManager<ABulk>.GetAccessorForTable(new TargetTable("NestClassTest", connectString, "dbo.AAs"));
                 var aReader = new BulkDataReader<ABulk>(aTypeAccessor, new[] { a1, a2, a3, a4 });
                 using (var aCopy = new SqlBulkCopy(connection))
                 {
@@ -59,7 +58,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
                     {
                         aCopy.ColumnMappings.Add(map);
                     }
-                    aCopy.DestinationTableName = "dbo.AEFs";
+                    aCopy.DestinationTableName = "dbo.AAs";
                     aCopy.WriteToServer(aReader);
                 }
             }
@@ -72,7 +71,7 @@ namespace Gridsum.DataflowEx.Test.DatabaseTests
         }
     }
 
-    public class NestContext : DbContext
+    public class NestContext : DbContextBase<NestContext>
     {
         public NestContext(string config)
             : base(config)
