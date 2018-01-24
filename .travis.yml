@@ -1,0 +1,14 @@
+language: csharp
+
+mono: none
+dotnet: 2.0.0
+
+services:
+ - docker
+
+install:
+ - dotnet restore
+
+script:
+ - dotnet build
+ - dotnet test Gridsum.DataflowEx.Test
