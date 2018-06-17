@@ -323,9 +323,9 @@ namespace Gridsum.DataflowEx
                             IDataflowDependency c = child;
                             Tuple<int, int> bufferStatus = c.BufferStatus;
                             
-                            if (child.Completion.IsCompleted && verboseMode)
+                            if (c.Completion.IsCompleted && verboseMode)
                             {
-                                LogHelper.PerfMon.DebugFormat("{0} is completed");
+                                LogHelper.PerfMon.DebugFormat("{0} is completed", c.DisplayName);
                             }
                             else if (bufferStatus.Total() != 0 || verboseMode)
                             {
