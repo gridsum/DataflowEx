@@ -1,0 +1,18 @@
+language: csharp
+
+mono: none
+dotnet: 2.0.0
+
+env:
+ - CONFIGURATION=Release
+
+services:
+ - docker
+
+install:
+ - dotnet restore
+
+script:
+ - dotnet build -c $CONFIGURATION
+ - dotnet test -c $CONFIGURATION Gridsum.DataflowEx.Test
+ - dotnet pack -c $CONFIGURATION Gridsum.DataflowEx
