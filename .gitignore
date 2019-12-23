@@ -177,3 +177,4 @@ UpgradeLog*.htm
 FakesAssemblies/
 /.vs/Gridsum.DataflowEx/v15/sqlite3/storage.ide
 .vs/config/applicationhost.config
+/.vs
